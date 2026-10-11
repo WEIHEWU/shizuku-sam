@@ -106,12 +106,14 @@ class MaxHzAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val foregroundPackage = event?.packageName?.toString()?.takeIf { it.isNotBlank() } ?: return
 
-        // 1. 无线调试自动配对嗅探 (统一整合为 Shizuku 核心无障碍)
-        if (foregroundPackage.contains("settings", ignoreCase = true) ||
-            foregroundPackage.contains("developer", ignoreCase = true) ||
-            foregroundPackage.contains("security", ignoreCase = true) ||
-            foregroundPackage.contains("systemui", ignoreCase = true)) {
-            AdbPairingDetector.onAccessibilityEvent(event, this)
+        // 1. 无线调试自动配对嗅探 (仅当用户在 Shizuku 内显式发起配对请求时运行，绝不抢占其他 App 的配对弹窗)
+        if (AdbPairingDetector.isPending()) {
+            if (foregroundPackage.contains("settings", ignoreCase = true) ||
+                foregroundPackage.contains("developer", ignoreCase = true) ||
+                foregroundPackage.contains("security", ignoreCase = true) ||
+                foregroundPackage.contains("systemui", ignoreCase = true)) {
+                AdbPairingDetector.onAccessibilityEvent(event, this)
+            }
         }
 
         // 1.1 开发者选项「更多设置」/ 应用兼容性策略 自动直达滑动

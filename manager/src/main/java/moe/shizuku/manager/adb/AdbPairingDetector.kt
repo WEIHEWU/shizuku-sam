@@ -26,7 +26,11 @@ object AdbPairingDetector {
 
     private const val TAG = "AdbPairingDetector"
     private const val AUTO_PAIRING_TIMEOUT_MS = 60_000L
+    private const val SESSION_WINDOW_MS = 120_000L
     private const val MAX_DEPTH = 20
+
+    @Volatile
+    private var requestedAtElapsed = 0L
 
     @Volatile
     private var pairingPort: Int? = null
@@ -47,7 +51,48 @@ object AdbPairingDetector {
     private val passwordRegex = Regex("""\b\d{6}\b""")
     private val fiveDigitRegex = Regex("""\b\d{5}\b""")
 
+    /**
+     * 仅当用户在 Shizuku 内显式点击「免输入自动配对助手」或「配对」入口时激活一次配对会话。
+     * 防止已配对或给其他 App 配对时无障碍后台误拦截系统配对码弹窗。
+     */
+    fun request() {
+        resetCandidates()
+        requestedAtElapsed = android.os.SystemClock.elapsedRealtime()
+        Log.i(TAG, "Auto-pairing session explicitly requested by user")
+    }
+
+    fun cancel() {
+        requestedAtElapsed = 0L
+        resetCandidates()
+    }
+
+    fun cancelIfReturnedToApp() {
+        val reqAt = requestedAtElapsed
+        if (reqAt > 0L && android.os.SystemClock.elapsedRealtime() - reqAt > 1_500L && !isPairingInProgress) {
+            Log.i(TAG, "User returned to Shizuku without pairing; disarming auto-pairing session")
+            cancel()
+        }
+    }
+
+    fun isPending(): Boolean {
+        val reqAt = requestedAtElapsed
+        if (reqAt <= 0L) return false
+        if (rikka.shizuku.Shizuku.pingBinder()) {
+            cancel()
+            return false
+        }
+        if (android.os.SystemClock.elapsedRealtime() - reqAt > SESSION_WINDOW_MS) {
+            cancel()
+            return false
+        }
+        return true
+    }
+
     fun reset() {
+        cancel()
+    }
+
+    private fun resetCandidates() {
         pairingPort = null
         pairingPassword = null
         candidateWindowId = -1
@@ -56,6 +101,7 @@ object AdbPairingDetector {
     }
 
     fun onAccessibilityEvent(event: AccessibilityEvent?, service: AccessibilityService) {
+        if (!isPending()) return
         if (event == null || isPairingInProgress) return
         if (pairingPort != null && pairingPassword != null) return
 
@@ -144,6 +190,9 @@ object AdbPairingDetector {
             withContext(Dispatchers.Main) {
                 if (success) {
                     Log.i(TAG, "Auto-pairing succeeded!")
+                    // 立即结束单次配对会话并停止通知栏配对搜索，防止后续用户给其他 App 配对时再次拦截
+                    cancel()
+                    runCatching { service.startService(AdbPairingService.stopIntent(service)) }
                     ShizukuSettings.setLastPort(port)
                     Toast.makeText(service, service.getString(R.string.pairing_code_auto_success), Toast.LENGTH_LONG).show()
 
@@ -156,7 +205,6 @@ object AdbPairingDetector {
                         putExtra("EXTRA_AUTO_START_AFTER_PAIRING", true)
                     }
                     service.startActivity(intent)
-                    reset()
                 } else {
                     Log.w(TAG, "Auto-pairing handshake failed, resetting candidates to retry on next frame")
                     pairingPort = null

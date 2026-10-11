@@ -76,6 +76,7 @@ class AdbPairDialogFragment : DialogFragment() {
 
         binding.btnAutoPairingHelper.setOnClickListener {
             dialog.dismiss()
+            moe.shizuku.manager.adb.AdbPairingDetector.request()
             if (AdbPairingAccessibilityService.isEnabled(context)) {
                 val intent = Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).apply {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
@@ -85,6 +86,7 @@ class AdbPairDialogFragment : DialogFragment() {
                     context.startActivity(intent)
                     Toast.makeText(context, "配对助手已就绪！点击「使用配对码配对设备」即可自动秒配对", Toast.LENGTH_LONG).show()
                 } catch (_: ActivityNotFoundException) {
+                    moe.shizuku.manager.adb.AdbPairingDetector.cancel()
                 }
             } else {
                 AccessibilityHelper.openPairingAssistantSettings(context)

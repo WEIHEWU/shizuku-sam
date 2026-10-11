@@ -26,6 +26,7 @@ class AdbPairingTutorialActivity : AppBarActivity() {
     private lateinit var binding: AdbPairingTutorialActivityBinding
 
     private var notificationEnabled: Boolean = false
+    private var launchedDeveloperOptions: Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -57,12 +58,16 @@ class AdbPairingTutorialActivity : AppBarActivity() {
 
 
             developerOptions.setOnClickListener {
+                launchedDeveloperOptions = true
+                AdbPairingDetector.request()
                 val intent = Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)
                 intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                 intent.putExtra(":settings:fragment_args_key", "toggle_adb_wireless")
                 try {
                     context.startActivity(intent)
                 } catch (e: ActivityNotFoundException) {
+                    launchedDeveloperOptions = false
+                    AdbPairingDetector.cancel()
                 }
             }
 
@@ -103,6 +108,10 @@ class AdbPairingTutorialActivity : AppBarActivity() {
 
     override fun onResume() {
         super.onResume()
+        if (launchedDeveloperOptions) {
+            launchedDeveloperOptions = false
+            AdbPairingDetector.cancelIfReturnedToApp()
+        }
 
         val newNotificationEnabled = isNotificationEnabled()
         if (newNotificationEnabled != notificationEnabled) {
@@ -117,6 +126,9 @@ class AdbPairingTutorialActivity : AppBarActivity() {
 
     override fun onDestroy() {
         if (isFinishing) {
+            if (!launchedDeveloperOptions) {
+                AdbPairingDetector.cancel()
+            }
             // 用户主动退出配对教程：立即停止配对搜索服务，
             // 避免 shortService 前台服务超时导致整个应用被系统 ANR
             runCatching { startService(AdbPairingService.stopIntent(this)) }

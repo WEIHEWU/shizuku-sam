@@ -50,6 +50,7 @@ import moe.shizuku.manager.Helps
 import moe.shizuku.manager.R
 import moe.shizuku.manager.ShizukuSettings
 import moe.shizuku.manager.adb.AdbPairingAccessibilityService
+import moe.shizuku.manager.adb.AdbPairingDetector
 import moe.shizuku.manager.adb.AdbPairingTutorialActivity
 import moe.shizuku.manager.adb.AdbPortProber
 import moe.shizuku.manager.utils.DhizukuHelper
@@ -1516,6 +1517,7 @@ abstract class HomeActivity : MaxHzActivity() {
             Toast.makeText(this, R.string.toast_wireless_pairing_requires_android_11, Toast.LENGTH_SHORT).show()
             return
         }
+        AdbPairingDetector.request()
         if (AdbPairingAccessibilityService.isEnabled(this)) {
             val intent = Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
@@ -1525,6 +1527,7 @@ abstract class HomeActivity : MaxHzActivity() {
                 startActivity(intent)
                 Toast.makeText(this, R.string.toast_auto_pairing_ready, Toast.LENGTH_LONG).show()
             } catch (e: ActivityNotFoundException) {
+                AdbPairingDetector.cancel()
                 Toast.makeText(this, R.string.toast_dev_settings_failed, Toast.LENGTH_SHORT).show()
             }
         } else {
@@ -1637,6 +1640,7 @@ abstract class HomeActivity : MaxHzActivity() {
 
     override fun onResume() {
         super.onResume()
+        AdbPairingDetector.cancelIfReturnedToApp()
         val currentThemeKey = computeUserThemeKey()
         if (lastRecordedThemeKey != null && lastRecordedThemeKey != currentThemeKey) {
             lastRecordedThemeKey = currentThemeKey
