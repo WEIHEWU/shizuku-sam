@@ -1,0 +1,450 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="permission_label">使用 Shizuku</string>
+    <string name="permission_description">允许应用使用 Shizuku。</string>
+    <string name="accessibility_service_label">Shizuku</string>
+    <string name="accessibility_service_unified_label">Shizuku</string>
+    <string name="accessibility_service_unified_description">Shizuku 核心辅助服务：提供无线调试免输入自动配对与屏幕刷新率即时动态调度。</string>
+    <string name="accessibility_service_pairing_label">Shizuku</string>
+    <string name="accessibility_service_pairing_description">用于自动识别系统无线调试配对码与端口，完成一键全自动免输配对。</string>
+    <string name="maxhz_accessibility_service_label">Shizuku</string>
+    <string name="accessibility_service_description">Shizuku 核心辅助服务：提供无线调试免输入自动配对与屏幕刷新率即时动态调度。</string>
+    <string name="pairing_code_auto_success">无线调试已全自动配对成功！</string>
+    <string name="home_status_service_is_running">%1$s 正在运行</string>
+    <string name="home_status_service_version">版本 %2$s，%1$s</string>
+    <string name="home_status_service_version_update"><![CDATA[版本 %2$s，%1$s<br>再次启动来升级到版本 %3$s]]></string>
+    <string name="home_status_service_not_running">%1$s未运行</string>
+    <string name="home_root_button_start">启动</string>
+    <string name="home_root_button_restart">重新启动</string>
+    <string name="home_root_title"><![CDATA[启动（针对已 root 设备）]]></string>
+    <string name="home_adb_title"><![CDATA[通过连接电脑启动（使用 adb）]]></string>
+    <string name="home_adb_description"><![CDATA[对于没有 root 的设备需要借助 adb 来启动 Shizuku（需要连接电脑）。这个过程每次设备重新启动后需要重新进行。请<b><a href=\"%1$s\">阅读帮助</a></b>。]]></string>
+    <string name="home_root_description"><![CDATA[另外，Shizuku 可以在开机时自动启动。如果没有，请检查您的系统或是第三方工具是否限制了 Shizuku。<br>你可以参考 %s。]]></string>
+    <string name="home_adb_dialog_view_command_copy_button">复制</string>
+    <string name="home_adb_dialog_view_command_button_send">发送</string>
+    <string name="home_adb_button_view_command">查看指令</string>
+    <string name="home_adb_dialog_view_command_message"><![CDATA[<font face="monospace">%1$s</font><br><br>* 还有一些其他注意事项，请确认你已阅读帮助。]]></string>
+    <string name="dialog_legacy_not_support_title">%1$s 不支持现代 Shizuku</string>
+    <string name="dialog_legacy_not_support_message"><![CDATA[旧式 Shizuku 已于 2019 年 3 月被弃用。此外，旧式 Shizuku 无法在较新版本的 Android 系统上工作。<p>请要求 <b>%1$s</b> 的开发者进行更新。]]></string>
+    <string name="dialog_requesting_legacy_title">%1$s 正在请求旧式 Shizuku</string>
+    <string name="dialog_requesting_legacy_message"><![CDATA[<b>%1$s</b> 支持现代 Shizuku，但它正在请求旧式 Shizuku。这可能是因为 Shizuku 没有运行，请在 Shizuku 应用内检查。<p>旧式 Shizuku 已于 2019 年 3 月被弃用。]]></string>
+    <string name="home_app_management_title">应用管理</string>
+    <plurals name="home_app_management_authorized_apps_count">
+        <item quantity="other"><![CDATA[已授权 %d 个应用]]></item>
+    </plurals>
+    <string name="home_app_management_view_authorized_apps">点按以管理授权的应用</string>
+    <string name="maxhz_title">Max 功能</string>
+    <string name="maxhz_home_summary">自适应高刷、省电优化、性能释放与应用设置</string>
+    <string name="maxhz_service_switch">后台自动规则（待机/电量/每App）</string>
+    <string name="maxhz_action_status">读取当前状态</string>
+    <string name="maxhz_action_compatible_saver">省电模式自适应高刷</string>
+    <string name="maxhz_action_quick_doze">熄屏深度休眠</string>
+    <string name="maxhz_action_disable_sync">限制后台扫描与同步</string>
+    <string name="maxhz_action_force_resizable">强制所有应用分屏/小窗</string>
+    <string name="maxhz_action_battery_protection">充电上限保护</string>
+    <string name="maxhz_action_restore">恢复系统默认</string>
+    <string name="maxhz_status_hint">使用 MaxHz 前，请先确保 Shizuku 正在运行并已授权。</string>
+    <string name="home_entry_shizuku">Shizuku</string>
+    <string name="home_entry_maxhz">Max 功能</string>
+    <string name="toast_copied_to_clipboard">%s\n已被复制到剪贴板。</string>
+    <string name="dialog_requesting_legacy_button_open_shizuku">打开 Shizuku</string>
+    <string name="action_about">关于</string>
+    <string name="about_view_source_code"><![CDATA[在 %s 查看源码]]></string>
+    <string name="settings_title">设置</string>
+    <string name="start_with_root_failed">未授予 root 权限或是该设备没有 root，因此无法启动服务。</string>
+    <string name="notification_channel_service_status">服务启动状态</string>
+    <string name="notification_service_starting">Shizuku 服务正在启动…</string>
+    <string name="notification_service_start_failed">启动 Shizuku 服务失败。</string>
+    <string name="notification_service_start_no_root">请求 root 权限失败。</string>
+    <string name="notification_working">工作中…</string>
+    <string name="settings_language">语言</string>
+    <string name="settings_user_interface">界面外观</string>
+    <string name="settings_black_night_theme">黑色夜间主题</string>
+    <string name="settings_black_night_theme_summary">当夜间模式启用时使用纯黑色主题</string>
+    <string name="settings_startup">启动</string>
+    <string name="app_management_dialog_adb_is_limited_title">adb 权限受限</string>
+    <string name="app_management_dialog_adb_is_limited_message">这极有可能是你的设备制造商限制了 adb 的权限。&lt;p&gt;&lt;b&gt;&lt;a href=\"%1$s\"&gt;此文档&lt;/a&gt;&lt;/b&gt;中可能有针对你的系统的解决方案。</string>
+    <string name="home_adb_button_view_help">阅读帮助</string>
+    <string name="dialog_cannot_open_browser_title">无法启动浏览器</string>
+    <string name="toast_copied_to_clipboard_with_text"><![CDATA[<b>%s</b> 已被复制到剪贴板。]]></string>
+    <string name="home_learn_more_title">了解 Shizuku</string>
+    <string name="home_learn_more_description">了解如何使用 Shizuku 开发</string>
+    <string name="app_management_item_summary_requires_root">* 需要以 root 执行的 Shizuku</string>
+    <string name="settings_translation_contributors">翻译贡献者</string>
+    <string name="translation_contributors"/>
+    <string name="settings_translation">参与翻译</string>
+    <string name="settings_translation_summary">帮助我们将 %s 翻译至您的语言</string>
+    <string name="dialog_adb_port">端口号</string>
+    <string name="adb_pairing">配对</string>
+    <string name="dialog_adb_pairing_title">与设备配对</string>
+    <string name="dialog_adb_pairing_paring_code">配对码</string>
+    <string name="starter">启动程序</string>
+    <string name="dialog_adb_invalid_port">端口号是一个 1 至 65535 的整数。</string>
+    <string name="home_wireless_adb_title"><![CDATA[通过无线调试启动]]></string>
+    <string name="home_wireless_adb_description"><![CDATA[在 Android 11 或更高版本上，您可以直接从您的设备启用无线调试并启动 Shizuku，无需连接到计算机。<p>请先查看分步骤指南。]]></string>
+    <string name="action_stop">停止 Shizuku</string>
+    <string name="dialog_stop_message">Shizuku 服务将被停止。</string>
+    <string name="paring_code_is_wrong">配对码错误。</string>
+    <string name="cannot_connect_port">无法连接至无线调试服务。</string>
+    <string name="adb_pairing_requires_multi_window">请先进入分屏（多窗口）模式。</string>
+    <string name="adb_error_key_store">无法为无线调试生成密钥。\n这可能是因为此设备上的 KeyStore 机制已损坏。</string>
+    <string name="adb_error_stop_tcp">无法停止 ADB TCP 模式</string>
+    <string name="adb_pair_required">请先进行配对步骤。</string>
+    <string name="adb_pairing_requires_multi_window_reason">系统要求配对对话框始终可见，使用分屏模式是使此应用和系统对话框同时可见的唯一方法。</string>
+    <string name="dialog_adb_discovery">正在搜索无线调试服务</string>
+    <string name="dialog_adb_discovery_message">请在“开发者选项”中启用“无线调试”功能。当网络变化时“无线调试”会被自动禁用。
+\n
+\n注意：请不要禁用“开发者选项”或“USB 调试”，否则 Shizuku 会被停止。</string>
+    <string name="dialog_adb_discovery_message_toggle_wireless_debugging">如果一直搜索，请尝试禁用并启用“无线调试”。</string>
+    <string name="dialog_adb_pairing_discovery">正在搜索配对服务</string>
+    <string name="dialog_wireless_adb_not_enabled">无线调试未启用。
+\n请注意，在 Android 11 之前，要启用无线调试必须连接电脑。</string>
+    <string name="dialog_usb_debugging_not_enabled">USB调试未启用。\n请在“开发者选项”中启用它。</string>
+    <string name="adb_dialog_popup_settings">弹窗设置</string>
+    <string name="dialog_adb_pairing_message">请跟随下面的步骤开始配对：“开发者选项” - “无线调试” - “使用配对码配对设备”。
+\n
+\n配对过程开始后，您将能够输入配对码。</string>
+    <string name="development_settings">开发者选项</string>
+    <string name="home_root_description_sui"><![CDATA[如果您正在使用 Magisk，可以尝试 %1$s。对于 root 用户，它将最终取代 Shizuku。注意，已有的应用需要一点点修改来使用 %2$s。]]></string>
+    <string name="settings_start_on_boot_summary">对于已 root 设备，Shizuku 可以开机启动</string>
+    <string name="settings_start_on_boot">开机启动（root）</string>
+    <string name="settings_watchdog">Watchdog 守护服务</string>
+    <string name="settings_watchdog_summary">Shizuku 异常停止时尝试自动重启。默认关闭，避免不必要的前台服务常驻。</string>
+    <string name="settings_tcp_mode">无线启动后保留 ADB TCP 模式</string>
+    <string name="settings_tcp_mode_summary">无线调试启动成功后切换到固定 TCP 端口，之后重启 Shizuku 不再依赖会变化的无线调试端口。</string>
+    <string name="settings_tcp_port">ADB TCP 端口</string>
+    <string name="permission_warning_template"><![CDATA[要允许<b>%1$s</b>%2$s吗？]]></string>
+    <string name="grant_dialog_button_allow_always">始终允许</string>
+    <string name="grant_dialog_button_deny">拒绝</string>
+    <string name="home_terminal_title">在终端应用中使用 Shizuku</string>
+    <string name="home_terminal_description">在您喜欢的终端应用中通过 Shizuku 运行命令</string>
+    <string name="terminal_tutorial_1">首先，将文件导出到任何您想要的位置。您将找到两个文件，%1$s 和 %2$s。</string>
+    <string name="terminal_tutorial_1_description">若选择的文件夹中已有同名文件，它们会被删除。\n\n导出功能使用 SAF（Storage Access Framework）。有报告称 MIUI 破坏了 SAF 的功能，如果您使用 MIUI，您可能需要从 Shizuku 的 apk 中提取文件，或是从 GitHub 下载文件。</string>
+    <string name="terminal_export_files">导出文件</string>
+    <string name="terminal_tutorial_2">然后，使用任意文本编辑器打开并编辑 %1$s。</string>
+    <string name="terminal_tutorial_2_description">例如，如果要在 %1$s 中使用 Shizuku，则应将 %2$s 替换为 %3$s（%4$s 是 %1$s 的软件包名称）。</string>
+    <string name="terminal_tutorial_3">最后，将文件移动到终端应用可以访问的位置，您便可使用 %1$s 来通过 Shizuku 运行命令。</string>
+    <string name="terminal_tutorial_3_description">一些技巧：将执行权限授予 %1$s 并将其添加到 %2$s，您将可以直接使用 %1$s。</string>
+    <string name="rish_description"><![CDATA[
+通过 %1$s，您可以在任何终端应用中连接到由 Shizuku 运行的 shell 并与之交互。
+<p>有关 %1$s 的具体使用方式，点按以阅读文档。
+]]></string>
+    <string name="adb_pairing_tutorial_title">将 Shizuku 与您的设备配对</string>
+    <string name="adb_pairing_tutorial_content_steps">进入“开发者选项”-“无线调试”。点按“使用配对码配对设备”，您将看到一个六位数字代码。</string>
+    <string name="adb_pairing_tutorial_content_enter_pairing_code">在通知中输入代码来完成配对。</string>
+    <string name="adb_pairing_tutorial_manual_pairing">通知无效？在应用内配对</string>
+    <string name="adb_pairing_tutorial_content_finish">返回到 Shizuku 并启动 Shizuku。</string>
+    <string name="notification_channel_adb_pairing">无线调试配对</string>
+    <string name="notification_channel_watchdog">Shizuku 守护服务</string>
+    <string name="notification_channel_auth_errors">自动化认证</string>
+    <string name="watchdog_running">Shizuku 守护服务正在运行</string>
+    <string name="watchdog_running_text">如果 Shizuku 异常停止，会尝试重新启动。</string>
+    <string name="watchdog_shizuku_stopped_title">Shizuku 异常停止</string>
+    <string name="watchdog_shizuku_stopped_text">守护服务正在尝试重新启动 Shizuku。</string>
+    <string name="notification_auth_missing_title">自动化请求已拦截</string>
+    <string name="notification_auth_missing_message">请求没有携带认证令牌。</string>
+    <string name="notification_auth_invalid_title">自动化请求已拦截</string>
+    <string name="notification_auth_invalid_message">认证令牌无效。</string>
+    <string name="notification_adb_pairing_input_paring_code">输入配对码</string>
+    <string name="notification_adb_pairing_searching_for_service_title">正在搜索配对服务</string>
+    <string name="notification_adb_pairing_service_found_title">已找到配对服务</string>
+    <string name="notification_adb_pairing_stop_searching">停止搜索</string>
+    <string name="notification_adb_pairing_working_title">正在进行配对</string>
+    <string name="notification_adb_pairing_succeed_title">配对成功</string>
+    <string name="notification_adb_pairing_succeed_text">您现在可以启动 Shizuku 服务了。</string>
+    <string name="notification_adb_pairing_failed_title">配对失败</string>
+    <string name="notification_adb_pairing_retry">重试</string>
+    <string name="adb_pairing_tutorial_content_notification_blocked">配对过程需要您与 Shizuku 的通知交互。请允许 Shizuku 发布通知。</string>
+    <string name="notification_settings">通知设置</string>
+    <string name="adb_pairing_tutorial_content_miui">MIUI 用户可能需要在系统设置中从“通知管理”-“通知显示设置”将通知样式切换为“原生样式”。</string>
+    <string name="adb_pairing_tutorial_content_miui_2">否则，您可能会无法从通知输入配对码。</string>
+    <string name="adb_pairing_tutorial_content_oppo">OPPO/Realme/一加 (ColorOS) 用户：系统可能不支持通知栏内联输入配对码。请直接点击下方的“在应用内配对”对话框进行配对。</string>
+    <string name="adb_pairing_tutorial_content_oppo_2">提示：建议使用分屏或小窗保持“开发者选项”处于前台，避免系统配对码窗口自动关闭。</string>
+    <string name="adb_pairing_tutorial_content_notification">一条来自 Shizuku 的通知将帮助您完成配对。</string>
+    <string name="adb_pairing_tutorial_content_left_is_clickable">请注意，“无线调试”选项的左侧是可点击的，点按它将打开一个新的页面。仅打开右侧的开关是错误的。</string>
+    <string name="home_wireless_adb_description_pre_11"><![CDATA[在 Android 11 之前，需要连接到计算机才能启用无线调试。]]></string>
+    <string name="home_wireless_adb_view_guide_button">分步骤指南</string>
+    <string name="adb_pairing_tutorial_content_network">Shizuku 需要访问本地网络。它由网络权限控制。</string>
+    <string name="adb_pairing_tutorial_content_network_limation_not_foreground">某些系统（例如 MIUI）不允许应用在不可见时访问网络，即使应用已按标准使用前台服务。请在此类系统上为 Shizuku 禁用电池优化功能。</string>
+    <string name="settings_use_system_color">使用系统主题颜色</string>
+    <string name="background_style_wallpaper">自定义壁纸</string>
+    <string name="settings_background_wallpaper_summary">从相册选择一张图片作为页面背景</string>
+    <string name="settings_background_wallpaper_summary_set">壁纸已设置，点击更换</string>
+    <string name="settings_background_wallpaper_change">更换壁纸</string>
+    <string name="settings_background_wallpaper_remove">移除壁纸（恢复极光渐变）</string>
+    <string name="wallpaper_fit">壁纸填充方式</string>
+    <string name="wallpaper_fit_crop">裁剪填充（不变形）</string>
+    <string name="wallpaper_fit_fit">完整显示（不变形，可能留白）</string>
+    <string name="wallpaper_fit_stretch">拉伸填满（会变形）</string>
+    <string name="home_app_management_empty">已请求或声明 Shizuku 的应用程序将显示在此处。</string>
+    <string name="home_adb_is_limited_title">您需要进行额外的步骤</string>
+    <string name="home_adb_is_limited_description">您的设备制造商限制了 adb 的权限，使用 Shizuku 的应用无法正常工作。\n\n通常，在“开发者选项”中调整一些选项即可解除此限制。请阅读帮助来了解具体的操作方式。\n\n您可能需要重新启动 Shizuku 以使操作生效。</string>
+    <string name="dhizuku_device_owner_label">Shizuku (Dhizuku 模式)</string>
+    <string name="dhizuku_device_owner_desc">作为系统设备所有者 (Device Owner) 管理系统策略并提供 Shizuku 核心服务，终身抗重启免 Wi-Fi</string>
+    <string name="dhizuku_device_owner_enabled">Dhizuku (设备所有者) 模式已激活！</string>
+    <string name="dhizuku_device_owner_disabled">Dhizuku (设备所有者) 模式已停用</string>
+    <string name="dhizuku_setup_title">Dhizuku 模式 (设备所有者)</string>
+    <string name="dhizuku_manage_title">Dhizuku 模式管理</string>
+    <string name="dhizuku_setup_summary">Dhizuku 设备所有者特权是一次配置终身抗重启的特权模式。需连接电脑通过 ADB 命令授权一次，或在已 Root 设备上直接写入。</string>
+    <string name="dhizuku_active_desc">当前应用已拥有系统「设备所有者 (Device Owner)」特权。无需依赖 Wi-Fi 无线调试，终身抗重启，可在下方随时一键停用。</string>
+    <string name="dhizuku_setup_prerequisite_title">提示：</string>
+    <string name="dhizuku_setup_prerequisite_content">Android 系统出于安全保护，禁止在手机设置中直接开启设备所有者，必须通过电脑 ADB 授权一次。</string>
+    <string name="dhizuku_setup_cmd_label">电脑 ADB 激活命令：</string>
+    <string name="dhizuku_copy_command">复制激活命令</string>
+    <string name="dhizuku_remove_owner">停用设备所有者</string>
+    <string name="dhizuku_remove_confirm">确定要停用设备所有者权限吗？\n\n停用后将恢复为普通模式，手机所有系统设置保持原样。</string>
+    <string name="dhizuku_status_active">已激活 (系统设备所有者 · 抗重启)</string>
+    <string name="dhizuku_status_inactive">未激活 (需电脑 ADB 配置一次 · 抗重启)</string>
+    <string name="dhizuku_app_store_faq_title">⚠️ 为什么应用商店（Google Play / 小米商店等）会消失？</string>
+    <string name="dhizuku_app_store_faq_content">1. 激活前移除账户影响：Google Play 或品牌商店在无账户状态下，系统启动器桌面会自动隐藏其图标。\n2. 系统企业管控策略：小米 HyperOS、OPPO、vivo 等部分系统的企业安全机制在检测到设备所有者后，误认为进入了“企业管控模式”，自动隐藏或冻结了内置公开商店。\n\n如何恢复：\n• 方法 1（推荐）：前往【系统设置 -> 账户】重新登录你的账号（如 Google、小米、三星账号等），商店图标通常会自动恢复。\n• 方法 2：点击下方【一键恢复应用商店】按钮，Shizuku 将利用特权自动解冻并解除隐藏。\n• 方法 3：电脑端执行 adb shell pm enable &amp; unhide 指令。</string>
+    <string name="dhizuku_restore_stores_btn">✨ 一键恢复应用商店</string>
+    <string name="dhizuku_remove_owner_btn">🚫 停用 / 移除设备所有者</string>
+    <string name="dhizuku_remove_cmd_title">电脑 ADB 解除/停用命令：</string>
+    <string name="dhizuku_copy_remove_cmd">复制解除命令</string>
+    <string name="dhizuku_method_admin_title">⚠️ 仅开启了普通设备管理器 (非设备所有者)</string>
+    <string name="dhizuku_method_admin_desc">您在系统设置中开启的仅为「普通设备管理器」：Android 安全机制禁止其运行 Shell 命令与底层调优。如需特权，请通过电脑 ADB 激活设备所有者，或使用主页的「ADB 启动」/「Root 启动」。</string>
+    <string name="dhizuku_method_admin_btn">关闭普通设备管理器</string>
+    <string name="dhizuku_disable_admin_btn">🚫 停用 / 移除普通设备管理器</string>
+    <string name="dhizuku_admin_active_desc">检测到当前仅开启了普通设备管理器。受 Android 安全机制限制，普通设备管理器无法执行 Shell 命令与调优功能，需通过电脑 ADB 配置设备所有者，或使用主页的 ADB 启动 / Root 启动。</string>
+
+    <!-- Navigation Dock Tabs -->
+    <string name="dock_tab_shizuku">Shizuku</string>
+    <string name="dock_tab_hardware">性能硬件</string>
+    <string name="dock_tab_rules">应用规则</string>
+
+    <!-- Home Glass Screen: Headers &amp; Subtitles -->
+    <string name="home_header_shizuku_running_title">Shizuku</string>
+    <string name="home_header_shizuku_running_subtitle">特权服务通道与跨应用授权中枢</string>
+    <string name="home_header_shizuku_stopped_title">Shizuku</string>
+    <string name="home_header_shizuku_stopped_subtitle">无线配对启动与特权服务通道</string>
+    <string name="home_header_hardware_title">系统调度与硬件增强</string>
+    <string name="home_header_hardware_subtitle">三星专属性能调度、旁路供电直供电与高刷新率硬件调优</string>
+
+    <!-- Home Glass Screen: Hero Card Status &amp; Badges -->
+    <string name="home_status_root_running">ROOT 运行中</string>
+    <string name="home_status_adb_running">ADB 运行中</string>
+    <string name="home_status_not_running">未运行</string>
+    <string name="home_status_do_badge">免 Root</string>
+    <string name="home_status_activated_summary">已通过 %1$s 模式激活 · API v%2$d.%3$d%4$s</string>
+    <string name="home_status_suffix_do"> · 免 Root 永久抗重启</string>
+    <string name="home_status_hint_do_active">已激活免 Root 设备管理 · 终身抗重启免 Wi-Fi</string>
+    <string name="home_status_hint_port_found">检测到本地配对端口 :%1$d · 可直接启动</string>
+    <string name="home_status_hint_no_wifi">未连接 Wi-Fi · 请连接 Wi-Fi 开启「无线调试」，或连接电脑启动</string>
+    <string name="home_status_hint_ready">无线调试环境已就绪 · 点击上方按钮启动</string>
+
+    <!-- Home Glass Screen: Hero Tiles &amp; Buttons -->
+    <string name="home_tile_service_version">服务版本</string>
+    <string name="home_tile_execution_mode">运行模式</string>
+    <string name="home_tile_mode_root">ROOT 模式</string>
+    <string name="home_tile_mode_adb">ADB 模式</string>
+    <string name="home_tile_authorized_apps">已授权应用</string>
+    <string name="home_tile_apps_count_format">%1$d 个</string>
+    <string name="home_btn_manage_authorized_apps">管理已授权应用 (%1$d 个已授权)</string>
+    <string name="home_btn_terminal_rish">终端 (rish)</string>
+    <string name="home_btn_restart_service">重启服务</string>
+    <string name="home_btn_reconnect_debugging">重连调试</string>
+    <string name="home_btn_stop_service">停止服务</string>
+    <string name="home_btn_adb_start_quick_port">无线调试启动</string>
+    <string name="home_btn_adb_start_quick_direct">无线调试启动</string>
+    <string name="home_btn_adb_start">无线调试启动</string>
+    <string name="home_btn_root_start">Root 启动</string>
+    <string name="home_btn_dhizuku_start">Dhizuku 模式</string>
+    <string name="home_btn_no_root_start">免 Root</string>
+    <string name="dhizuku_device_owner_badge">设备所有者</string>
+    <string name="home_status_dhizuku_ready">Dhizuku (设备所有者) 已就绪</string>
+    <string name="home_status_dhizuku_ready_subtitle">已持有终身抗重启特权 · 系统策略与高刷已就绪，如需命令行可启动 Shell</string>
+    <string name="home_status_dhizuku_badge_ready">设备所有者 · 已就绪</string>
+
+    <!-- Home Glass Screen: ADB Pairing Hub Card -->
+    <string name="home_card_pairing_hub_title">无线调试配对</string>
+    <string name="home_action_auto_pairing_title">免输入自动配对</string>
+    <string name="home_action_auto_pairing_subtitle">开启无障碍服务，弹出配对码时自动输入完成配对</string>
+    <string name="home_badge_enabled">已开启</string>
+    <string name="home_badge_to_enable">去开启</string>
+    <string name="home_action_manual_pairing_title">无线调试配对向导</string>
+    <string name="home_action_manual_pairing_subtitle">查看配对步骤教程或手动输入 6 位配对码</string>
+    <string name="home_badge_pairing_wizard">配对向导</string>
+    <string name="home_action_open_dev_settings_title">开发者选项</string>
+    <string name="home_action_open_dev_settings_subtitle">直达系统设置，开启「无线调试」以启动服务</string>
+    <string name="home_badge_to_settings">前往设置</string>
+
+    <!-- Home Glass Screen: Startup Methods Card -->
+    <string name="home_card_launch_methods_title">更多启动方式</string>
+    <string name="home_action_root_start_title">通过 Root 启动</string>
+    <string name="home_action_root_start_subtitle">适用于已获取 Root 权限设备，免电脑免 Wi-Fi 一键直启</string>
+    <string name="home_action_pc_start_title">连接电脑启动</string>
+    <string name="home_action_pc_start_subtitle">手机通过 USB 连接电脑，在命令行运行脚本激活</string>
+    <string name="home_badge_view_command">查看命令</string>
+    <string name="home_action_dhizuku_start_title">Dhizuku 模式 (设备所有者)</string>
+    <string name="home_action_dhizuku_start_subtitle">配置企业最高管理特权，终身抗重启免 Wi-Fi</string>
+    <string name="home_action_dhizuku_title">Dhizuku 模式 (设备所有者)</string>
+    <string name="home_action_dhizuku_subtitle">配置企业最高管理特权，终身抗重启免 Wi-Fi</string>
+    <string name="home_action_dhizuku_active_subtitle">Dhizuku 设备所有者特权已生效 (抗重启 · 免 Wi-Fi)</string>
+    <string name="home_badge_activated">已激活</string>
+    <string name="home_badge_learn_and_setup">了解与配置</string>
+    <string name="home_badge_not_configured">未配置</string>
+
+    <!-- Home Glass Screen: Running Service Tools Card -->
+    <string name="home_card_running_tools_title">管理与备用通道</string>
+    <string name="home_action_root_restart_title">通过 Root 重新启动</string>
+    <string name="home_action_root_restart_subtitle">切换为 Root 权限模式运行服务</string>
+    <string name="home_action_pc_view_title">电脑端 ADB 启动命令</string>
+    <string name="home_action_pc_view_subtitle">在电脑终端直接运行 adb starter.sh 脚本激活</string>
+    <string name="home_action_dhizuku_running_subtitle">Dhizuku 设备所有者特权已生效 (抗重启 · 免 Wi-Fi)</string>
+
+    <!-- Home Glass Screen: Performance Mode Card (Tab 1) -->
+    <string name="home_card_perf_mode_title">调度档位</string>
+    <string name="home_perf_mode_default">系统默认</string>
+    <string name="home_perf_mode_saver">省电自适应</string>
+    <string name="home_perf_mode_game">游戏满血</string>
+    <string name="home_perf_mode_desc_default">系统默认：恢复官方标准调度与自适应刷新率，清除所有额外脚本与限频，日常稳定均衡。</string>
+    <string name="home_perf_mode_desc_saver">省电自适应：开启系统轻度省电限制，但解锁 120Hz 高刷自适应 + 快速休眠，耗电极低且滑动丝滑。</string>
+    <string name="home_perf_mode_desc_game">游戏满血：锁定 CPU/GPU 满血性能调度与极速触控响应，放宽刷新率限制，游戏满帧不降频。</string>
+
+    <!-- Home Glass Screen: Quick Switches Card -->
+    <string name="home_card_quick_switches_title">硬件与体验增强</string>
+    <string name="home_switch_passthrough_title">旁路供电 (游戏直供电)</string>
+    <string name="home_switch_passthrough_subtitle">边充边玩绕过电池直接为主板供电，机身不发热、保护电池寿命</string>
+    <string name="home_switch_game_auto_title">游戏启动自切满血</string>
+    <string name="home_switch_game_auto_subtitle_active">已添加 %1$d 款游戏 · 点击进入二级菜单管理名单</string>
+    <string name="home_switch_game_auto_subtitle_inactive">前台运行游戏时秒切满血 · 点击配置游戏名单</string>
+    <string name="home_badge_game_count">%1$d 款 ›</string>
+    <string name="home_badge_configure_list">配置名单 ›</string>
+    <string name="home_switch_fps_title">实时帧率浮窗 (FPS)</string>
+    <string name="home_switch_fps_subtitle">在屏幕右上角微型悬浮显示当前前台应用与游戏的真实刷新率与帧率</string>
+    <string name="home_switch_outdoor_title">户外高亮模式</string>
+    <string name="home_switch_outdoor_subtitle">强光或阳光直射下临时突破常规亮度上限，阳光下清晰可见</string>
+
+    <string name="home_switch_touch_title">触控低延迟</string>
+    <string name="home_switch_touch_subtitle">消除事件排队缓冲，直推底层驱动提升跟手度 · 点击打开报点率诊断</string>
+    <string name="home_switch_thermal_title">系统温控保护</string>
+    <string name="home_switch_thermal_subtitle">清理第三方篡改残留，还原三星官方硬件级安全温控与过热保护</string>
+
+    <!-- Home Glass Screen: Quick Actions Card -->
+    <string name="home_card_quick_actions_title">系统维护与拓展</string>
+    <string name="home_action_battery_info_title">电池信息与健康度</string>
+    <string name="home_action_battery_info_subtitle">实时读取电量、温度、充放电电流、循环数与三星原厂健康度</string>
+    <string name="home_action_night_guard_title">待机异常唤醒排查</string>
+    <string name="home_action_night_guard_subtitle">智能排查后台频繁唤醒与异常耗电，一键压制</string>
+    <string name="home_action_restore_defaults_title">恢复系统默认</string>
+    <string name="home_action_restore_defaults_subtitle">清除所有自定义调度与限制，完全重置回原生系统默认</string>
+    <string name="home_badge_safe_reset">安全重置</string>
+    <string name="home_action_geek_lab_title">极客实验室</string>
+    <string name="home_action_geek_lab_subtitle">解除受限设置、后台保活白名单与底层环境诊断</string>
+    <string name="home_badge_enter_lab">进入实验室</string>
+    <string name="home_action_user_manual_title">使用手册与帮助</string>
+    <string name="home_action_user_manual_subtitle">查看工作原理、使用指南与排错说明</string>
+    <string name="home_badge_help">帮助</string>
+
+    <!-- Geek Lab Dialog -->
+    <string name="geek_lab_dialog_title">极客实验室</string>
+    <string name="geek_lab_opt_unlock_restricted">解除受限设置</string>
+    <string name="geek_lab_opt_process_manager">后台保活白名单</string>
+    <string name="geek_lab_opt_system_diagnostics">系统环境快速诊断</string>
+    <string name="dialog_close">关闭</string>
+
+    <!-- Restricted Settings Guide &amp; Unlock Dialog -->
+    <string name="restricted_settings_dialog_title">解除「受限设置」无障碍拦截</string>
+    <string name="restricted_settings_dialog_message">Android 13 及更高版本出于防侧载安全机制，默认限制非应用商店 APK 的无障碍服务，显示为「受限设置」。\n\n【如何解除限制？】\n1. 点击下方「前往应用设置」进入系统详情页；\n2. 点击页面右上角「三个点 (⋮)」菜单；\n3. 选择「允许受限设置」(Allow restricted settings)；\n4. 验证指纹或锁屏密码，即可正常开启无障碍服务！</string>
+    <string name="restricted_settings_btn_go_to_app_info">前往应用设置</string>
+    <string name="restricted_settings_btn_open_accessibility">打开无障碍</string>
+    <string name="toast_restricted_settings_unlocked">已通过特权指令成功解除受限设置！</string>
+    <string name="toast_restricted_settings_guide_hint">请点击右上角「三个点 (⋮)」菜单并选择「允许受限设置」</string>
+
+    <string name="restore_defaults_dialog_title">恢复系统默认</string>
+    <string name="restore_defaults_dialog_message">将一键清除所有已生效的调度、省电、刷新率及系统调优设置，完全交回官方系统默认接管：\n\n• 恢复原生性能调度与温控限制\n• 恢复原生自适应刷新率策略\n• 关闭旁路供电与户外高亮模式\n• 停止后台辅助保活服务\n\n此操作不会清除任何应用数据或配对信息。确定恢复吗？</string>
+    <string name="restore_defaults_confirm">确定恢复</string>
+    <string name="restore_defaults_success">已完全恢复官方系统默认状态</string>
+    <string name="restore_defaults_failed">恢复失败: %1$s</string>
+
+    <string name="detail_title_game_auto">游戏模式切换</string>
+    <string name="detail_title_doze_whitelist">后台保护名单</string>
+    <string name="detail_title_quick_doze">熄屏深度休眠</string>
+    <string name="detail_title_battery_protection">旁路供电与电池保护</string>
+
+    <string name="toast_dev_settings_opened">已打开「开发者选项」，请开启「无线调试」</string>
+    <string name="toast_dev_settings_opened_compat_policies">已打开「开发者选项」，请滑至底部进入「更多设置」开启（开启无障碍可自动滑动）</string>
+    <string name="toast_dev_settings_opened_compat_policies_auto">已打开「开发者选项」，正在自动为您滑动至「更多设置」...</string>
+    <string name="toast_dev_settings_failed">无法直接打开开发者选项，请在系统设置中进入</string>
+    <string name="toast_outdoor_enabled">已激发户外最高物理亮度</string>
+    <string name="toast_outdoor_disabled">已恢复常规亮度</string>
+    <string name="toast_outdoor_enable_failed">开启户外高亮失败: %1$s</string>
+    <string name="toast_outdoor_disable_failed">恢复常规亮度失败: %1$s</string>
+
+    <string name="toast_service_not_running">Shizuku 服务尚未运行</string>
+    <string name="toast_service_not_running_start_first">Shizuku 服务尚未运行，请先在下方启动</string>
+    <string name="toast_hotspot_opened">已为您打开网络共享设置，开启「便携式热点」即可免 Wi-Fi 配对与启动</string>
+    <string name="toast_mode_switched_saver">已切换至：省电自适应高刷 (省电+120Hz自适应)</string>
+    <string name="toast_mode_switched_game">已切换至：游戏满血模式 (CPU/GPU满血加速+120Hz)</string>
+    <string name="toast_mode_switched_default">已恢复：系统默认原生调度</string>
+    <string name="toast_mode_switch_failed">切换失败: %1$s</string>
+    <string name="toast_passthrough_enabled">已开启旁路供电 (游戏直供电)</string>
+    <string name="toast_passthrough_disabled">已关闭旁路供电</string>
+    <string name="toast_passthrough_toggle_failed">切换旁路供电失败: %1$s</string>
+    <string name="toast_game_auto_enabled">已开启游戏启动自动切满血</string>
+    <string name="toast_game_auto_disabled">已关闭游戏自动切换</string>
+    <string name="toast_fps_enabled">已开启实时帧率浮窗</string>
+    <string name="toast_fps_disabled">已关闭实时帧率浮窗</string>
+    <string name="toast_fps_toggle_failed">切换浮窗失败: %1$s</string>
+    <string name="toast_wireless_pairing_requires_android_11">无线调试配对需要 Android 11 及以上系统</string>
+    <string name="toast_auto_pairing_ready">配对助手已就绪！请点击「使用配对码配对设备」，将自动完成配对</string>
+
+    <!-- Tab 2: App Rules (应用规则) -->
+    <string name="home_header_rules_title">分应用刷新率规则</string>
+    <string name="home_header_rules_subtitle">针对前台独立应用设定专属自适应或固定帧率，离开后自动恢复</string>
+    <string name="rules_card_accessibility_title">前台感知与即时切换</string>
+    <string name="rules_card_accessibility_subtitle">基于无障碍服务实时检测前台活动应用并瞬时切换对应规则</string>
+    <string name="rules_badge_service_running">服务运行中</string>
+    <string name="rules_badge_service_disabled">服务未开启 (功能锁定)</string>
+    <string name="rules_btn_enable_accessibility">前往开启无障碍</string>
+    <string name="rules_warning_accessibility">⚠️ 无障碍即时切换服务未开启，分应用规则无法在前台自动切换生效。</string>
+    <string name="rules_warning_accessibility_locked">⚠️ 分应用刷新率规则强制依赖无障碍服务感知前台应用。未开启无障碍服务，此功能无法使用，请先开启服务。</string>
+    <string name="rules_toast_accessibility_required">必须开启无障碍服务后方可使用分应用刷新率规则</string>
+    <string name="rules_rule_status_paused">已暂停 (无障碍未开启)</string>
+    <string name="rules_compat_policy_tip_title">为什么抖音等流媒体锁定 60Hz？</string>
+    <string name="rules_compat_policy_tip_desc">Android 系统内置了应用兼容性限频策略，默认将抖音、B站等流媒体强行锁死在 60Hz。三星设备请前往「开发者选项」滑至最底部点击「更多设置」，开启「Disable app compatibility policies（停用应用兼容性策略）」即可彻底解锁 120Hz 高刷。</string>
+    <string name="rules_btn_open_dev_options">前往开发者选项</string>
+    <string name="rules_calibrate_ltpo_title">LTPO 自适应降频校准</string>
+    <string name="rules_calibrate_ltpo_desc">激活 1Hz~120Hz 硬件级自适应，清理残留锁频，大幅降低桌面与应用静止功耗。</string>
+    <string name="rules_btn_calibrate_ltpo">激活自适应降频</string>
+    <string name="toast_calibrate_ltpo_success">已成功激活 1Hz~120Hz 硬件级自适应降频！画面静止时将瞬间跌入最低功耗。</string>
+    <string name="toast_calibrate_ltpo_failed">校准失败：%1$s</string>
+    <string name="rules_card_presets_title">常用场景预设</string>
+    <string name="rules_preset_daily">日常自适应 (10~120Hz)</string>
+    <string name="rules_preset_video">视频节能 (60Hz)</string>
+    <string name="rules_preset_reading">阅读护眼 (10~60Hz)</string>
+    <string name="rules_preset_game">游戏极速 (120Hz)</string>
+    <string name="rules_card_config_title">应用规则设定</string>
+    <string name="rules_select_app_hint">点击选择目标应用</string>
+    <string name="rules_switch_adaptive">自适应刷新率</string>
+    <string name="rules_switch_adaptive_summary_on">在最低与最高刷新率区间动态调节</string>
+    <string name="rules_switch_adaptive_summary_off">锁定在最高刷新率固定输出</string>
+    <string name="rules_label_max_hz">最高刷新率</string>
+    <string name="rules_label_min_hz">最低刷新率</string>
+    <string name="rules_btn_save">保存此规则</string>
+    <string name="rules_btn_delete">删除此规则</string>
+    <string name="rules_card_list_title">已生效的应用规则 (%1$d)</string>
+    <string name="rules_list_empty">暂无独立应用规则，所有应用将遵循系统全局刷新率。</string>
+    <string name="rules_btn_clear_all">清空全部规则</string>
+    <string name="rules_toast_saved">已保存应用规则</string>
+    <string name="rules_toast_deleted">已删除应用规则</string>
+    <string name="rules_toast_cleared">已清空所有应用规则</string>
+
+    <!-- Settings Glass Screen -->
+    <string name="settings_section_startup">启动与服务常驻</string>
+    <string name="settings_section_appearance">界面外观与主题</string>
+    <string name="settings_section_language">语言与国际化</string>
+    <string name="settings_section_about">关于与翻译</string>
+    <string name="settings_port_dialog_title">网络调试 (TCP) 端口</string>
+    <string name="settings_night_mode_title">深色主题</string>
+    <string name="settings_night_mode_follow_system">跟随系统</string>
+    <string name="settings_night_mode_on">始终开启</string>
+    <string name="settings_night_mode_off">始终关闭</string>
+
+    <!-- 无障碍精准指引与特权激活 -->
+    <string name="accessibility_dialog_guide_title">开启无障碍服务指引</string>
+    <string name="accessibility_dialog_guide_message">在三星 One UI 等设备上，系统将第三方无障碍服务归类在「已安装的应用程序」中。\n\n跳转后请点击列表中的「已安装的应用程序」，找到「%1$s」并开启开关。</string>
+    <string name="accessibility_dialog_guide_btn_jump">前往系统设置</string>
+    <string name="accessibility_toast_activated_by_privilege">已通过特权通道直接激活无障碍即时切换服务！</string>
+    <string name="accessibility_toast_samsung_hint">请在列表中点击「已安装的应用程序」，找到「%1$s」开启</string>
+</resources>

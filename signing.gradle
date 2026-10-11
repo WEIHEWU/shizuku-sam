@@ -1,0 +1,144 @@
+import java.security.KeyStore
+import java.security.PrivateKey
+import java.security.cert.X509Certificate
+
+def signingPropertiesFile = rootProject.file('signing.properties')
+def environmentKeys = [
+        'SHIZUKU_RELEASE_KEYSTORE_FILE',
+        'SHIZUKU_RELEASE_KEYSTORE_PASSWORD',
+        'SHIZUKU_RELEASE_KEY_ALIAS',
+        'SHIZUKU_RELEASE_KEY_PASSWORD',
+]
+def environmentValues = environmentKeys.collectEntries { key -> [(key): System.getenv(key)] }
+def hasAnyEnvironmentValue = environmentValues.values().any { value ->
+    value != null && !value.trim().isEmpty()
+}
+
+def signingValues = [:]
+def signingSource = null
+def configurationProblem = null
+
+def useDebugFallback = false
+if (hasAnyEnvironmentValue) {
+    signingSource = 'release signing environment variables'
+    signingValues = [
+            keystoreFile    : environmentValues.SHIZUKU_RELEASE_KEYSTORE_FILE,
+            keystorePassword: environmentValues.SHIZUKU_RELEASE_KEYSTORE_PASSWORD,
+            keyAlias        : environmentValues.SHIZUKU_RELEASE_KEY_ALIAS,
+            keyPassword     : environmentValues.SHIZUKU_RELEASE_KEY_PASSWORD,
+    ]
+} else if (signingPropertiesFile.exists()) {
+    signingSource = 'the ignored root signing.properties file'
+    if (!signingPropertiesFile.isFile() || !signingPropertiesFile.canRead()) {
+        configurationProblem = 'The root signing.properties path is not a readable regular file.'
+    } else {
+        def properties = new Properties()
+        try {
+            signingPropertiesFile.withInputStream { stream -> properties.load(stream) }
+            signingValues = [
+                    keystoreFile    : properties.getProperty('KEYSTORE_FILE'),
+                    keystorePassword: properties.getProperty('KEYSTORE_PASSWORD'),
+                    keyAlias        : properties.getProperty('KEYSTORE_ALIAS'),
+                    keyPassword     : properties.getProperty('KEYSTORE_ALIAS_PASSWORD'),
+            ]
+        } catch (Exception ignored) {
+            configurationProblem = 'The root signing.properties file could not be read.'
+        }
+    }
+} else {
+    useDebugFallback = true
+}
+
+def signingFieldLabels = [
+        keystoreFile    : 'keystore file',
+        keystorePassword: 'keystore password',
+        keyAlias        : 'key alias',
+        keyPassword     : 'key password',
+]
+def missingSigningFields = signingFieldLabels.findAll { field, ignored ->
+    def value = signingValues[field]
+    value == null || value.trim().isEmpty()
+}.values()
+
+if (!useDebugFallback && configurationProblem == null && !missingSigningFields.isEmpty()) {
+    configurationProblem = "${signingSource} is incomplete; missing: ${missingSigningFields.join(', ')}."
+}
+
+def releaseSigningConfig = android.signingConfigs.releaseSigning
+if (useDebugFallback) {
+    releaseSigningConfig.initWith(android.signingConfigs.debug)
+} else if (configurationProblem == null) {
+    releaseSigningConfig.storeFile = rootProject.file(signingValues.keystoreFile)
+    releaseSigningConfig.storePassword = signingValues.keystorePassword
+    releaseSigningConfig.keyAlias = signingValues.keyAlias
+    releaseSigningConfig.keyPassword = signingValues.keyPassword
+}
+
+def validateReleaseSigningConfig = tasks.register('validateReleaseSigningConfig') {
+    group = 'verification'
+    description = 'Fails unless the external Release signing configuration is complete, readable, and usable.'
+
+    doLast {
+        if (useDebugFallback) {
+            logger.lifecycle('No release signing.properties found; using Android debug keystore fallback for open-source build.')
+            return
+        }
+        if (configurationProblem != null) {
+            throw new GradleException(configurationProblem)
+        }
+
+        def keystoreFile = releaseSigningConfig.storeFile
+        if (keystoreFile == null || !keystoreFile.isFile() || !keystoreFile.canRead()) {
+            throw new GradleException('The configured Release keystore is not a readable regular file.')
+        }
+
+        def debugKeystoreFile = android.signingConfigs.debug.storeFile
+        if (debugKeystoreFile != null && keystoreFile.canonicalFile == debugKeystoreFile.canonicalFile) {
+            throw new GradleException('The Release signing configuration points to the Android Debug keystore.')
+        }
+
+        KeyStore keyStore
+        try {
+            keyStore = KeyStore.getInstance(keystoreFile, signingValues.keystorePassword.toCharArray())
+        } catch (Exception ignored) {
+            throw new GradleException('The Release keystore could not be opened with the configured keystore password.')
+        }
+
+        if (!keyStore.containsAlias(signingValues.keyAlias)) {
+            throw new GradleException('The configured Release key alias does not exist in the keystore.')
+        }
+        if (!keyStore.isKeyEntry(signingValues.keyAlias)) {
+            throw new GradleException('The configured Release alias is not a private-key entry.')
+        }
+
+        def privateKey
+        try {
+            privateKey = keyStore.getKey(signingValues.keyAlias, signingValues.keyPassword.toCharArray())
+        } catch (Exception ignored) {
+            throw new GradleException('The configured Release key password is invalid.')
+        }
+        if (!(privateKey instanceof PrivateKey)) {
+            throw new GradleException('The configured Release alias does not contain a private key.')
+        }
+
+        def certificate = keyStore.getCertificate(signingValues.keyAlias)
+        if (!(certificate instanceof X509Certificate)) {
+            throw new GradleException('The configured Release alias does not contain an X.509 certificate.')
+        }
+        try {
+            certificate.checkValidity()
+        } catch (Exception ignored) {
+            throw new GradleException('The configured Release signing certificate is not currently valid.')
+        }
+        def signerDn = certificate.subjectX500Principal.name.toLowerCase(Locale.ROOT)
+        if (signerDn.contains('cn=android debug')) {
+            throw new GradleException('Android Debug certificates are forbidden for Release builds.')
+        }
+    }
+}
+
+tasks.configureEach { task ->
+    if (task.name == 'preReleaseBuild') {
+        task.dependsOn(validateReleaseSigningConfig)
+    }
+}

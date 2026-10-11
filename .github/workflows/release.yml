@@ -1,0 +1,34 @@
+name: Publish Release
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create GitHub Release and Upload APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v13.7.3
+          name: "Shizuku Sam v13.7.3"
+          body: |
+            ### Shizuku Sam v13.7.3 (Samsung One UI 8.5 Enhanced Edition)
+
+            - **Shizuku 增强内核 + 无 Wi-Fi 重启自启**：100% 兼容 `moe.shizuku.privileged.api` 生态，支持 `127.0.0.1` 本地回环端口并发扫描与开机自动激活无线调试。
+            - **三通道执行引擎 (`SimEngine`)**：自动按 `Root (su) → Shizuku (rish/Binder) → Device Owner (DPM)` 路由底层指令并执行硬件回读校验。
+            - **零安慰剂纯真系统调校**：移除全部伪开关，仅保留 100% 真实读写 `Settings.System` / `Settings.Secure` / `Settings.Global`、`SurfaceFlinger`、`cmd package`、`dumpsys deviceidle` 与内核 sysfs 节点的硬核功能。
+            - **三星专属增强**：全局 120Hz / LTPO 刷新率控制、240Hz 游戏触控采样率与实时触控测试仪、色彩模式与硬件极暗、原生双击亮屏/锁屏、充电保护与快充总成、RAM Plus 虚拟内存、Private DNS (DoT) 加密解析等。
+          files: |
+            releases/Shizuku-Sam-v13.7.3.apk

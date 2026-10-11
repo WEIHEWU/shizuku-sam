@@ -1,0 +1,4 @@
+# One lowercase or uppercase SHA-256 certificate digest per line; colons are allowed.
+# Replace the placeholder with the approved production signing certificate digest.
+# This file is intentionally fail-closed until the publisher supplies that digest.
+REPLACE_WITH_APPROVED_RELEASE_CERTIFICATE_SHA256

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="ThemeOverlay"/>
+
+    <style name="ThemeOverlay.Black">
+        <item name="android:colorPrimary">@android:color/black</item>
+        <item name="android:colorPrimaryDark">@android:color/black</item>
+        <item name="android:colorBackground">@android:color/black</item>
+        <item name="colorSurface">@android:color/black</item>
+    </style>
+
+    <style name="ThemeOverlay.DynamicColors.Light" parent="ThemeOverlay.Material3.DynamicColors.Light.Rikka">
+        <item name="android:popupBackground">@drawable/bg_popup_menu_light</item>
+        <item name="popupMenuBackground">@drawable/bg_popup_menu_light</item>
+        <item name="colorSurface">#FFFFFFFF</item>
+        <item name="colorSurfaceContainer">#FFFFFFFF</item>
+        <item name="colorSurfaceContainerLow">#FFFFFFFF</item>
+        <item name="colorSurfaceContainerHigh">#FFFFFFFF</item>
+        <item name="colorSurfaceContainerHighest">#FFFFFFFF</item>
+        <item name="actionBarPopupTheme">@style/ThemeOverlay.App.PopupMenu</item>
+        <item name="popupTheme">@style/ThemeOverlay.App.PopupMenu</item>
+    </style>
+
+    <style name="ThemeOverlay.DynamicColors.Dark" parent="ThemeOverlay.Material3.DynamicColors.Dark.Rikka">
+        <item name="android:popupBackground">@drawable/bg_popup_menu_dark</item>
+        <item name="popupMenuBackground">@drawable/bg_popup_menu_dark</item>
+        <item name="colorSurface">#FF1E222A</item>
+        <item name="colorSurfaceContainer">#FF1E222A</item>
+        <item name="colorSurfaceContainerLow">#FF1E222A</item>
+        <item name="colorSurfaceContainerHigh">#FF1E222A</item>
+        <item name="colorSurfaceContainerHighest">#FF1E222A</item>
+        <item name="actionBarPopupTheme">@style/ThemeOverlay.App.PopupMenu.Dark</item>
+        <item name="popupTheme">@style/ThemeOverlay.App.PopupMenu.Dark</item>
+    </style>
+
+</resources>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <instrumentation
+        android:name="moe.shizuku.manager.maxhz.ShellArgMaxInstrumentation"
+        android:targetPackage="moe.shizuku.privileged.api" />
+    <instrumentation
+        android:name="moe.shizuku.manager.maxhz.Reg001PersistenceInstrumentation"
+        android:targetPackage="moe.shizuku.privileged.api" />
+</manifest>

@@ -1,0 +1,492 @@
+<resources>
+    <string name="app_name" translatable="false">Shizuku</string>
+    <string name="accessibility_service_label">Shizuku</string>
+    <string name="accessibility_service_unified_label">Shizuku</string>
+    <string name="accessibility_service_unified_description">Shizuku accessibility service: provides wireless debugging auto-pairing and dynamic refresh rate adaptation.</string>
+    <string name="accessibility_service_pairing_label">Shizuku</string>
+    <string name="accessibility_service_pairing_description">Automatically identifies wireless debugging pairing code and port for zero-touch pairing.</string>
+    <string name="maxhz_accessibility_service_label">Shizuku</string>
+    <string name="accessibility_service_description">Shizuku accessibility service: provides wireless debugging auto-pairing and dynamic refresh rate adaptation.</string>
+    <string name="pairing_code_auto_success">Wireless debugging paired successfully!</string>
+
+    <!-- To translators: you can leave your here -->
+    <string name="translation_contributors" />
+
+    <!-- Home - Status -->
+    <string name="home_status_service_is_running">%1$s is running</string>
+    <string name="home_status_service_not_running">%1$s is not running</string>
+    <string name="home_status_service_version">Version %2$s, %1$s</string>
+    <string name="home_status_service_version_update"><![CDATA[Version %2$s, %1$s<br>Start again to update to version %3$s]]></string>
+
+    <!-- Home - Adb -->
+    <string name="home_adb_title"><![CDATA[Start by connecting to a computer]]></string>
+    <string name="home_adb_description"><![CDATA[For devices without root, you need to use adb to start Shizuku (requires computer connection). This process needs to be repeated every time the device is restarted. Please <b><a href=\"%1$s\">read the help</a></b>.]]></string>
+    <string name="home_adb_button_view_help">Read help</string>
+    <string name="home_adb_button_view_command">View command</string>
+    <string name="home_adb_dialog_view_command_message"><![CDATA[<font face="monospace">%1$s</font><br><br>* There are some other considerations, please confirm that you have read the help first.]]></string>
+    <string name="home_adb_dialog_view_command_copy_button">Copy</string>
+    <string name="home_adb_dialog_view_command_button_send">Send</string>
+
+    <!-- Home - Wireless Adb -->
+    <string name="home_wireless_adb_title"><![CDATA[Start via Wireless debugging]]></string>
+    <string name="home_wireless_adb_description"><![CDATA[On Android 11 or above, you can enable Wireless debugging and start Shizuku directly from your device, without connecting to a computer.<p>Please view the step-by-step guide first.]]></string>
+    <string name="home_wireless_adb_description_pre_11"><![CDATA[Before Android 11, connecting to a computer is required to enable Wireless debugging.]]></string>
+    <string name="home_wireless_adb_view_guide_button">Step-by-step guide</string>
+
+    <!-- Adb -->
+    <string name="dialog_adb_discovery">Searching for wireless debugging service</string>
+    <string name="dialog_adb_discovery_message">Please enable \"Wireless debugging\" in \"Developer options\". \"Wireless debugging\" is automatically disabled when network changes.\n\nNote, do not disable \"Developer options\" or \"USB debugging\", or Shizuku will be stopped.</string>
+    <string name="dialog_adb_discovery_message_toggle_wireless_debugging">Please try to disable and enable \"Wireless debugging\" if it keeps searching.</string>
+    <string name="dialog_adb_port">Port</string>
+    <string name="dialog_adb_invalid_port">Port is an integer ranging from 1 to 65535.</string>
+    <string name="adb_pairing">Pairing</string>
+    <string name="dialog_adb_pairing_title">Pair with device</string>
+    <string name="dialog_adb_pairing_discovery">Searching for pairing service</string>
+    <string name="dialog_adb_pairing_paring_code">Pairing code</string>
+    <string name="paring_code_is_wrong">Pairing code is wrong.</string>
+    <string name="cannot_connect_port">Can\'t connect to wireless debugging service.</string>
+    <string name="dialog_wireless_adb_not_enabled">Wireless debugging is not enabled.\nNote, before Android 11, to enable wireless debugging, computer connection is a must.</string>
+    <string name="dialog_usb_debugging_not_enabled">USB debugging is not enabled.\nPlease enable it in \"Developer Options\".</string>
+    <string name="adb_dialog_popup_settings">Pop-up Settings</string>
+    <string name="dialog_adb_pairing_message">Please start paring by the following steps: \"Developer Options\" - \"Wireless debugging\" - \"Pairing device using pairing code\".\n\nAfter the pairing process starts, you will able to input the pairing code.</string>
+    <string name="adb_pairing_requires_multi_window">Please enter split-screen (multi-window) mode first.</string>
+    <string name="adb_pairing_requires_multi_window_reason">The system requires the pairing dialog always visible, using split-screen mode is the only way to let this app and system dialog visible at the same time.</string>
+    <string name="adb_error_key_store">Unable to generate key for wireless debugging.\nThis may be because KeyStore mechanism of this device is broken.</string>
+    <string name="adb_error_stop_tcp">Unable to stop ADB TCP mode</string>
+    <string name="adb_pair_required">Please go through the pairing step first.</string>
+    <string name="development_settings">Developer options</string>
+    <string name="notification_settings">Notification options</string>
+    <string name="adb_pairing_tutorial_title">Pair Shizuku with your device</string>
+    <string name="adb_pairing_tutorial_content_notification">A notification from Shizuku will help you complete the pairing.</string>
+    <string name="adb_pairing_tutorial_content_steps">Enter \"Developer options\" - \"Wireless debugging\". Tap \"Pair device with pairing code\", you will see a six-digit code.</string>
+    <string name="adb_pairing_tutorial_content_enter_pairing_code">Enter the code in the notification to complete pairing.</string>
+    <string name="adb_pairing_tutorial_manual_pairing">Notification not working? Pair in app</string>
+    <string name="adb_pairing_tutorial_content_notification_blocked">The pairing process needs you to interact with a notification from Shizuku. Please allow Shizuku to post notifications.</string>
+    <string name="adb_pairing_tutorial_content_miui">MIUI users may need to switch notification style to \"Android\" from \"Notification\" - \"Notification shade\" in system settings.</string>
+    <string name="adb_pairing_tutorial_content_miui_2">Otherwise, you may not able to enter paring code from the notification.</string>
+    <string name="adb_pairing_tutorial_content_oppo">OPPO/Realme/OnePlus (ColorOS) users: notification inline reply may not be supported by system. Please tap \"Pair in app\" below to pair via manual dialog.</string>
+    <string name="adb_pairing_tutorial_content_oppo_2">Tip: Keep Developer Options open in split screen or floating window to prevent the system pairing code from closing.</string>
+    <string name="adb_pairing_tutorial_content_left_is_clickable">Please note, left part of the \"Wireless debugging\" option is clickable, tapping it will open a new page. Only turing on the switch on the right is incorrect.</string>
+    <string name="adb_pairing_tutorial_content_finish">Back to Shizuku and start Shizuku.</string>
+    <string name="adb_pairing_tutorial_content_network">Shizuku needs to access local network. It is controlled by the network permission.</string>
+    <string name="adb_pairing_tutorial_content_network_limation_not_foreground">Some systems (such as MIUI) disallow apps to access the network when they are not visible, even if the app uses foreground service as standard. Please disable battery optimization features for Shizuku on such systems.</string>
+
+    <!-- Home - Root -->
+    <string name="home_root_title"><![CDATA[Start (for rooted devices)]]></string>
+    <string name="home_root_description"><![CDATA[In addition, Shizuku can be started automatically on boot. If not, please check if your system or third-party tools have restricted Shizuku.<br>You can refer to %s.]]></string>
+    <string name="home_root_description_sui"><![CDATA[If you are using Magisk, you can try %1$s. For root users, it will eventually replace Shizuku. Note, existing applications needs to change a little to use %2$s.]]></string>
+    <string name="home_root_button_start">Start</string>
+    <string name="home_root_button_restart">Restart</string>
+
+    <!-- Home - Application management -->
+    <string name="home_app_management_title">Application management</string>
+    <plurals name="home_app_management_authorized_apps_count">
+        <item quantity="one"><![CDATA[Authorized %d application]]></item>
+        <item quantity="other"><![CDATA[Authorized %d applications]]></item>
+    </plurals>
+    <string name="home_app_management_view_authorized_apps"><![CDATA[Tap to manage authorized apps]]></string>
+    <string name="home_app_management_empty">Apps that has requested or declared Shizuku will show here.</string>
+
+    <!-- MaxHz -->
+    <string name="maxhz_title">MaxHz 控制</string>
+    <string name="maxhz_home_summary">自适应刷新率、兼容省电、快速待机、每 App 刷新率</string>
+    <string name="maxhz_service_switch">后台自动规则（待机/电量/每App）</string>
+    <string name="maxhz_action_status">读取当前状态（参数检测）</string>
+    <string name="maxhz_action_compatible_saver">兼容省电（省电高刷）</string>
+    <string name="maxhz_action_quick_doze">快速待机（Doze优化）</string>
+    <string name="maxhz_action_disable_sync">后台同步/扫描护栏</string>
+    <string name="maxhz_action_force_resizable">强制窗口（分屏兼容）</string>
+    <string name="maxhz_action_battery_protection">电池保护（充电保护）</string>
+    <string name="maxhz_action_restore">恢复默认（一键总恢复）</string>
+    <string name="maxhz_status_hint">使用 MaxHz 前，请先确保 Shizuku 正在运行并已授权。</string>
+    <string name="home_entry_shizuku">Shizuku</string>
+    <string name="home_entry_maxhz">Max 功能</string>
+
+    <!-- Home - Learn more -->
+    <string name="home_learn_more_title">Learn Shizuku</string>
+    <string name="home_learn_more_description">Learn how to develop with Shizuku</string>
+
+    <!-- Home - Adb permissions limited -->
+    <string name="home_adb_is_limited_title">You need to take an extra step</string>
+    <string name="home_adb_is_limited_description">Your device manufacturer has restricted adb permissions and apps using Shizuku will not work properly.\n\nUsually, this limitation can be lifted by adjusting some options in \"Developer options\". Please read the help for details on how to do this.\n\nYou may need to restart Shizuku for the operation to take effect.</string>
+
+    <!-- Application management -->
+    <string name="app_management_dialog_adb_is_limited_title">The permission of adb is limited</string>
+    <string name="app_management_dialog_adb_is_limited_message"><![CDATA[It\'s highly possible that your device manufacturer limits the permission of adb.<p>There may be a solution for your system in <b><a href=\"%1$s\">this document</a></b>.]]></string>
+    <string name="app_management_item_summary_requires_root">* requires Shizuku runs with root</string>
+
+    <!-- Terminal -->
+    <string name="home_terminal_title">Use Shizuku in terminal apps</string>
+    <string name="home_terminal_description">Run commands through Shizuku in terminal apps you like</string>
+    <string name="terminal_tutorial_1">First, Export files to any where you want. You will find two files, %1$s and %2$s.</string>
+    <string name="terminal_tutorial_1_description">If there are files with the same name in the selected folder, they will be deleted.\n\nThe export function uses SAF (Storage Access Framework). It\'s reported that MIUI breaks the functions of SAF. If you are using MIUI, you may have to extract the file from Shizuku\'s apk or download from GitHub.</string>
+    <string name="terminal_export_files">Export files</string>
+    <string name="terminal_tutorial_2">Then, use any text editor to open and edit %1$s.</string>
+    <string name="terminal_tutorial_2_description">For example, if you want to use Shizuku in %1$s, you should replace %2$s with %3$s (%4$s is the package name of %1$s).</string>
+    <string name="terminal_tutorial_3">Finally, move the files to somewhere where your terminal app can access, you will be able to use %1$s to run commands through Shizuku.</string>
+    <string name="terminal_tutorial_3_description">Some tips: grant execute permission to %1$s and add it to %2$s, you will able to use %1$s directly.</string>
+    <string name="rish_description"><![CDATA[
+With %1$s, in any terminal app, you can connect to and interact with the shell runs by Shizuku.
+<p>About the detailed usage %1$s, tap to view the document.
+    ]]></string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_language">Language</string>
+    <string name="settings_user_interface">Appearance</string>
+    <string name="settings_black_night_theme">Black night theme</string>
+    <string name="settings_black_night_theme_summary">Use the pure black theme if night mode is enabled</string>
+    <string name="settings_startup">Startup</string>
+    <string name="settings_translation_contributors">Translation contributors</string>
+    <string name="settings_translation">Participate in translation</string>
+    <string name="settings_translation_summary">Help us translate %s into your language</string>
+    <string name="settings_start_on_boot">Start on boot (root)</string>
+    <string name="settings_start_on_boot_summary">For rooted devices, Shizuku is able to start automatically on boot</string>
+    <string name="settings_watchdog">Watchdog service</string>
+    <string name="settings_watchdog_summary">Restart Shizuku when the service stops unexpectedly. Disabled by default to avoid unnecessary foreground service usage.</string>
+    <string name="settings_tcp_mode">Keep ADB TCP mode after wireless start</string>
+    <string name="settings_tcp_mode_summary">After wireless debugging starts Shizuku, switch ADB to a stable TCP port so later restarts do not depend on the changing wireless debugging port.</string>
+    <string name="settings_tcp_port">ADB TCP port</string>
+    <string name="settings_use_system_color">Use system theme color</string>
+
+    <string name="background_style_wallpaper">Custom wallpaper</string>
+    <string name="settings_background_wallpaper_summary">Pick an image from your gallery as the page background</string>
+    <string name="settings_background_wallpaper_summary_set">Wallpaper set — tap to change</string>
+    <string name="settings_background_wallpaper_change">Change wallpaper</string>
+    <string name="settings_background_wallpaper_remove">Remove wallpaper (back to aurora)</string>
+    <string name="wallpaper_fit">Wallpaper fit</string>
+    <string name="wallpaper_fit_crop">Crop to fill (no distortion)</string>
+    <string name="wallpaper_fit_fit">Fit entire image (may letterbox)</string>
+    <string name="wallpaper_fit_stretch">Stretch to fill (may distort)</string>
+
+    <!-- About -->
+    <string name="action_about">About</string>
+    <string name="about_view_source_code"><![CDATA[View source code at %s]]></string>
+
+    <!-- Stop -->
+    <string name="action_stop">Stop Shizuku</string>
+    <string name="dialog_stop_message">Shizuku service will be stopped.</string>
+
+    <!-- Notification -->
+    <string name="notification_channel_service_status">Service start status</string>
+    <string name="notification_service_starting">Shizuku service is starting…</string>
+    <string name="notification_service_start_failed">Start Shizuku service failed.</string>
+    <string name="notification_service_start_no_root">Failed to request root permission.</string>
+    <string name="notification_working">Working…</string>
+    <string name="notification_channel_adb_pairing">Wireless debugging pairing</string>
+    <string name="notification_channel_watchdog">Shizuku watchdog</string>
+    <string name="notification_channel_auth_errors">Automation authentication</string>
+    <string name="watchdog_running">Shizuku watchdog is running</string>
+    <string name="watchdog_running_text">It will try to restart Shizuku if the service stops unexpectedly.</string>
+    <string name="watchdog_shizuku_stopped_title">Shizuku stopped unexpectedly</string>
+    <string name="watchdog_shizuku_stopped_text">The watchdog is trying to restart Shizuku.</string>
+    <string name="notification_auth_missing_title">Automation request blocked</string>
+    <string name="notification_auth_missing_message">The request did not include an authentication token.</string>
+    <string name="notification_auth_invalid_title">Automation request blocked</string>
+    <string name="notification_auth_invalid_message">The authentication token is invalid.</string>
+    <string name="notification_adb_pairing_input_paring_code">Enter pairing code</string>
+    <string name="notification_adb_pairing_searching_for_service_title">Searching for pairing service</string>
+    <string name="notification_adb_pairing_service_found_title">Pairing service found</string>
+    <string name="notification_adb_pairing_stop_searching">Stop searching</string>
+    <string name="notification_adb_pairing_working_title">Pairing in progress</string>
+    <string name="notification_adb_pairing_succeed_title">Pairing successful</string>
+    <string name="notification_adb_pairing_succeed_text">You can start Shizuku service now.</string>
+    <string name="notification_adb_pairing_failed_title">Pairing failed</string>
+    <string name="notification_adb_pairing_retry">Retry</string>
+
+    <!-- Permission related, appears in system permission UI -->
+    <string name="permission_group_label" translatable="false">Shizuku</string>
+    <string name="permission_group_description" translatable="false">@string/permission_label</string>
+    <string name="permission_label">access Shizuku</string>
+    <string name="permission_description">Allow the app to use Shizuku.</string>
+    <string name="permission_warning_template"><![CDATA[Allow <b>%1$s</b> to %2$s?]]></string>
+    <string name="grant_dialog_button_allow_always">Allow all the time</string>
+    <string name="grant_dialog_button_deny">"Deny"</string>
+
+    <!-- Starter -->
+    <string name="starter">Starter</string>
+    <string name="starting_root_shell" translatable="false">Starting root shell…</string>
+    <string name="start_with_root_failed">Can\'t start service because root permission is not granted or this device is not rooted.</string>
+
+    <!-- Misc -->
+    <string name="dialog_cannot_open_browser_title">Can\'t start browser</string>
+    <string name="toast_copied_to_clipboard">%s\nhas been copied to clipboard.</string>
+    <string name="toast_copied_to_clipboard_with_text"><![CDATA[<b>%s</b> has been copied to clipboard.]]></string>
+
+    <!-- Messages for legacy -->
+    <string name="dialog_legacy_not_support_title">%1$s does not support modern Shizuku</string>
+    <string name="dialog_legacy_not_support_message"><![CDATA[Legacy Shizuku has been deprecated since March 2019. Also, legacy Shizuku does not work on newer Android systems.<p>Please ask the developer of <b>%1$s</b> to update.]]></string>
+    <string name="dialog_requesting_legacy_title">%1$s is requesting legacy Shizuku</string>
+    <string name="dialog_requesting_legacy_message"><![CDATA[<b>%1$s</b> has modern Shizuku support, but it\'s requesting legacy Shizuku. This could because Shizuku is not running, please check in Shizuku app.<p>Legacy Shizuku has been deprecated since March 2019.]]></string>
+    <string name="dialog_requesting_legacy_button_open_shizuku">Open Shizuku</string>
+
+    <!-- Dhizuku (Device Owner) -->
+    <string name="dhizuku_device_owner_label">Shizuku (Dhizuku Mode)</string>
+    <string name="dhizuku_device_owner_desc">Device Owner mode providing boot-persistent Shizuku privileges without Wi-Fi.</string>
+    <string name="dhizuku_device_owner_enabled">Dhizuku (Device Owner) mode activated!</string>
+    <string name="dhizuku_device_owner_disabled">Dhizuku (Device Owner) mode deactivated</string>
+    <string name="dhizuku_setup_title">Dhizuku Mode (Device Owner)</string>
+    <string name="dhizuku_manage_title">Dhizuku Mode Management</string>
+    <string name="dhizuku_setup_summary">Dhizuku Device Owner is a permanent, reboot-proof privileged mode. Requires a one-time PC ADB command setup or direct write on Rooted devices.</string>
+    <string name="dhizuku_active_desc">This app currently has Android Device Owner privileges. Elevated permissions are retained permanently across reboots without requiring Wi-Fi or PC connection.</string>
+    <string name="dhizuku_setup_prerequisite_title">Tip:</string>
+    <string name="dhizuku_setup_prerequisite_content">Android security policy prohibits enabling Device Owner directly from system settings; it must be authorized once via PC ADB.</string>
+    <string name="dhizuku_setup_cmd_label">PC ADB Activation Command:</string>
+    <string name="dhizuku_copy_command">Copy Activation Command</string>
+    <string name="dhizuku_remove_owner">Deactivate Device Owner</string>
+    <string name="dhizuku_remove_confirm">Are you sure you want to deactivate Device Owner? The app will revert to normal mode and system settings will remain intact.</string>
+    <string name="dhizuku_status_active">Activated (Device Owner · Reboot-proof)</string>
+    <string name="dhizuku_status_inactive">Inactive (Configure once via PC ADB · Reboot-proof)</string>
+    <string name="dhizuku_app_store_faq_title">⚠️ Why did the App Store disappear?</string>
+    <string name="dhizuku_app_store_faq_content">1. Account removal side-effect: In a zero-account state, Google Play or brand app stores automatically hide their launcher icons.\n2. OEM Enterprise Policy: ROMs like Xiaomi HyperOS, OPPO, or Samsung Knox may hide consumer app stores when Device Owner is detected.\n\nHow to restore:\n• Method 1 (Recommended): Re-login to your account (Google/Mi/Samsung) in Settings -> Accounts. The store icon will reappear.\n• Method 2: Tap the Restore App Stores button below to unhide automatically.\n• Method 3: Run adb shell pm enable &amp; unhide from your PC.</string>
+    <string name="dhizuku_restore_stores_btn">✨ Restore App Stores</string>
+    <string name="dhizuku_remove_owner_btn">🚫 Deactivate / Remove Device Owner</string>
+    <string name="dhizuku_remove_cmd_title">PC ADB Deactivation Command:</string>
+    <string name="dhizuku_copy_remove_cmd">Copy Deactivation Command</string>
+    <string name="dhizuku_method_admin_title">⚠️ Standard Device Admin Only (Not Device Owner)</string>
+    <string name="dhizuku_method_admin_desc">Only Standard Device Admin was granted in system settings. Android security forbids Shell execution for Device Admin. Please activate Device Owner via PC ADB or use ADB / Root Start on the Home screen.</string>
+    <string name="dhizuku_method_admin_btn">Disable Device Admin</string>
+    <string name="dhizuku_disable_admin_btn">🚫 Deactivate / Remove Device Admin</string>
+    <string name="dhizuku_admin_active_desc">Detected standard Device Admin only. Under Android security policy, standard Device Admin cannot execute Shell commands. Please configure Device Owner via PC ADB or use ADB/Root Start on Home.</string>
+
+    <!-- Navigation Dock Tabs -->
+    <string name="dock_tab_shizuku">Shizuku</string>
+    <string name="dock_tab_hardware">Hardware</string>
+    <string name="dock_tab_rules">App Rules</string>
+
+    <!-- Home Glass Screen: Headers &amp; Subtitles -->
+    <string name="home_header_shizuku_running_title">Shizuku</string>
+    <string name="home_header_shizuku_running_subtitle">Privileged service channel &amp; authorization hub</string>
+    <string name="home_header_shizuku_stopped_title">Shizuku</string>
+    <string name="home_header_shizuku_stopped_subtitle">Wireless pairing startup &amp; privileged service channel</string>
+    <string name="home_header_hardware_title">System Scheduling &amp; Hardware</string>
+    <string name="home_header_hardware_subtitle">Samsung performance profiles, bypass charging, and refresh rate tuning</string>
+
+    <!-- Home Glass Screen: Hero Card Status &amp; Badges -->
+    <string name="home_status_root_running">ROOT Running</string>
+    <string name="home_status_adb_running">ADB Running</string>
+    <string name="home_status_not_running">Not Running</string>
+    <string name="home_status_do_badge">No-Root</string>
+    <string name="home_status_activated_summary">Activated via %1$s mode · API v%2$d.%3$d%4$s</string>
+    <string name="home_status_suffix_do"> · Persistent No-Root</string>
+    <string name="home_status_hint_do_active">No-Root Device Management active · Reboot-persistent without Wi-Fi</string>
+    <string name="home_status_hint_port_found">Detected pairing port :%1$d · Ready to start</string>
+    <string name="home_status_hint_no_wifi">No Wi-Fi connected · Connect to Wi-Fi to enable Wireless Debugging or connect to PC</string>
+    <string name="home_status_hint_ready">Wireless debugging environment ready · Tap above to start</string>
+
+    <!-- Home Glass Screen: Hero Tiles &amp; Buttons -->
+    <string name="home_tile_service_version">Version</string>
+    <string name="home_tile_execution_mode">Mode</string>
+    <string name="home_tile_mode_root">ROOT Mode</string>
+    <string name="home_tile_mode_adb">ADB Mode</string>
+    <string name="home_tile_authorized_apps">Authorized</string>
+    <string name="home_tile_apps_count_format">%1$d apps</string>
+    <string name="home_btn_manage_authorized_apps">Manage Authorized Apps (%1$d authorized)</string>
+    <string name="home_btn_terminal_rish">Terminal (rish)</string>
+    <string name="home_btn_restart_service">Restart Service</string>
+    <string name="home_btn_reconnect_debugging">Reconnect</string>
+    <string name="home_btn_stop_service">Stop Service</string>
+    <string name="home_btn_adb_start_quick_port">ADB Start</string>
+    <string name="home_btn_adb_start_quick_direct">ADB Start</string>
+    <string name="home_btn_adb_start">ADB Start</string>
+    <string name="home_btn_root_start">Root Start</string>
+    <string name="home_btn_dhizuku_start">Dhizuku Mode</string>
+    <string name="home_btn_no_root_start">No-Root</string>
+    <string name="dhizuku_device_owner_badge">Device Owner</string>
+    <string name="home_status_dhizuku_ready">Dhizuku (Device Owner) Ready</string>
+    <string name="home_status_dhizuku_ready_subtitle">Permanent reboot-resistant privilege active. Refresh rate &amp; policies ready.</string>
+    <string name="home_status_dhizuku_badge_ready">Device Owner · Ready</string>
+
+    <!-- Home Glass Screen: ADB Pairing Hub Card -->
+    <string name="home_card_pairing_hub_title">Wireless Pairing</string>
+    <string name="home_action_auto_pairing_title">Hands-Free Auto-Pairing</string>
+    <string name="home_action_auto_pairing_subtitle">Uses Accessibility to automatically input code when paired</string>
+    <string name="home_badge_enabled">Enabled</string>
+    <string name="home_badge_to_enable">Enable</string>
+    <string name="home_action_manual_pairing_title">Pairing Tutorial &amp; Code</string>
+    <string name="home_action_manual_pairing_subtitle">View pairing tutorial or manually enter 6-digit code</string>
+    <string name="home_badge_pairing_wizard">Tutorial</string>
+    <string name="home_action_open_dev_settings_title">Developer Options</string>
+    <string name="home_action_open_dev_settings_subtitle">Open system settings to toggle Wireless Debugging</string>
+    <string name="home_badge_to_settings">Settings</string>
+
+    <!-- Home Glass Screen: Startup Methods Card -->
+    <string name="home_card_launch_methods_title">More Startup Methods</string>
+    <string name="home_action_root_start_title">Start via Root</string>
+    <string name="home_action_root_start_subtitle">One-tap start for rooted devices without PC or Wi-Fi</string>
+    <string name="home_action_pc_start_title">Start via Computer</string>
+    <string name="home_action_pc_start_subtitle">Connect phone via USB and run script in computer terminal</string>
+    <string name="home_badge_view_command">View Command</string>
+    <string name="home_action_dhizuku_start_title">Dhizuku Mode (Device Owner)</string>
+    <string name="home_action_dhizuku_start_subtitle">Configure enterprise Device Owner privilege, survives reboots without Wi-Fi</string>
+    <string name="home_action_dhizuku_title">Dhizuku Mode (Device Owner)</string>
+    <string name="home_action_dhizuku_subtitle">Configure enterprise Device Owner privilege, survives reboots without Wi-Fi</string>
+    <string name="home_action_dhizuku_active_subtitle">Dhizuku Device Owner privilege is active (No Wi-Fi needed on reboot)</string>
+    <string name="home_badge_activated">Activated</string>
+    <string name="home_badge_learn_and_setup">Setup Guide</string>
+    <string name="home_badge_not_configured">Not Set</string>
+
+    <!-- Home Glass Screen: Running Service Tools Card -->
+    <string name="home_card_running_tools_title">Management &amp; Fallbacks</string>
+    <string name="home_action_root_restart_title">Restart via Root</string>
+    <string name="home_action_root_restart_subtitle">Switch to Root permission mode to run service</string>
+    <string name="home_action_pc_view_title">Computer ADB Command</string>
+    <string name="home_action_pc_view_subtitle">Execute adb starter.sh script in computer terminal</string>
+    <string name="home_action_dhizuku_running_subtitle">Dhizuku Device Owner privilege is active (No Wi-Fi needed on reboot)</string>
+
+    <!-- Home Glass Screen: Performance Mode Card (Tab 1) -->
+    <string name="home_card_perf_mode_title">Performance Profiles</string>
+    <string name="home_perf_mode_default">System Default</string>
+    <string name="home_perf_mode_saver">Adaptive Saver</string>
+    <string name="home_perf_mode_game">Max Performance</string>
+    <string name="home_perf_mode_desc_default">System Default: Restore official standard scheduling and adaptive refresh rate, clear extra scripts and throttling, stable for daily use.</string>
+    <string name="home_perf_mode_desc_saver">Adaptive Saver: Light power saving profile with unlocked 120Hz smooth adaptive rate and fast doze sleep for minimal battery drain.</string>
+    <string name="home_perf_mode_desc_game">Max Performance: Lock CPU/GPU performance schedule and high touch response, unlock refresh rate limits for zero frame drop.</string>
+
+    <!-- Home Glass Screen: Quick Switches Card -->
+    <string name="home_card_quick_switches_title">Hardware &amp; Experience</string>
+    <string name="home_switch_passthrough_title">Bypass Charging (Direct Power)</string>
+    <string name="home_switch_passthrough_subtitle">Power motherboard directly while gaming &amp; plugged in, preventing heat and preserving battery</string>
+    <string name="home_switch_game_auto_title">Auto Game Performance</string>
+    <string name="home_switch_game_auto_subtitle_active">%1$d games configured · Tap to manage list</string>
+    <string name="home_switch_game_auto_subtitle_inactive">Auto switch to max performance when gaming in foreground · Tap to configure</string>
+    <string name="home_badge_game_count">%1$d games ›</string>
+    <string name="home_badge_configure_list">Configure ›</string>
+    <string name="home_switch_fps_title">Real-time FPS Overlay</string>
+    <string name="home_switch_fps_subtitle">Compact overlay showing foreground app refresh rate and real FPS in upper right corner</string>
+    <string name="home_switch_outdoor_title">Outdoor High Brightness Mode</string>
+    <string name="home_switch_outdoor_subtitle">Temporarily boost physical display brightness beyond standard ceiling in direct sunlight</string>
+
+    <string name="home_switch_touch_title">Ultra-low Touch Latency</string>
+    <string name="home_switch_touch_subtitle">Eliminate queue buffering and accelerate TSP event delivery · Tap to open live diagnostic pad</string>
+    <string name="home_switch_thermal_title">System Thermal Protection</string>
+    <string name="home_switch_thermal_subtitle">Clear risky thermal overrides and restore official stock hardware-level thermal safeguards</string>
+
+    <!-- Home Glass Screen: Quick Actions Card -->
+    <string name="home_card_quick_actions_title">System Maintenance &amp; Tools</string>
+    <string name="home_action_battery_info_title">Battery Info &amp; Health</string>
+    <string name="home_action_battery_info_subtitle">Real-time battery level, temperature, current, cycle count and official Samsung health ASOC</string>
+    <string name="home_action_night_guard_title">Standby Wakeup Diagnosis</string>
+    <string name="home_action_night_guard_subtitle">Diagnose abnormal background wakeups and drain, suppress with one tap</string>
+    <string name="home_action_restore_defaults_title">Restore System Defaults</string>
+    <string name="home_action_restore_defaults_subtitle">Clear active tuning and restore official stock defaults</string>
+    <string name="home_badge_safe_reset">Safe Reset</string>
+    <string name="home_action_geek_lab_title">Geek Lab</string>
+    <string name="home_action_geek_lab_subtitle">Unlock restricted settings, background whitelist, and low-level diagnostics</string>
+    <string name="home_badge_enter_lab">Enter Lab</string>
+    <string name="home_action_user_manual_title">User Manual &amp; Help</string>
+    <string name="home_action_user_manual_subtitle">View architecture, usage guides, and troubleshooting</string>
+    <string name="home_badge_help">Help</string>
+
+    <!-- Geek Lab Dialog -->
+    <string name="geek_lab_dialog_title">Geek Lab</string>
+    <string name="geek_lab_opt_unlock_restricted">Unlock Restricted Settings</string>
+    <string name="geek_lab_opt_process_manager">Background Whitelist</string>
+    <string name="geek_lab_opt_system_diagnostics">Quick System Diagnostics</string>
+    <string name="dialog_close">Close</string>
+
+    <!-- Restricted Settings Guide &amp; Unlock Dialog -->
+    <string name="restricted_settings_dialog_title">Unlock Restricted Settings</string>
+    <string name="restricted_settings_dialog_message">Android 13+ restricts accessibility services for sideloaded APKs by default, showing them as \"Restricted Settings\".\n\n【How to Unlock:】\n1. Tap \"Go to App Info\" below to open the system details page;\n2. Tap the three dots (⋮) menu in the top-right corner;\n3. Select \"Allow restricted settings\";\n4. Verify your fingerprint or lock screen password, then accessibility will be unlocked!</string>
+    <string name="restricted_settings_btn_go_to_app_info">Go to App Info</string>
+    <string name="restricted_settings_btn_open_accessibility">Open Accessibility</string>
+    <string name="toast_restricted_settings_unlocked">Restricted settings unlocked via privileged command!</string>
+    <string name="toast_restricted_settings_guide_hint">Tap top-right three dots (⋮) and select \"Allow restricted settings\"</string>
+
+    <string name="restore_defaults_dialog_title">Restore System Defaults</string>
+    <string name="restore_defaults_dialog_message">This will clear all active performance, power saving, refresh rate, and system tuning settings, returning full control to the official system defaults:\n\n• Restore stock performance scheduling and thermal limits\n• Restore stock adaptive refresh rate policy\n• Turn off bypass charging and outdoor high brightness\n• Stop background helper services\n\nThis will not delete any app data or pairing information. Proceed?</string>
+    <string name="restore_defaults_confirm">Restore</string>
+    <string name="restore_defaults_success">Official system defaults fully restored</string>
+    <string name="restore_defaults_failed">Failed to restore: %1$s</string>
+
+    <string name="detail_title_game_auto">Game Mode Auto Switch</string>
+    <string name="detail_title_doze_whitelist">Background Protection List</string>
+    <string name="detail_title_quick_doze">Screen-Off Deep Sleep</string>
+    <string name="detail_title_battery_protection">Bypass Charging &amp; Battery Protection</string>
+
+    <string name="toast_dev_settings_opened">Developer options opened. Please enable Wireless Debugging.</string>
+    <string name="toast_dev_settings_opened_compat_policies">Developer options opened. Scroll to bottom \"More settings\" to toggle (enable Accessibility for auto-scroll).</string>
+    <string name="toast_dev_settings_opened_compat_policies_auto">Developer options opened. Automatically scrolling to \"More settings\"...</string>
+    <string name="toast_dev_settings_failed">Unable to open Developer options directly. Please navigate via Settings.</string>
+    <string name="toast_outdoor_enabled">Outdoor peak physical brightness enabled</string>
+    <string name="toast_outdoor_disabled">Standard brightness restored</string>
+    <string name="toast_outdoor_enable_failed">Failed to enable outdoor mode: %1$s</string>
+    <string name="toast_outdoor_disable_failed">Failed to restore brightness: %1$s</string>
+
+    <string name="toast_service_not_running">Shizuku service is not running</string>
+    <string name="toast_service_not_running_start_first">Shizuku service is not running. Please start it below first.</string>
+    <string name="toast_hotspot_opened">Tethering &amp; hotspot opened. Turn on hotspot to pair and start without Wi-Fi.</string>
+    <string name="toast_mode_switched_saver">Switched to: Adaptive Saver (Power saving + 120Hz adaptive)</string>
+    <string name="toast_mode_switched_game">Switched to: Max Performance (CPU/GPU boost + 120Hz)</string>
+    <string name="toast_mode_switched_default">Restored to: System Default scheduling</string>
+    <string name="toast_mode_switch_failed">Failed to switch mode: %1$s</string>
+    <string name="toast_passthrough_enabled">Bypass charging enabled (Direct motherboard power)</string>
+    <string name="toast_passthrough_disabled">Bypass charging disabled</string>
+    <string name="toast_passthrough_toggle_failed">Failed to toggle bypass charging: %1$s</string>
+    <string name="toast_game_auto_enabled">Auto Game Performance enabled</string>
+    <string name="toast_game_auto_disabled">Auto Game Performance disabled</string>
+    <string name="toast_fps_enabled">Real-time FPS overlay enabled</string>
+    <string name="toast_fps_disabled">Real-time FPS overlay disabled</string>
+    <string name="toast_fps_toggle_failed">Failed to toggle FPS overlay: %1$s</string>
+    <string name="toast_wireless_pairing_requires_android_11">Wireless debugging pairing requires Android 11 or above.</string>
+    <string name="toast_auto_pairing_ready">Pairing assistant is ready! Tap \"Pair device with pairing code\" to pair automatically.</string>
+
+    <!-- Tab 2: App Rules -->
+    <string name="home_header_rules_title">Per-App Refresh Rate</string>
+    <string name="home_header_rules_subtitle">Assign custom adaptive or fixed refresh rates to specific apps</string>
+    <string name="rules_card_accessibility_title">Foreground App Detection</string>
+    <string name="rules_card_accessibility_subtitle">Monitors active foreground apps via Accessibility Service to switch rates seamlessly</string>
+    <string name="rules_badge_service_running">Service Running</string>
+    <string name="rules_badge_service_disabled">Service Disabled</string>
+    <string name="rules_btn_enable_accessibility">Enable Accessibility</string>
+    <string name="rules_warning_accessibility">⚠️ Accessibility service is not enabled. Rules will not switch automatically.</string>
+    <string name="rules_warning_accessibility_locked">⚠️ App-specific refresh rate rules strictly require the Accessibility Service to detect foreground apps. This feature is disabled until the service is turned on.</string>
+    <string name="rules_toast_accessibility_required">Accessibility Service must be enabled to use per-app rules</string>
+    <string name="rules_rule_status_paused">Paused (Service Off)</string>
+    <string name="rules_compat_policy_tip_title">Why Some Apps (e.g. TikTok) Lock at 60Hz?</string>
+    <string name="rules_compat_policy_tip_desc">Android and One UI have built-in compatibility policies that force video streaming apps (TikTok, etc.) to 60Hz. On Samsung devices, go to Developer Options, scroll to the bottom and enter \"More settings\", then enable \"Disable app compatibility policies\" to unlock full 120Hz.</string>
+    <string name="rules_btn_open_dev_options">Open Developer Options</string>
+    <string name="rules_calibrate_ltpo_title">LTPO Adaptive Calibration</string>
+    <string name="rules_calibrate_ltpo_desc">Activate 1Hz~120Hz native hardware adaptive refresh and clear residual locks to reduce idle screen power drain.</string>
+    <string name="rules_btn_calibrate_ltpo">Activate Adaptive Refresh</string>
+    <string name="toast_calibrate_ltpo_success">Successfully activated 1Hz~120Hz native LTPO adaptive refresh! Lowest power achieved when screen is idle.</string>
+    <string name="toast_calibrate_ltpo_failed">Calibration failed: %1$s</string>
+    <string name="rules_card_presets_title">Scenario Presets</string>
+    <string name="rules_preset_daily">Daily Adaptive (10~120Hz)</string>
+    <string name="rules_preset_video">Video Saver (60Hz)</string>
+    <string name="rules_preset_reading">Reading (10~60Hz)</string>
+    <string name="rules_preset_game">Gaming Max (120Hz)</string>
+    <string name="rules_card_config_title">App Rule Configuration</string>
+    <string name="rules_select_app_hint">Tap to select target app</string>
+    <string name="rules_switch_adaptive">Adaptive Refresh Rate</string>
+    <string name="rules_switch_adaptive_summary_on">Dynamically scales between minimum and maximum rate</string>
+    <string name="rules_switch_adaptive_summary_off">Locks display to fixed maximum refresh rate</string>
+    <string name="rules_label_max_hz">Max Refresh Rate</string>
+    <string name="rules_label_min_hz">Min Refresh Rate</string>
+    <string name="rules_btn_save">Save Rule</string>
+    <string name="rules_btn_delete">Delete Rule</string>
+    <string name="rules_card_list_title">Configured Rules (%1$d)</string>
+    <string name="rules_list_empty">No custom rules. All apps follow system global refresh rate.</string>
+    <string name="rules_btn_clear_all">Clear All Rules</string>
+    <string name="rules_toast_saved">Rule saved</string>
+    <string name="rules_toast_deleted">Rule removed</string>
+    <string name="rules_toast_cleared">All rules cleared</string>
+
+    <!-- Settings Glass Screen -->
+    <string name="settings_section_startup">Startup &amp; Background Daemon</string>
+    <string name="settings_section_appearance">Appearance &amp; Theme</string>
+    <string name="settings_section_language">Language</string>
+    <string name="settings_section_about">About &amp; Translation</string>
+    <string name="settings_port_dialog_title">TCP Debugging Port</string>
+    <string name="settings_night_mode_title">Dark Theme</string>
+    <string name="settings_night_mode_follow_system">Follow System</string>
+    <string name="settings_night_mode_on">Always On</string>
+    <string name="settings_night_mode_off">Always Off</string>
+
+    <!-- Accessibility Guidance Dialog & Privileged Activation -->
+    <string name="accessibility_dialog_guide_title">Enable Accessibility Service</string>
+    <string name="accessibility_dialog_guide_message">On Samsung One UI and other systems, third-party accessibility services are organized under \"Installed apps\".\n\nAfter jumping to Accessibility settings, please tap \"Installed apps\", find \"%1$s\" and turn it on.</string>
+    <string name="accessibility_dialog_guide_btn_jump">Go to Settings</string>
+    <string name="accessibility_toast_activated_by_privilege">Accessibility service activated directly via privileged service!</string>
+    <string name="accessibility_toast_samsung_hint">Please tap \"Installed apps\" -> find and enable \"%1$s\"</string>
+</resources>

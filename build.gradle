@@ -1,0 +1,46 @@
+plugins {
+    id("idea")
+    id("com.android.application") apply false
+    id("com.android.library") apply false
+    id("org.jetbrains.kotlin.android") apply false
+    id("dev.rikka.tools.autoresconfig") apply false
+    id("dev.rikka.tools.materialthemebuilder") apply false
+    id("dev.rikka.tools.refine") apply false
+}
+
+idea.module {
+    excludeDirs += file('out')
+}
+
+subprojects {
+    plugins.withId("com.android.base") {
+        android {
+            compileSdk = 37
+            buildToolsVersion = "36.0.0"
+            ndkVersion = "29.0.13113456"
+            defaultConfig {
+                minSdk = 26
+                targetSdk = 37
+            }
+            compileOptions {
+                sourceCompatibility = JavaVersion.VERSION_21
+                targetCompatibility = JavaVersion.VERSION_21
+            }
+        }
+    }
+}
+
+apply from: 'api/manifest.gradle'
+def gitCommitId = "20260812"
+def gitCommitCount = 100
+try {
+    def id = 'git rev-parse --short HEAD'.execute([], project.rootDir).text.trim()
+    if (id) gitCommitId = id
+    def countStr = 'git rev-list --count HEAD'.execute([], project.rootDir).text.trim()
+    if (countStr && countStr.isInteger()) gitCommitCount = Integer.parseInt(countStr)
+} catch (Throwable ignored) {
+}
+ext {
+    versionCode = 130703
+    versionName = "13.7.3"
+}

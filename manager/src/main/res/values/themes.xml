@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="ThemeOverlay.App.PopupMenu" parent="ThemeOverlay.Material3">
+        <item name="android:colorBackground">#FFFFFFFF</item>
+        <item name="colorSurface">#FFFFFFFF</item>
+        <item name="colorSurfaceContainer">#FFFFFFFF</item>
+        <item name="colorSurfaceContainerLow">#FFFFFFFF</item>
+        <item name="colorSurfaceContainerHigh">#FFFFFFFF</item>
+        <item name="colorSurfaceContainerHighest">#FFFFFFFF</item>
+        <item name="android:popupBackground">@drawable/bg_popup_menu_light</item>
+        <item name="popupMenuBackground">@drawable/bg_popup_menu_light</item>
+    </style>
+
+    <style name="ThemeOverlay.App.PopupMenu.Dark" parent="ThemeOverlay.Material3">
+        <item name="android:colorBackground">#FF1E222A</item>
+        <item name="colorSurface">#FF1E222A</item>
+        <item name="colorSurfaceContainer">#FF1E222A</item>
+        <item name="colorSurfaceContainerLow">#FF1E222A</item>
+        <item name="colorSurfaceContainerHigh">#FF1E222A</item>
+        <item name="colorSurfaceContainerHighest">#FF1E222A</item>
+        <item name="android:popupBackground">@drawable/bg_popup_menu_dark</item>
+        <item name="popupMenuBackground">@drawable/bg_popup_menu_dark</item>
+    </style>
+
+    <style name="Widget.App.PopupMenu.Overflow" parent="Widget.Material3.PopupMenu.Overflow">
+        <item name="android:popupBackground">@drawable/bg_popup_menu_light</item>
+    </style>
+
+    <style name="Widget.App.PopupMenu.Overflow.Dark" parent="Widget.Material3.PopupMenu.Overflow">
+        <item name="android:popupBackground">@drawable/bg_popup_menu_dark</item>
+    </style>
+
+    <style name="Base.AppTheme.Light" parent="Theme.Material3.Light.Shizuku">
+        <item name="android:statusBarColor">?android:colorBackground</item>
+
+        <item name="appColorPrimary">@color/app_color_light</item>
+        <item name="homeCardStyle">@style/Card.Light</item>
+
+        <item name="colorSurface">#FFFFFFFF</item>
+        <item name="colorSurfaceContainer">#FFFFFFFF</item>
+        <item name="colorSurfaceContainerLow">#FFFFFFFF</item>
+        <item name="colorSurfaceContainerHigh">#FFFFFFFF</item>
+        <item name="colorSurfaceContainerHighest">#FFFFFFFF</item>
+        <item name="android:popupBackground">@drawable/bg_popup_menu_light</item>
+        <item name="popupMenuBackground">@drawable/bg_popup_menu_light</item>
+        <item name="actionBarPopupTheme">@style/ThemeOverlay.App.PopupMenu</item>
+        <item name="popupTheme">@style/ThemeOverlay.App.PopupMenu</item>
+        <item name="actionOverflowMenuStyle">@style/Widget.App.PopupMenu.Overflow</item>
+
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+    </style>
+
+    <style name="Theme.Light" parent="Base.AppTheme.Light" />
+
+    <style name="Base.AppTheme" parent="Theme.Material3.Dark.Shizuku">
+        <item name="appColorPrimary">@color/app_color_dark</item>
+        <item name="homeCardStyle">@style/Card</item>
+
+        <item name="colorSurface">#FF1E222A</item>
+        <item name="colorSurfaceContainer">#FF1E222A</item>
+        <item name="colorSurfaceContainerLow">#FF1E222A</item>
+        <item name="colorSurfaceContainerHigh">#FF1E222A</item>
+        <item name="colorSurfaceContainerHighest">#FF1E222A</item>
+        <item name="android:popupBackground">@drawable/bg_popup_menu_dark</item>
+        <item name="popupMenuBackground">@drawable/bg_popup_menu_dark</item>
+        <item name="actionBarPopupTheme">@style/ThemeOverlay.App.PopupMenu.Dark</item>
+        <item name="popupTheme">@style/ThemeOverlay.App.PopupMenu.Dark</item>
+        <item name="actionOverflowMenuStyle">@style/Widget.App.PopupMenu.Overflow.Dark</item>
+
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+    </style>
+
+    <style name="Theme" parent="Base.AppTheme" />
+
+</resources>
