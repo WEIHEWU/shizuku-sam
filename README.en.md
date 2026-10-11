@@ -1,10 +1,10 @@
 # Shizuku Sam
 
-[中文说明](README.md) · **[📥 Direct Download APK (Shizuku-Sam-v13.7.3.apk · 3.3 MB)](https://github.com/WEIHEWU/shizuku-sam/raw/main/releases/Shizuku-Sam-v13.7.3.apk)** · [Releases](https://github.com/WEIHEWU/shizuku-sam/releases)
+[中文说明](README.md) · **[📥 Direct Download Latest APK (Shizuku-Sam-v13.7.7.apk · 3.4 MB)](https://github.com/WEIHEWU/shizuku-sam/raw/main/releases/Shizuku-Sam-v13.7.7.apk)** · [Releases](https://github.com/WEIHEWU/shizuku-sam/releases)
 
-An enhanced edition of **Shizuku (`moe.shizuku.privileged.api`)** tailored for Samsung One UI 8.5 / Galaxy flagships, featuring **Wi-Fi-free Boot Auto-Start (Loopback ADB TLS port scanner)**, a **3-Channel Execution Engine (Root / Shizuku / Device Owner)**, and a **100% genuine, zero-placebo hardware & system tuning suite**.
+An enhanced edition of **Shizuku (`moe.shizuku.privileged.api`)** tailored for Samsung One UI 8.5 / Galaxy flagships, built with **Miuix (`top.yukonga.miuix.kmp`)** UI, featuring **Wi-Fi-free Boot Auto-Start (Loopback ADB TLS port scanner)**, a **3-Channel Execution Engine (Root / Shizuku / Device Owner)**, and a **100% genuine, zero-placebo hardware & system tuning suite**.
 
-Current version: `13.7.3` (`versionCode 130703`).
+Current version: `13.7.7` (`versionCode 130707`).
 
 > Tested and verified on Samsung Galaxy S24 Ultra (One UI 8.5 / Android 16), while remaining 100% compatible with the standard Shizuku API ecosystem.
 
@@ -18,7 +18,7 @@ Current version: `13.7.3` (`versionCode 130703`).
   - Automatically routes privileged operations through **Root (`su`) → Shizuku (`rish`/Binder) → Device Owner (DPM)** with real-time state readback verification.
 
 ### 2. Display & Touch Tuning (100% Real System Writes, Zero Placebo)
-- **Refresh Rate & LTPO Control**: Directly configures `Settings.Secure [refresh_rate_mode]`, `Settings.System [peak_refresh_rate]`, and `min_refresh_rate` (Adaptive 120Hz / Forced 120Hz / Standard 60Hz), plus `SurfaceFlinger` hardware frame rate locking.
+- **Refresh Rate & LTPO Control**: Directly configures `Settings.Secure [refresh_rate_mode]`, `Settings.System [peak_refresh_rate]`, and `min_refresh_rate` (Adaptive 120Hz / Forced 120Hz / Standard 60Hz), plus `SurfaceFlinger` hardware frame rate locking and zero-lag real-time FPS monitor (`dumpsys SurfaceFlinger --latency`).
 - **Samsung 240Hz Touch Sampling & Live Touch Tester**: Reads/writes `game_touch_sampling_rate` and `sec_tsp` hardware status (`get_game_mode`), complete with an interactive multi-touch Hz & latency test pad.
 - **Screen Color Mode & Hardware Extra Dim (`Reduce Bright Colors`)**: Directly controls `sec_display_preset_index`, `reduce_bright_colors_activated`, and `reduce_bright_colors_level`.
 - **Samsung Native Double-Tap to Wake (`double_tab_to_wake_up`) & Double-Tap to Sleep (`double_tab_to_sleep`)**.
@@ -31,7 +31,7 @@ Current version: `13.7.3` (`versionCode 130703`).
 - **App DEX Compilation (`cmd package compile -m speed-profile / everything`)**, system-wide cache trimming (`pm trim-caches`), kernel pagecache reclamation (`drop_caches`), and `fstrim`.
 
 ### 4. Battery Health, Charging & Network Privacy
-- **Samsung Battery Protection (`protect_battery`) & Fast Charging Controls**: Direct toggles for `adaptive_fast_charging`, `super_fast_charging`, and `wireless_fast_charging`.
+- **Samsung Battery Protection (`protect_battery` / `battery_protection_threshold`) & Fast Charging Controls**: Miuix modal dialog for charging threshold & direct toggles for `adaptive_fast_charging`, `super_fast_charging`, `wireless_fast_charging`, and bypass power (`pass_through`).
 - **Deep Doze Force-Idle (`dumpsys deviceidle force-idle`)**.
 - **Private DNS (DoT) Switcher**: Built-in presets for AdGuard DNS, Cloudflare `1.1.1.1`, AliDNS, DNSPod, and custom DoT hostnames.
 - **Immersive Mode (`policy_control`), Status Bar Icon Filter (`icon_blacklist`), Recents Privacy Blur, and Clipboard Guard**.
@@ -44,7 +44,7 @@ Requires JDK 21 and Android SDK (`compileSdk 37` / `NDK 29.0.13113456`).
 ./gradlew :manager:assembleRelease
 ```
 
-Output APK: `manager/build/outputs/apk/release/shizuku-v13.7.3-release.apk`.
+Output APK: `manager/build/outputs/apk/release/shizuku-v13.7.7-release.apk`.
 - If `signing.properties` is present in the project root, the release keystore is used.
 - Otherwise, the build script automatically falls back to the Android Debug Keystore so cloned repositories build out of the box.
 
