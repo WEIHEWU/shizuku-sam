@@ -4130,32 +4130,6 @@ open class MaxHzActivity : AppBarActivity() {
         val batteryState = statusBadge(batteryProtectionState())
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            
-            addSpacedView(toggleCard(
-                "全局旁路供电（全场景通用）",
-                "连接 25W+ PPS 快充头且电量 ≥20% 时，充电器直接为主板供电，电池不充电、不发热，日常全局通用。",
-                "开启全局旁路",
-                "启用全场景硬件旁路供电",
-                {
-                    val limit = batteryLimitInput.safeInt(80).coerceIn(50, 100)
-                    MaxHzController.applyPassThroughMode(limit).also {
-                        if (it.code == 0) {
-                            MaxHzPrefs.setPassThroughEnabled(this@MaxHzActivity, true)
-                        }
-                    }
-                },
-                "恢复旁路",
-                "关闭全局旁路供电",
-                {
-                    MaxHzController.restorePassThroughMode().also {
-                        if (it.code == 0) {
-                            MaxHzPrefs.setPassThroughEnabled(this@MaxHzActivity, false)
-                        }
-                    }
-                },
-                { passThroughState() },
-                requireRoot = true
-            ), gap)
 
             addSpacedView(featureCard(
                 "自定义电池保护阈值",
