@@ -155,8 +155,13 @@ dependencies {
     implementation 'androidx.compose.foundation:foundation'
     implementation 'androidx.compose.material3:material3'
     implementation 'androidx.compose.runtime:runtime-livedata'
-    implementation 'androidx.activity:activity-compose:1.10.1'
+    implementation 'androidx.activity:activity-compose:1.13.0'
     debugImplementation 'androidx.compose.ui:ui-tooling'
+
+    // Miuix UI 组件库（与 Kotlin 2.3.21 匹配的 0.9.1 版本）
+    implementation 'top.yukonga.miuix.kmp:miuix-ui-android:0.9.1'
+    implementation 'top.yukonga.miuix.kmp:miuix-preference-android:0.9.1'
+    implementation 'top.yukonga.miuix.kmp:miuix-icons-android:0.9.1'
 
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2'
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2'

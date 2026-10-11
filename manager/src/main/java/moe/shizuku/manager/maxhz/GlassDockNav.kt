@@ -86,11 +86,12 @@ fun GlassDockNav(
     )
 
     val pillShape = remember { RoundedCornerShape(24.dp) }
-    val pillBgColor = if (isDark) Color(0xFF2C323E) else Color(0xFFE2E8F0)
-    val pillBorderColor = if (isDark) Color(0x33FFFFFF) else Color(0x18000000)
+    val primaryColor = top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme.primary
+    val pillBgColor = if (isDark) primaryColor.copy(alpha = 0.22f) else primaryColor.copy(alpha = 0.14f)
+    val pillBorderColor = if (isDark) primaryColor.copy(alpha = 0.38f) else primaryColor.copy(alpha = 0.24f)
 
-    val dockBgColor = if (isDark) Color(0xF2181C24) else Color(0xF8FFFFFF)
-    val dockBorderColor = if (isDark) Color(0x28FFFFFF) else Color(0x14000000)
+    val dockBgColor = if (isDark) Color(0xF51F1F23) else Color(0xFAFFFFFF)
+    val dockBorderColor = if (isDark) Color(0x26FFFFFF) else Color(0x14000000)
 
     Box(
         Modifier
@@ -100,10 +101,10 @@ fun GlassDockNav(
             .height(58.dp)
             .clip(dockShape)
             .background(dockBgColor)
-            .border(1.dp, dockBorderColor, dockShape),
+            .border(0.8.dp, dockBorderColor, dockShape),
         contentAlignment = Alignment.CenterStart
     ) {
-        // 1. 高性能指示器胶囊（纯 GPU 硬件变换层，免去内部二次离屏烘焙与重布局）
+        // 1. Miuix 指示器胶囊（纯 GPU 硬件变换层）
         Box(
             Modifier
                 .graphicsLayer {
@@ -113,7 +114,7 @@ fun GlassDockNav(
                 .height(DOCK_PILL_HEIGHT)
                 .clip(pillShape)
                 .background(pillBgColor)
-                .border(1.dp, pillBorderColor, pillShape)
+                .border(0.8.dp, pillBorderColor, pillShape)
         )
 
         // 2. 3 个页签交互行
@@ -129,6 +130,7 @@ fun GlassDockNav(
                     label = label,
                     selected = index == clampedIndex,
                     isDark = isDark,
+                    primaryColor = primaryColor,
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         onTabClick(index)
@@ -140,23 +142,23 @@ fun GlassDockNav(
 }
 
 /**
- * dock 内的单个胶囊按钮：
- * 文字颜色平滑过渡，零额外 RenderNode 开销。
+ * dock 内的单个胶囊按钮：选中时高亮为 Miuix 主色。
  */
 @Composable
 private fun RowScope.DockTabButton(
     label: String,
     selected: Boolean,
     isDark: Boolean,
+    primaryColor: Color,
     onClick: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
 
     val textColor by animateColorAsState(
         targetValue = when {
-            selected -> if (isDark) Color(0xFFEAF2FF) else Color(0xFF10151F)
-            isDark -> Color(0xFF8E99A8)
-            else -> Color(0xFF6B7280)
+            selected -> primaryColor
+            isDark -> Color(0xFF98989F)
+            else -> Color(0xFF6E6E73)
         },
         animationSpec = tween(durationMillis = 150),
         label = "dockTabText"
@@ -175,7 +177,7 @@ private fun RowScope.DockTabButton(
     ) {
         Text(
             text = label,
-            fontSize = 12.5.sp,
+            fontSize = 13.sp,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
             color = textColor
         )

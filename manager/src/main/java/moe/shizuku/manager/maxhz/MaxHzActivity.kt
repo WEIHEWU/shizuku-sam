@@ -4307,6 +4307,78 @@ open class MaxHzActivity : AppBarActivity() {
         }
     }
 
+    protected fun applyBatteryProtectionFromUi(
+        limit: Int,
+        recharge: Int,
+        onChanged: (() -> Unit)? = null,
+        onResult: (Boolean, String) -> Unit
+    ) {
+        val safeLimit = limit.coerceIn(50, 100)
+        val safeRecharge = recharge.coerceIn(40, (safeLimit - 5).coerceAtLeast(40))
+        val wasEnabled = MaxHzPrefs.batteryProtectionEnabled(this)
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                MaxHzController.applyBatteryProtection(safeLimit, safeRecharge)
+            }
+            if (result.code == 0) {
+                MaxHzPrefs.setBatteryProtectionConfig(this@MaxHzActivity, safeLimit, safeRecharge)
+                MaxHzPrefs.setBatteryProtectionEnabled(this@MaxHzActivity, true)
+                startMaxHzService()
+                onChanged?.invoke()
+                val msg = "已开启充电上限保护（${safeLimit}% 停充 / ${safeRecharge}% 复充）"
+                Toast.makeText(this@MaxHzActivity, msg, Toast.LENGTH_SHORT).show()
+                onResult(true, msg)
+            } else {
+                MaxHzPrefs.setBatteryProtectionEnabled(this@MaxHzActivity, wasEnabled)
+                val msg = "设置失败：${commandFailureReason(result)}"
+                Toast.makeText(this@MaxHzActivity, msg, Toast.LENGTH_SHORT).show()
+                onResult(false, msg)
+            }
+        }
+    }
+
+    protected fun restoreBatteryProtectionFromUi(
+        onChanged: (() -> Unit)? = null,
+        onResult: (Boolean, String) -> Unit
+    ) {
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                MaxHzController.restoreBatteryProtection()
+            }
+            if (result.code == 0) {
+                MaxHzPrefs.setBatteryProtectionEnabled(this@MaxHzActivity, false)
+                updateMaxHzServiceState()
+                onChanged?.invoke()
+                val msg = "已恢复系统默认电池保护"
+                Toast.makeText(this@MaxHzActivity, msg, Toast.LENGTH_SHORT).show()
+                onResult(true, msg)
+            } else {
+                val msg = "恢复失败：${commandFailureReason(result)}"
+                Toast.makeText(this@MaxHzActivity, msg, Toast.LENGTH_SHORT).show()
+                onResult(false, msg)
+            }
+        }
+    }
+
+    protected fun fetchBatteryInfoFromUi(onResult: (String) -> Unit) {
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                try {
+                    MaxHzController.readBatteryProtectionStatus()
+                } catch (t: Throwable) {
+                    MaxHzShell.Result(-2, "", t.message ?: t.javaClass.simpleName)
+                }
+            }
+            val time = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
+            val text = if (result.code == 0) {
+                "更新时间：$time\n${batteryProtectionSystemStatusText(result.out)}"
+            } else {
+                "更新时间：$time\n无法读取电池信息\n请检查 Shizuku 或 Root 权限状态后重试。"
+            }
+            onResult(text)
+        }
+    }
+
     protected fun showBatteryInfoDialog() {
         val infoView = batteryProtectionSystemStatusView("电池信息\n正在读取...\n点击下方“刷新数据”可重新获取。")
         val content = LinearLayout(this).apply {
@@ -4332,21 +4404,9 @@ open class MaxHzActivity : AppBarActivity() {
 
         fun loadData() {
             infoView.text = "电池信息\n正在读取最新状态..."
-            lifecycleScope.launch {
-                val result = withContext(Dispatchers.IO) {
-                    try {
-                        MaxHzController.readBatteryProtectionStatus()
-                    } catch (t: Throwable) {
-                        MaxHzShell.Result(-2, "", t.message ?: t.javaClass.simpleName)
-                    }
-                }
+            fetchBatteryInfoFromUi { text ->
                 if (dialog.isShowing) {
-                    val time = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
-                    infoView.text = if (result.code == 0) {
-                        "电池信息\n更新时间：$time\n${batteryProtectionSystemStatusText(result.out)}"
-                    } else {
-                        "电池信息\n更新时间：$time\n无法读取电池信息\n请检查 Shizuku 状态后重试。"
-                    }
+                    infoView.text = "电池信息\n$text"
                 }
             }
         }

@@ -451,6 +451,9 @@ abstract class HomeActivity : MaxHzActivity() {
                 .setNegativeButton(android.R.string.cancel, null)
                 .show()
         },
+        onConfirmStopService = {
+            try { Shizuku.exit() } catch (_: Throwable) {}
+        },
         onModeChange = { mode -> handleModeChange(mode) },
         onTogglePassThrough = { on -> handleTogglePassThrough(on) },
         onToggleBatteryProtection = { on -> handleToggleBatteryProtection(on) },
@@ -458,6 +461,20 @@ abstract class HomeActivity : MaxHzActivity() {
             showBatteryProtectionDialog {
                 syncSchemeAStates()
             }
+        },
+        onApplyBatteryProtectionConfig = { limit, recharge, onResult ->
+            applyBatteryProtectionFromUi(
+                limit = limit,
+                recharge = recharge,
+                onChanged = { syncSchemeAStates() },
+                onResult = onResult
+            )
+        },
+        onRestoreBatteryProtectionDefault = { onResult ->
+            restoreBatteryProtectionFromUi(
+                onChanged = { syncSchemeAStates() },
+                onResult = onResult
+            )
         },
         onToggleGameAutoSwitch = { on -> handleToggleGameAutoSwitch(on) },
         onToggleFpsMonitor = { on -> handleToggleFpsMonitor(on) },
@@ -480,6 +497,7 @@ abstract class HomeActivity : MaxHzActivity() {
         },
         onToggleForceResizable = { on -> handleToggleForceResizable(on) },
         onBatteryInfoClick = { showBatteryInfoDialog() },
+        onFetchBatteryInfo = { onResult -> fetchBatteryInfoFromUi(onResult) },
         onRestoreDefaultsClick = { handleRestoreDefaultsClick() },
         onOpenLaboratoryClick = { handleOpenLaboratoryClick() },
         onOpenGameAutoConfigClick = { pushDetail(getString(R.string.detail_title_game_auto)) { gameAutoPerformanceCard() } },

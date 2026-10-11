@@ -81,7 +81,7 @@ fun getSystemOrAppPrimaryColor(isDark: Boolean): Color {
             val scheme = if (isDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
             scheme.primary
         } else {
-            if (isDark) Color(0xFF8C9EFF) else Color(0xFF3F51B5)
+            if (isDark) Color(0xFF277AF7) else Color(0xFF3482FF)
         }
     }
 }
@@ -92,6 +92,7 @@ fun GlassAppTheme(
     content: @Composable () -> Unit
 ) {
     val context = LocalContext.current
+    val primaryColor = getSystemOrAppPrimaryColor(isDark)
     val colorScheme = remember(isDark, ThemeHelper.isUsingSystemColor()) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && ThemeHelper.isUsingSystemColor()) {
             if (isDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
@@ -100,10 +101,47 @@ fun GlassAppTheme(
         }
     }
 
+    val miuixColors = remember(isDark, primaryColor) {
+        if (isDark) {
+            top.yukonga.miuix.kmp.theme.darkColorScheme(
+                primary = primaryColor,
+                primaryVariant = primaryColor,
+                surface = Color(0xFF000000),
+                background = Color(0xFF000000),
+                surfaceContainer = Color(0xFF1F1F23),
+                surfaceVariant = Color(0xFF1F1F23)
+            )
+        } else {
+            top.yukonga.miuix.kmp.theme.lightColorScheme(
+                primary = primaryColor,
+                primaryVariant = primaryColor,
+                surface = Color(0xFFF7F7F7),
+                background = Color(0xFFF7F7F7),
+                surfaceContainer = Color(0xFFFFFFFF),
+                surfaceVariant = Color(0xFFFFFFFF)
+            )
+        }
+    }
+
+    val existingNavOwner = androidx.navigationevent.compose.LocalNavigationEventDispatcherOwner.current
+    val fallbackNavOwner = remember {
+        object : androidx.navigationevent.NavigationEventDispatcherOwner {
+            override val navigationEventDispatcher = androidx.navigationevent.NavigationEventDispatcher()
+        }
+    }
+
     MaterialTheme(
         colorScheme = colorScheme,
         shapes = GlassShapes,
-        typography = GlassTypography,
-        content = content
-    )
+        typography = GlassTypography
+    ) {
+        androidx.compose.runtime.CompositionLocalProvider(
+            androidx.navigationevent.compose.LocalNavigationEventDispatcherOwner provides (existingNavOwner ?: fallbackNavOwner)
+        ) {
+            top.yukonga.miuix.kmp.theme.MiuixTheme(
+                colors = miuixColors,
+                content = content
+            )
+        }
+    }
 }

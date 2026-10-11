@@ -2,10 +2,6 @@ package moe.shizuku.manager.maxhz
 
 import android.net.Uri
 import android.view.View
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -18,12 +14,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -33,21 +26,25 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import moe.shizuku.manager.utils.Contrast
+import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CardDefaults
+import top.yukonga.miuix.kmp.basic.SmallTitle
+import top.yukonga.miuix.kmp.basic.Switch
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.preference.ArrowPreference
+import top.yukonga.miuix.kmp.preference.SwitchPreference
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.utils.overScrollVertical
 
 /**
- * 方案 A：MaxHz 三个 tab（屏幕显示 / 性能加速 / 电池省电）的高性能 Compose 渲染。
- *
- * 彻底消除 GPU 离屏模糊与背景管线开销，对齐 ShizukuX 原生极速设计，保证 120fps 流畅度。
+ * 方案 A：MaxHz 三个 tab（屏幕显示 / 性能加速 / 电池省电）的 Miuix 原生渲染。
  */
 
 /** 行内开关动作 */
@@ -101,28 +98,21 @@ fun MaxHzPageScreen(
 ) {
     val density = LocalDensity.current
     val bottomInsetDp = with(density) { bottomInsetPx.toDp() }
-
-    val bgColor = if (isBlackNightTheme) {
-        Color.Black
-    } else if (isDark) {
-        Color(0xFF111418)
-    } else {
-        Color(0xFFF7F9FC)
-    }
+    val bgColor = if (isBlackNightTheme) Color.Black else MiuixTheme.colorScheme.surface
 
     Box(Modifier.fillMaxSize().background(bgColor)) {
         val expandedStates = remember { mutableStateMapOf<String, Boolean>() }
         val listState = rememberLazyListState()
 
         LazyColumn(
-            Modifier.fillMaxSize(),
+            Modifier.fillMaxSize().overScrollVertical(),
             state = listState,
             contentPadding = PaddingValues(
                 top = with(density) { topInsetPx.toDp() },
                 start = 16.dp, end = 16.dp,
                 bottom = GLASS_DOCK_CLEARANCE_DP + bottomInsetDp
             ),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             groups.forEach { group ->
                 item(key = "group-${group.label}", contentType = "group") {
@@ -174,7 +164,11 @@ private fun ActionGlassCard(
     primaryColor: Color,
     card: MaxHzActionCard
 ) {
-    GlassCard(isDark = isDark) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        cornerRadius = 16.dp,
+        colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+    ) {
         Column(Modifier.padding(16.dp)) {
             Row(
                 Modifier.fillMaxWidth(),
@@ -191,14 +185,14 @@ private fun ActionGlassCard(
                         text = card.title,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Medium,
-                        color = if (isDark) Color(0xFFF1F5F9) else Color(0xFF1E293B),
+                        color = MiuixTheme.colorScheme.onSurface,
                         maxLines = 1
                     )
                     Spacer(Modifier.height(2.dp))
                     Text(
                         text = card.subtitle,
-                        fontSize = 11.5.sp,
-                        color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B)
+                        fontSize = 12.sp,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                     )
                 }
             }
@@ -235,40 +229,27 @@ private fun GroupGlassCard(
                     } else {
                         Modifier
                     }
-                )
-                .padding(start = 18.dp, top = 2.dp, bottom = 6.dp),
+                ),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = group.label,
-                fontSize = 12.5.sp,
-                fontWeight = FontWeight.Bold,
-                color = Contrast.ensure(primaryColor, Contrast.glassSurface(isDark)),
-                modifier = Modifier.weight(1f, fill = false)
+            SmallTitle(
+                text = if (group.collapsedByDefault) {
+                    "${group.label} ${if (expanded) "▾" else "▸"}"
+                } else {
+                    group.label
+                },
+                insideMargin = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
             )
-            if (group.collapsedByDefault) {
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    text = if (expanded) "▾" else "▸",
-                    fontSize = 12.sp,
-                    color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B)
-                )
-            }
         }
         if (expanded) {
-            GlassCard(isDark = isDark) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                cornerRadius = 16.dp,
+                colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+            ) {
                 Column {
-                    group.entries.forEachIndexed { index, entry ->
+                    group.entries.forEach { entry ->
                         key("$pageKey/${entry.title}") {
-                            if (index > 0) {
-                                Box(
-                                    Modifier
-                                        .padding(start = 68.dp, end = 16.dp)
-                                        .fillMaxWidth()
-                                        .height(1.dp)
-                                        .background(if (isDark) Color(0x1AFFFFFF) else Color(0x0D000000))
-                                )
-                            }
                             EntryRow(entry, isDark, primaryColor, refreshTick, pageKey)
                         }
                     }
@@ -300,75 +281,58 @@ private fun EntryRow(
     val isOn = optimistic ?: remember(cacheKey) { entry.toggle?.isOn?.invoke() ?: false }
     var busy by remember { mutableStateOf(false) }
 
-    val rowModifier = Modifier
-        .fillMaxWidth()
-        .clickable { entry.onClick() }
+    val colors = LiquidGlassTheme.categoryColorsFor(entry.title)
+    val summaryText = if (!statusText.isNullOrBlank()) {
+        "${entry.subtitle} · $statusText"
+    } else {
+        entry.subtitle
+    }
 
-    Row(
-        rowModifier
-            .padding(horizontal = 16.dp, vertical = 11.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        val colors = LiquidGlassTheme.categoryColorsFor(entry.title)
-        IconBadge(
-            painter = painterResource(featureIconRes(entry.title)),
-            colors = Pair(colors.first.toLong(), colors.second.toLong())
-        )
-        Spacer(Modifier.width(14.dp))
-        Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = entry.title,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = if (isDark) Color(0xFFF1F5F9) else Color(0xFF1E293B),
-                    modifier = Modifier.weight(1f, fill = false)
+    if (entry.toggle != null) {
+        val enabled = remember(cacheKey) { entry.toggle.isEnabled() }
+        SwitchPreference(
+            title = entry.title,
+            summary = summaryText,
+            checked = isOn,
+            enabled = enabled,
+            onCheckedChange = { want ->
+                if (busy) return@SwitchPreference
+                busy = true
+                optimistic = want
+                entry.toggle.onToggle(want) { ok ->
+                    busy = false
+                    if (!ok) optimistic = null
+                    MaxHzComposeRefreshBus.bump()
+                }
+            },
+            startAction = {
+                IconBadge(
+                    painter = painterResource(featureIconRes(entry.title)),
+                    colors = Pair(colors.first.toLong(), colors.second.toLong())
                 )
-                if (statusText != null) {
-                    Spacer(Modifier.width(8.dp))
+            }
+        )
+    } else {
+        ArrowPreference(
+            title = entry.title,
+            summary = entry.subtitle,
+            onClick = entry.onClick,
+            startAction = {
+                IconBadge(
+                    painter = painterResource(featureIconRes(entry.title)),
+                    colors = Pair(colors.first.toLong(), colors.second.toLong())
+                )
+            },
+            endActions = {
+                if (!statusText.isNullOrBlank()) {
                     Text(
                         text = statusText,
-                        fontSize = 11.sp,
-                        color = if (isOn) {
-                            if (isDark) Color(0xFF34D399) else Color(0xFF059669)
-                        } else {
-                            if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B)
-                        }
+                        fontSize = 13.sp,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantActions
                     )
                 }
             }
-            Spacer(Modifier.height(2.dp))
-            Text(
-                text = entry.subtitle,
-                fontSize = 11.5.sp,
-                color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B)
-            )
-        }
-        if (entry.toggle != null) {
-            key(cacheKey) {
-                GlassToggle(
-                    checked = isOn,
-                    enabled = remember(cacheKey) { entry.toggle.isEnabled() },
-                    isDark = isDark,
-                    onChange = { want ->
-                        if (busy) return@GlassToggle
-                        busy = true
-                        optimistic = want
-                        entry.toggle.onToggle(want) { ok ->
-                            busy = false
-                            if (!ok) optimistic = null
-                            MaxHzComposeRefreshBus.bump()
-                        }
-                    }
-                )
-            }
-        } else {
-            Text(
-                text = "›",
-                fontSize = 18.sp,
-                color = if (isDark) Color(0xFF64748B) else Color(0xFF94A3B8)
-            )
-        }
+        )
     }
 }
 
@@ -380,46 +344,3 @@ object MaxHzComposeRefreshBus {
     }
 }
 
-/** iOS 风格开关，纯 GPU translationX 滑动，零测量与重新布局损耗 */
-@Composable
-private fun GlassToggle(
-    checked: Boolean,
-    enabled: Boolean = true,
-    isDark: Boolean = false,
-    onChange: (Boolean) -> Unit
-) {
-    val trackColor by animateColorAsState(
-        targetValue = if (checked) Color(0xFF34C759) else if (isDark) Color(0xFF333B48) else Color(0xFFE2E8F0),
-        animationSpec = tween(durationMillis = 200),
-        label = "trackColor"
-    )
-    val knobColor = Color.White
-
-    val density = LocalDensity.current
-    val targetOffsetPx = with(density) { if (checked) 18.dp.toPx() else 2.dp.toPx() }
-    val knobTranslationX by animateFloatAsState(
-        targetValue = targetOffsetPx,
-        animationSpec = spring(dampingRatio = 0.82f, stiffness = 500f),
-        label = "knobOffset"
-    )
-
-    Box(
-        Modifier
-            .width(46.dp)
-            .height(28.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(if (enabled) trackColor else trackColor.copy(alpha = 0.5f))
-            .clickable(enabled = enabled) { onChange(!checked) },
-        contentAlignment = Alignment.CenterStart
-    ) {
-        Box(
-            Modifier
-                .graphicsLayer {
-                    translationX = knobTranslationX
-                }
-                .size(24.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(knobColor)
-        )
-    }
-}

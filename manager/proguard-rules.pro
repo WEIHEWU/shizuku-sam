@@ -61,5 +61,6 @@
 -renamesourcefileattribute SourceFile
 
 # Compose 1.10 起经由 activity/lifecycle 间接引入 androidx.window，
-# 其 extensions 相关类属于设备端可选实现，编译期不存在，忽略即可。
+# 其 extensions / sidecar 相关类属于设备端可选实现，编译期不存在，忽略即可。
 -dontwarn androidx.window.extensions.**
+-dontwarn androidx.window.sidecar.**
