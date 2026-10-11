@@ -3,21 +3,26 @@ package moe.shizuku.manager.maxhz
 import android.app.Service
 import android.content.Intent
 import android.graphics.PixelFormat
+import android.hardware.display.DisplayManager
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.SystemClock
 import android.provider.Settings
+import android.view.Display
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import rikka.shizuku.Shizuku
+import kotlin.math.abs
 import kotlin.math.min
 
 class MaxHzFpsMonitorService : Service() {
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private var windowManager: WindowManager? = null
+    private var displayManager: DisplayManager? = null
     private var overlayView: MaxHzFpsOverlayView? = null
     private var overlayParams: WindowManager.LayoutParams? = null
     @Volatile
@@ -39,14 +44,32 @@ class MaxHzFpsMonitorService : Service() {
     private var gfxLastPackage: String? = null
     private var gfxLastFrames = 0L
     private var gfxLastAt = 0L
-    // 性能优化：gfxinfo 回退路径节流时间戳
     private var lastGfxInfoAt = 0L
-    // 省电修复：前台查询节流时间戳
     private var lastForegroundLookupAt = 0L
+
+    private val displayListener = object : DisplayManager.DisplayListener {
+        override fun onDisplayAdded(displayId: Int) = Unit
+        override fun onDisplayRemoved(displayId: Int) = Unit
+        override fun onDisplayChanged(displayId: Int) {
+            if (displayId != Display.DEFAULT_DISPLAY || !running) return
+            // 当系统底层切换 LTPO / 刷新率档位（如 120Hz ↔ 60Hz ↔ 24Hz）且最近一次采样已超过 350ms 时，
+            // 立即在主线程同步硬件面板刷新率，消除静止画面档位切换滞后
+            val now = System.currentTimeMillis()
+            if (now - cachedAt >= 350L) {
+                val hwHz = readDisplayRefreshRate()
+                if (hwHz > 0) {
+                    emaFps = hwHz
+                    overlayView?.takeIf { it.isAttachedToWindow }?.update(hwHz, currentPackage)
+                }
+            }
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
         windowManager = getSystemService(WindowManager::class.java)
+        displayManager = getSystemService(DisplayManager::class.java)
+        displayManager?.registerDisplayListener(displayListener, mainHandler)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -70,6 +93,7 @@ class MaxHzFpsMonitorService : Service() {
 
     override fun onDestroy() {
         running = false
+        runCatching { displayManager?.unregisterDisplayListener(displayListener) }
         MaxHzPrefs.setFpsMonitorRunning(this, false)
         val thread = monitorThread
         monitorThread = null
@@ -169,6 +193,7 @@ class MaxHzFpsMonitorService : Service() {
         monitorThread = Thread {
             val powerManager = getSystemService(android.os.PowerManager::class.java)
             while (running) {
+                val loopStart = SystemClock.elapsedRealtime()
                 try {
                     if (!Settings.canDrawOverlays(this@MaxHzFpsMonitorService)) {
                         running = false
@@ -177,17 +202,18 @@ class MaxHzFpsMonitorService : Service() {
                         break
                     }
 
-                    // 省电修复：熄屏时暂停采样。原版熄屏后仍每 700ms 跑 dumpsys，
-                    // 阻止 CPU 休眠，是待机耗电和发热的主要来源之一。
+                    // 熄屏时暂停采样
                     if (powerManager?.isInteractive != true) {
                         Thread.sleep(SCREEN_OFF_IDLE_MS)
                         continue
                     }
 
-                    // 省电修复：前台包名查询节流。原版每个采样周期都跑 1-3 条 dumpsys
-                    // 查前台应用，让 system_server 持续高负载。改为每 FOREGROUND_LOOKUP_MS 查一次。
+                    // 1. 优先从无障碍内存状态零延迟获取当前前台包名（0ms 开销，应用切换瞬间即刻感知）
                     val now = System.currentTimeMillis()
-                    if (now - lastForegroundLookupAt >= FOREGROUND_LOOKUP_MS || currentPackage.isBlank()) {
+                    val fastPkg = MaxHzForegroundApp.currentWindowPackage()
+                    if (!fastPkg.isNullOrBlank() && fastPkg != currentPackage) {
+                        resetForTarget(MaxHzForegroundTarget(fastPkg, null))
+                    } else if (now - lastForegroundLookupAt >= FOREGROUND_LOOKUP_MS || currentPackage.isBlank()) {
                         lastForegroundLookupAt = now
                         val target = foregroundTarget()
                         if (target != null && (
@@ -200,7 +226,13 @@ class MaxHzFpsMonitorService : Service() {
 
                     val raw = measureFps(currentPackage)
                     val smoothed = if (raw >= 0) {
-                        emaFps = if (emaFps < 0) raw else EMA_ALPHA * raw + (1 - EMA_ALPHA) * emaFps
+                        // 自适应阶跃响应：帧率变化 >= 8 FPS（如 60↔120 切换、明显掉帧）时直接跳过平滑立即显示；
+                        // 仅在小幅波动（< 8 FPS）时做轻度平滑（EMA_ALPHA = 0.65）
+                        emaFps = when {
+                            emaFps < 0 -> raw
+                            abs(raw - emaFps) >= STEP_CHANGE_THRESHOLD_FPS -> raw
+                            else -> EMA_ALPHA * raw + (1 - EMA_ALPHA) * emaFps
+                        }
                         emaFps
                     } else {
                         emaFps = -1.0
@@ -212,7 +244,9 @@ class MaxHzFpsMonitorService : Service() {
                     mainHandler.post {
                         overlayView?.takeIf { it.isAttachedToWindow }?.update(displayFps, displayPackage)
                     }
-                    Thread.sleep(POLL_INTERVAL_MS)
+                    val elapsed = SystemClock.elapsedRealtime() - loopStart
+                    val sleepMs = (POLL_INTERVAL_MS - elapsed).coerceAtLeast(MIN_SLEEP_MS)
+                    Thread.sleep(sleepMs)
                 } catch (_: InterruptedException) {
                     break
                 } catch (_: Throwable) {
@@ -244,14 +278,13 @@ class MaxHzFpsMonitorService : Service() {
     }
 
     private fun measureFps(packageName: String): Double {
-        if (!Shizuku.pingBinder() && !MaxHzShell.isRootAvailable()) {
+        if (!Shizuku.pingBinder() && !MaxHzShell.isReady()) {
             return -1.0
         }
 
-        if (packageName.isBlank()) return -1.0
-
-        val now = System.currentTimeMillis()
-        if (cachedFps >= 0 && now - cachedAt < CACHE_VALID_MS) return cachedFps
+        if (packageName.isBlank()) {
+            return readDisplayRefreshRate()
+        }
 
         var probes = 0
         var layer = resolveLayer(packageName)
@@ -280,8 +313,25 @@ class MaxHzFpsMonitorService : Service() {
             cachedAt = System.currentTimeMillis()
             return gfxFps
         }
-        readKernelFps().takeIf { it >= 0 }?.let { return it }
+        readKernelFps().takeIf { it >= 0 }?.let {
+            cachedFps = it
+            cachedAt = System.currentTimeMillis()
+            return it
+        }
+        // 当画面静止或系统桌面无独立 BLAST 图层更新时，回退至硬件屏幕实时刷新率（LTPO 实时档位）
+        val hwRefreshRate = readDisplayRefreshRate()
+        if (hwRefreshRate > 0) {
+            return hwRefreshRate
+        }
+        val now = System.currentTimeMillis()
         return if (cachedFps >= 0 && now - cachedAt <= STALE_CACHE_MS) cachedFps else -1.0
+    }
+
+    private fun readDisplayRefreshRate(): Double {
+        return runCatching {
+            val display = displayManager?.getDisplay(Display.DEFAULT_DISPLAY)
+            display?.refreshRate?.toDouble()?.takeIf { it > 1.0 && it.isFinite() } ?: -1.0
+        }.getOrDefault(-1.0)
     }
 
     private fun readKernelFps(): Double {
@@ -290,7 +340,7 @@ class MaxHzFpsMonitorService : Service() {
             kernelFpsPath = detectKernelFpsPath()
         }
         val path = kernelFpsPath?.takeIf { it.isNotBlank() } ?: return -1.0
-        val line = exec("cat ${shellArg(path)}", 800)
+        val line = exec("cat ${shellArg(path)}", 600)
             .lineSequence()
             .firstOrNull()
             ?.trim()
@@ -311,7 +361,7 @@ class MaxHzFpsMonitorService : Service() {
             "/sys/class/drm/sde-crtc-1/measured_fps"
         )
         return paths.firstOrNull { path ->
-            exec("[ -r ${shellArg(path)} ] && cat ${shellArg(path)}", 800)
+            exec("[ -r ${shellArg(path)} ] && cat ${shellArg(path)}", 600)
                 .lineSequence()
                 .firstOrNull()
                 ?.isNotBlank() == true
@@ -319,19 +369,17 @@ class MaxHzFpsMonitorService : Service() {
     }
 
     private fun readSurfaceFlingerLatency(layer: String): Double {
-        val output = exec("dumpsys SurfaceFlinger --latency \"${shellQuoteBody(layer)}\"", 1500)
+        val output = exec("dumpsys SurfaceFlinger --latency \"${shellQuoteBody(layer)}\"", 1000)
         val timestamps = MaxHzFpsSurfaceParser.presentedFrameTimestamps(output)
         return MaxHzFpsSurfaceParser.calculateFps(timestamps, System.nanoTime())
     }
 
     private fun readGfxInfo(packageName: String): Double {
         val now = System.currentTimeMillis()
-        // 性能优化：gfxinfo framestats 是单次最重的 dumpsys，仅在 SurfaceFlinger 取不到时回退。
-        // 距上次执行不足 GFXINFO_MIN_INTERVAL_MS 时跳过，交由内核 FPS / 缓存兜底，避免每秒都跑。
         if (now - lastGfxInfoAt < GFXINFO_MIN_INTERVAL_MS) return -1.0
         lastGfxInfoAt = now
         val totalFrames = TOTAL_FRAMES_PATTERN.find(
-            exec("dumpsys gfxinfo ${shellArg(packageName)} framestats", 1500)
+            exec("dumpsys gfxinfo ${shellArg(packageName)} framestats", 1000)
         )?.groupValues?.getOrNull(1)?.toLongOrNull() ?: return -1.0
 
         if (gfxLastPackage != packageName) {
@@ -343,19 +391,16 @@ class MaxHzFpsMonitorService : Service() {
 
         val deltaFrames = totalFrames - gfxLastFrames
         val deltaMs = now - gfxLastAt
-        if (deltaMs < 250) return cachedFps
+        if (deltaMs < 200) return cachedFps
         gfxLastFrames = totalFrames
         gfxLastAt = now
         return if (deltaFrames > 0 && deltaMs > 0) deltaFrames * 1000.0 / deltaMs else -1.0
     }
 
     private fun foregroundTarget(): MaxHzForegroundTarget? {
-        // 性能优化：原版串行跑 3 条 dumpsys（activity activities / window / window windows）。
-        // mCurrentFocus / mFocusedApp / mFocusedWindow 在单次 `dumpsys window` 中即可取得，
-        // 合并为 1 条；解析仍由 COMPONENT_PATTERN 匹配 pkg/activity，前台判定不受影响。
         val output = exec(
             "dumpsys window 2>/dev/null | grep -m 4 -E 'mCurrentFocus|mFocusedApp|mFocusedWindow'",
-            1400
+            1000
         )
         return MaxHzFpsSurfaceParser.foregroundTarget(output)
     }
@@ -366,7 +411,7 @@ class MaxHzFpsMonitorService : Service() {
             return layerCandidates.getOrNull(layerCandidateIndex)
         }
         layerCandidates = MaxHzFpsSurfaceParser.rankedLayers(
-            exec("dumpsys SurfaceFlinger --list", 1500),
+            exec("dumpsys SurfaceFlinger --list", 1000),
             packageName,
             currentActivityClass
         )
@@ -390,7 +435,7 @@ class MaxHzFpsMonitorService : Service() {
     }
 
     private fun exec(command: String, timeoutMs: Long): String {
-        if (!Shizuku.pingBinder()) return ""
+        if (!Shizuku.pingBinder() && !MaxHzShell.isReady()) return ""
         return runCatching { MaxHzShell.execRaw(command, timeoutMs).out }.getOrDefault("")
     }
 
@@ -407,28 +452,21 @@ class MaxHzFpsMonitorService : Service() {
     }
 
     companion object {
-        // 省电修复：采样间隔从 700ms 放宽到 1000ms，肉眼几乎无差别，
-        // 但 dumpsys 调用次数减少约 30%。
-        private const val POLL_INTERVAL_MS = 1_000L
-        // 省电修复：熄屏时挂起采样，每 3s 醒一次只检查亮屏状态（不跑任何 dumpsys）
-        private const val SCREEN_OFF_IDLE_MS = 3_000L
-        // 省电修复：前台包名查询间隔（独立于 FPS 采样）
-        // 性能优化：前台包名变化远慢于 2s，放宽到 3s 进一步降低 dumpsys 频率
-        private const val FOREGROUND_LOOKUP_MS = 3_000L
+        // 500ms 高响应采样周期（扣除命令执行耗时，保证每秒稳定刷新 2 次）
+        private const val POLL_INTERVAL_MS = 500L
+        private const val MIN_SLEEP_MS = 100L
+        private const val SCREEN_OFF_IDLE_MS = 2_000L
+        private const val FOREGROUND_LOOKUP_MS = 1_500L
         private const val MONITOR_THREAD_JOIN_MS = 500L
         private const val DOUBLE_TAP_MS = 300L
-        private const val LAYER_CACHE_MS = 12_000L
-        // 性能优化：原值 650 < POLL_INTERVAL_MS(1000)，导致缓存跨轮询永远失效、
-        // 每个采样周期都跑完整 dumpsys 管线（死缓存）。放大到 >= 轮询周期后，
-        // 缓存可跨轮询命中，shell/dumpsys 调用量约减半，悬浮窗仍是 1s 刷新。
-        private const val CACHE_VALID_MS = 2_000L
-        // 性能优化：gfxinfo framestats 是最重的 dumpsys，仅在 SurfaceFlinger 取不到时才回退。
-        // 为其单独加节流，避免回退路径每秒都跑一次。
-        private const val GFXINFO_MIN_INTERVAL_MS = 1_500L
-        private const val STALE_CACHE_MS = 2_500L
-        private const val STALE_LAYER_MISSES = 2
+        private const val LAYER_CACHE_MS = 5_000L
+        private const val GFXINFO_MIN_INTERVAL_MS = 1_000L
+        private const val STALE_CACHE_MS = 850L
+        private const val STALE_LAYER_MISSES = 1
         private const val MAX_LAYER_PROBES_PER_SAMPLE = 3
-        private const val EMA_ALPHA = 0.3
+        // 阶跃阈值 >= 8 FPS 时直接跳过 EMA 瞬时跳变，小幅波动使用 0.65 高权重跟手滤波
+        private const val STEP_CHANGE_THRESHOLD_FPS = 8.0
+        private const val EMA_ALPHA = 0.65
         private val TOTAL_FRAMES_PATTERN = Regex("Total frames rendered:\\s*(\\d+)")
     }
 }

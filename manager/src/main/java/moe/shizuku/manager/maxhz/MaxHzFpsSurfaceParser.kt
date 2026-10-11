@@ -126,8 +126,8 @@ internal object MaxHzFpsSurfaceParser {
     private const val FRAME_READY_COLUMN = 2
     private const val MIN_RECENT_TIMESTAMPS = 2
     private const val NANOS_PER_SECOND = 1_000_000_000L
-    private const val FPS_WINDOW_NS = NANOS_PER_SECOND
-    private const val MAX_FRAME_AGE_NS = 2_500_000_000L
+    private const val FPS_WINDOW_NS = 500_000_000L
+    private const val MAX_FRAME_AGE_NS = 1_200_000_000L
     private val WHITESPACE = Regex("\\s+")
     private val COMPONENT_PATTERN = Regex(
         "([a-zA-Z][a-zA-Z0-9._]*)/(\\.?[a-zA-Z0-9_.$]+)"

@@ -1040,11 +1040,11 @@ open class MaxHzActivity : AppBarActivity() {
                                 }
                             }
                         )) {
-                            pushDetail("旁路供电与电池保护") { batteryProtectionSection() }
+                            showBatteryProtectionDialog()
                         },
 
                         EntryItem("充电上限保护", "自定义 80%/85% 充电上限，保护电池循环寿命", { "${MaxHzPrefs.batteryLimit(this@MaxHzActivity)}% / ${MaxHzPrefs.batteryRecharge(this@MaxHzActivity)}%" }) {
-                            pushDetail("旁路供电与电池保护") { batteryProtectionSection() }
+                            showBatteryProtectionDialog()
                         },
                     )
                 )
@@ -1887,7 +1887,7 @@ open class MaxHzActivity : AppBarActivity() {
             "FPS" -> pushDetail("实时 FPS 监视器") { refreshRateSection() }
             "Night Guard" -> pushDetail("待机异常唤醒排查") { nightWakeupGuardSection() }
             "Doze" -> pushDetail("快速的 Doze 模式") { quickDozeSection() }
-            "电池保护" -> pushDetail("电池保护调整") { batteryProtectionSection() }
+            "电池保护" -> showBatteryProtectionDialog()
             "后台服务" -> pushDetail("系统诊断", skipScrollTop = true, targetDiagnosticKey = "后台服务状态") { systemDiagnosticsSection("后台服务状态") }
             "后台错误" -> pushDetail("系统诊断", skipScrollTop = true, targetDiagnosticKey = "后台错误") { systemDiagnosticsSection("后台错误") }
             else -> pushDetail("系统诊断") { systemDiagnosticsSection() }
@@ -4195,6 +4195,115 @@ open class MaxHzActivity : AppBarActivity() {
             }
         } else {
             "最近一次应用设置\n暂无应用记录\n设置参数后点击“应用设置”，成功后会显示在这里。"
+        }
+    }
+
+    protected fun showBatteryProtectionDialog(onChanged: (() -> Unit)? = null) {
+        val batteryLimitInput = numberInput(MaxHzPrefs.batteryLimit(this))
+        val batteryRechargeInput = numberInput(MaxHzPrefs.batteryRecharge(this))
+        val statusView = batteryProtectionSystemStatusView(
+            "当前状态：${batteryProtectionState()}\n" +
+                "充电上限：${MaxHzPrefs.batteryLimit(this)}%  ·  恢复充电：${MaxHzPrefs.batteryRecharge(this)}%"
+        )
+
+        fun applyPreset(limit: Int, recharge: Int) {
+            batteryLimitInput.setText(limit.toString())
+            batteryRechargeInput.setText(recharge.toString())
+        }
+
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(4), dp(18), 0)
+            addView(TextView(this@MaxHzActivity).apply {
+                text = "自定义充电截止电量与恢复充电阈值，达到上限后自动停止充电以延长电池循环寿命。"
+                textSize = 12.5f
+                setTextColor(themeColors.onSurfaceVariant)
+                setLineSpacing(0f, 1.25f)
+                setPadding(0, 0, 0, dp(10))
+            })
+            addSpacedView(statusView, dp(10))
+            addSpacedView(
+                horizontalActions(
+                    button("80% / 75% 日常") { applyPreset(80, 75) },
+                    button("85% / 80% 均衡") { applyPreset(85, 80) },
+                    button("90% / 85% 出行") { applyPreset(90, 85) }
+                ),
+                dp(10)
+            )
+            addSpacedView(
+                batteryProtectionInputGroup(
+                    "充电上限%" to batteryLimitInput,
+                    "恢复充电%" to batteryRechargeInput
+                ),
+                dp(6)
+            )
+        }
+
+        val dialog = MaterialAlertDialogBuilder(this)
+            .setTitle("充电上限保护")
+            .setView(ScrollView(this).apply {
+                addView(content)
+            })
+            .setPositiveButton("应用并开启", null)
+            .setNeutralButton("恢复默认", null)
+            .setNegativeButton("取消", null)
+            .create()
+
+        dialog.show()
+
+        dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE)?.setOnClickListener {
+            val limit = batteryLimitInput.safeInt(80).coerceIn(50, 100)
+            val recharge = batteryRechargeInput.safeInt(75).coerceIn(40, (limit - 5).coerceAtLeast(40))
+            val wasEnabled = MaxHzPrefs.batteryProtectionEnabled(this@MaxHzActivity)
+            statusView.text = "正在写入电池保护配置 (${limit}% / ${recharge}%)..."
+            lifecycleScope.launch {
+                val result = withContext(Dispatchers.IO) {
+                    MaxHzController.applyBatteryProtection(limit, recharge)
+                }
+                if (result.code == 0) {
+                    MaxHzPrefs.setBatteryProtectionConfig(this@MaxHzActivity, limit, recharge)
+                    MaxHzPrefs.setBatteryProtectionEnabled(this@MaxHzActivity, true)
+                    startMaxHzService()
+                    onChanged?.invoke()
+                    Toast.makeText(
+                        this@MaxHzActivity,
+                        "已开启充电上限保护（${limit}% 停充 / ${recharge}% 复充）",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    if (dialog.isShowing) dialog.dismiss()
+                } else {
+                    MaxHzPrefs.setBatteryProtectionEnabled(this@MaxHzActivity, wasEnabled)
+                    statusView.text = "设置失败：${commandFailureReason(result)}"
+                    Toast.makeText(
+                        this@MaxHzActivity,
+                        "设置失败：${commandFailureReason(result)}",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+        }
+
+        dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_NEUTRAL)?.setOnClickListener {
+            statusView.text = "正在恢复系统默认充电设置..."
+            lifecycleScope.launch {
+                val result = withContext(Dispatchers.IO) {
+                    MaxHzController.restoreBatteryProtection()
+                }
+                if (result.code == 0) {
+                    MaxHzPrefs.setBatteryProtectionEnabled(this@MaxHzActivity, false)
+                    updateMaxHzServiceState()
+                    onChanged?.invoke()
+                    Toast.makeText(this@MaxHzActivity, "已恢复系统默认电池保护", Toast.LENGTH_SHORT).show()
+                    if (dialog.isShowing) dialog.dismiss()
+                } else {
+                    statusView.text = "恢复失败：${commandFailureReason(result)}"
+                    Toast.makeText(
+                        this@MaxHzActivity,
+                        "恢复失败：${commandFailureReason(result)}",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
         }
     }
 

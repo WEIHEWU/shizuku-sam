@@ -455,7 +455,9 @@ abstract class HomeActivity : MaxHzActivity() {
         onTogglePassThrough = { on -> handleTogglePassThrough(on) },
         onToggleBatteryProtection = { on -> handleToggleBatteryProtection(on) },
         onOpenBatteryProtectionConfigClick = {
-            pushDetail("充电上限保护") { batteryProtectionSection() }
+            showBatteryProtectionDialog {
+                syncSchemeAStates()
+            }
         },
         onToggleGameAutoSwitch = { on -> handleToggleGameAutoSwitch(on) },
         onToggleFpsMonitor = { on -> handleToggleFpsMonitor(on) },
