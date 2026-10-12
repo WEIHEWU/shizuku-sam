@@ -272,6 +272,7 @@ fun ShizukuHomeScreen(
                         item(key = "adb-running-tools", contentType = "tools") {
                             AdbRunningToolsCard(
                                 isDark = isDark,
+                                isRoot = status?.uid == 0,
                                 isDeviceOwner = isDeviceOwner,
                                 actions = actions
                             )
@@ -889,7 +890,7 @@ private fun HeroCard(
                         Tile(
                             Modifier.weight(1f),
                             stringResource(R.string.home_tile_service_version),
-                            "v$apiVersion.$patchVersion.0",
+                            "v$apiVersion.$patchVersion",
                             isAccent = false,
                             ok = true,
                             isDark = isDark,
@@ -905,9 +906,7 @@ private fun HeroCard(
                             primaryColor = primaryColor
                         )
                         Tile(
-                            Modifier
-                                .weight(1f)
-                                .clickable { actions.onAuthorizedAppsClick() },
+                            Modifier.weight(1f),
                             stringResource(R.string.home_tile_authorized_apps),
                             stringResource(R.string.home_tile_apps_count_format, grantedCount),
                             isAccent = grantedCount > 0,
@@ -930,53 +929,29 @@ private fun HeroCard(
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         TextButton(
                             text = stringResource(R.string.home_btn_terminal_rish),
                             onClick = actions.onRishClick,
-                            insideMargin = PaddingValues(horizontal = 10.dp, vertical = 11.dp),
+                            insideMargin = PaddingValues(horizontal = 12.dp, vertical = 11.dp),
                             modifier = Modifier.weight(1f)
                         )
-                        if (isRoot) {
-                            TextButton(
-                                text = stringResource(R.string.home_btn_restart_service),
-                                onClick = actions.onStartRootClick,
-                                insideMargin = PaddingValues(horizontal = 10.dp, vertical = 11.dp),
-                                modifier = Modifier.weight(1f)
-                            )
-                        } else {
-                            TextButton(
-                                text = stringResource(R.string.home_btn_reconnect_debugging),
-                                onClick = actions.onWirelessStartClick,
-                                insideMargin = PaddingValues(horizontal = 10.dp, vertical = 11.dp),
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
                         GlassPillButton(
                             text = stringResource(R.string.home_btn_stop_service),
                             isDark = isDark,
                             style = GlassButtonStyle.Danger,
-                            onClick = onRequestStopDialog
-                        )
-                    }
-                } else {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        TextButton(
-                            text = stringResource(R.string.home_btn_adb_start),
-                            onClick = actions.onWirelessStartClick,
-                            colors = ButtonDefaults.textButtonColorsPrimary(),
-                            modifier = Modifier.weight(1.4f)
-                        )
-                        TextButton(
-                            text = stringResource(R.string.home_btn_root_start),
-                            onClick = actions.onStartRootClick,
+                            onClick = onRequestStopDialog,
                             modifier = Modifier.weight(1f)
                         )
                     }
+                } else {
+                    TextButton(
+                        text = stringResource(R.string.home_btn_adb_start),
+                        onClick = actions.onWirelessStartClick,
+                        colors = ButtonDefaults.textButtonColorsPrimary(),
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
         }
@@ -1093,6 +1068,7 @@ private fun PrivilegeLaunchMethodsCard(
 @Composable
 private fun AdbRunningToolsCard(
     isDark: Boolean,
+    isRoot: Boolean = false,
     isDeviceOwner: Boolean,
     actions: HomeActions
 ) {
@@ -1106,6 +1082,16 @@ private fun AdbRunningToolsCard(
             cornerRadius = 20.dp,
             colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
         ) {
+            if (!isRoot) {
+                AdbActionRow(
+                    isDark = isDark,
+                    icon = painterResource(R.drawable.ic_wadb_24),
+                    iconTint = if (isDark) Color(0xFF60A5FA) else Color(0xFF277AF6),
+                    title = stringResource(R.string.home_btn_reconnect_debugging),
+                    subtitle = "重新扫描本地回环无线调试端口并刷新 ADB 令牌连接",
+                    onClick = actions.onWirelessStartClick
+                )
+            }
             AdbActionRow(
                 isDark = isDark,
                 icon = painterResource(R.drawable.ic_root_24dp),
@@ -1183,7 +1169,7 @@ private fun PerformanceModeCard(
                             mode == 1 -> if (isDark) Color(0xFF34D399) else Color(0xFF10B981)
                             else -> if (isDark) Color(0xFF60A5FA) else primaryColor
                         }
-                        val subFg = if (selected) activeFg.copy(alpha = 0.82f)
+                        val subFg = if (selected) activeFg.copy(alpha = 0.85f)
                         else MiuixTheme.colorScheme.onSurfaceVariantSummary
 
                         Column(
@@ -1197,7 +1183,7 @@ private fun PerformanceModeCard(
                                         onModeChange(mode)
                                     }
                                 }
-                                .padding(horizontal = 10.dp, vertical = 10.dp),
+                                .padding(horizontal = 6.dp, vertical = 10.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
@@ -1239,7 +1225,7 @@ private fun PerformanceModeCard(
 }
 
 // ==================================================================
-// 6. 3×2 快捷状态磁贴矩阵 + 2×2 双列粉彩指标与配置卡（Bento 风格）
+// 6. 快捷硬件开关与电池健康卡（全宽 Miuix 纯净卡片，零按钮重复、100% 完整文案）
 // ==================================================================
 
 @Composable
@@ -1269,289 +1255,89 @@ private fun QuickSwitchesCard(
     onOpenBatteryInfoDialog: () -> Unit = {},
     onOpenAppLaunchBoostClick: () -> Unit = {}
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column {
         SmallTitle(
             text = stringResource(R.string.home_card_quick_switches_title),
-            insideMargin = PaddingValues(horizontal = 10.dp, vertical = 2.dp)
+            insideMargin = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
         )
-
-        // 第一排：3 列快捷磁贴（旁路供电 / 充电保护 / 游戏高刷）
-        Row(
+        Card(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(9.dp)
+            cornerRadius = 20.dp,
+            colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
         ) {
-            QuickStatusTile(
-                modifier = Modifier.weight(1f),
+            SwitchItemRow(
                 isDark = isDark,
-                primaryColor = primaryColor,
                 icon = painterResource(R.drawable.ic_maxhz_battery_24),
-                label = "旁路供电",
-                activeText = "已启用",
-                inactiveText = "未启用",
-                active = isPassThroughActive,
-                onClick = { onTogglePassThrough(!isPassThroughActive) }
+                iconTint = if (isDark) Color(0xFF34D399) else Color(0xFF10B981),
+                title = stringResource(R.string.home_switch_passthrough_title),
+                subtitle = stringResource(R.string.home_switch_passthrough_subtitle),
+                checked = isPassThroughActive,
+                onCheckedChange = onTogglePassThrough
             )
-            QuickStatusTile(
-                modifier = Modifier.weight(1f),
+            SwitchItemRow(
                 isDark = isDark,
-                primaryColor = primaryColor,
                 icon = painterResource(R.drawable.ic_maxhz_shield_24),
-                label = "充电保护",
-                activeText = "${batteryProtectionLimit}% 停充",
-                inactiveText = "未启用",
-                active = isBatteryProtectionActive,
-                onClick = { onToggleBatteryProtection(!isBatteryProtectionActive) }
+                iconTint = if (isDark) Color(0xFF60A5FA) else Color(0xFF277AF6),
+                title = "充电上限保护 (${batteryProtectionLimit}% / ${batteryProtectionRecharge}%)",
+                subtitle = "点击此行设置停充与恢复阈值，右侧开关直接启停充电保护",
+                badgeText = "调参 ›",
+                holdDownState = holdDownBatteryProtection,
+                checked = isBatteryProtectionActive,
+                onCheckedChange = onToggleBatteryProtection,
+                onRowClick = onOpenBatteryProtectionConfigClick
             )
-            QuickStatusTile(
-                modifier = Modifier.weight(1f),
+            SwitchItemRow(
                 isDark = isDark,
-                primaryColor = primaryColor,
                 icon = painterResource(R.drawable.ic_maxhz_game_24),
-                label = "游戏高刷",
-                activeText = "已启用",
-                inactiveText = "未启用",
-                active = isGameAutoSwitchActive,
-                onClick = { onToggleGameAutoSwitch(!isGameAutoSwitchActive) }
+                iconTint = if (isDark) Color(0xFFFBBF24) else Color(0xFFF59E0B),
+                title = if (gameAutoPackageCount > 0) {
+                    "游戏自动高刷加速 ($gameAutoPackageCount 款)"
+                } else {
+                    "游戏自动高刷加速"
+                },
+                subtitle = "识别前台游戏自动接管高刷与触控采样，点击此行配置加速名单",
+                badgeText = "选游戏 ›",
+                checked = isGameAutoSwitchActive,
+                onCheckedChange = onToggleGameAutoSwitch,
+                onRowClick = onOpenGameAutoConfigClick
             )
-        }
-
-        // 第二排：3 列快捷磁贴（FPS 浮窗 / 户外强光 / 熄屏快睡）
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(9.dp)
-        ) {
-            QuickStatusTile(
-                modifier = Modifier.weight(1f),
+            SwitchItemRow(
                 isDark = isDark,
-                primaryColor = primaryColor,
                 icon = painterResource(R.drawable.ic_maxhz_chart_24),
-                label = "FPS 浮窗",
-                activeText = "已启用",
-                inactiveText = "未启用",
-                active = isFpsMonitorActive,
-                onClick = { onToggleFpsMonitor(!isFpsMonitorActive) }
+                iconTint = if (isDark) Color(0xFFA78BFA) else Color(0xFF7C3AED),
+                title = "实时 FPS 帧率浮窗",
+                subtitle = "在屏幕左上角显示 SurfaceFlinger 纳秒级零延迟实时帧率与功耗",
+                checked = isFpsMonitorActive,
+                onCheckedChange = onToggleFpsMonitor
             )
-            QuickStatusTile(
-                modifier = Modifier.weight(1f),
+            SwitchItemRow(
                 isDark = isDark,
-                primaryColor = primaryColor,
                 icon = painterResource(R.drawable.ic_maxhz_sun_24),
-                label = "户外强光",
-                activeText = "已启用",
-                inactiveText = "未启用",
-                active = isOutdoorModeActive,
-                onClick = { onToggleOutdoorMode(!isOutdoorModeActive) }
+                iconTint = if (isDark) Color(0xFFFB923C) else Color(0xFFEA580C),
+                title = stringResource(R.string.home_switch_outdoor_title),
+                subtitle = stringResource(R.string.home_switch_outdoor_subtitle),
+                checked = isOutdoorModeActive,
+                onCheckedChange = onToggleOutdoorMode
             )
-            QuickStatusTile(
-                modifier = Modifier.weight(1f),
-                isDark = isDark,
-                primaryColor = primaryColor,
-                icon = painterResource(R.drawable.ic_outline_dark_mode_24),
-                label = "熄屏快睡",
-                activeText = "已启用",
-                inactiveText = "未启用",
-                active = isQuickDozeActive,
-                onClick = { onToggleQuickDoze(!isQuickDozeActive) }
-            )
-        }
-
-        Spacer(Modifier.height(2.dp))
-        SmallTitle(
-            text = "参数配置与硬件直读",
-            insideMargin = PaddingValues(horizontal = 10.dp, vertical = 2.dp)
-        )
-
-        // 2×2 双列 Bento 粉彩指标与配置弹窗卡片
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            BentoMetricCard(
-                modifier = Modifier.weight(1f),
+            AdbActionRow(
                 isDark = isDark,
                 icon = painterResource(R.drawable.ic_maxhz_battery_24),
-                accentColor = if (isDark) Color(0xFF34D399) else Color(0xFF10B981),
-                valueText = "${batteryProtectionLimit}% / ${batteryProtectionRecharge}%",
-                labelText = "充电上限保护设置",
-                onClick = onOpenBatteryProtectionConfigClick
-            )
-            BentoMetricCard(
-                modifier = Modifier.weight(1f),
-                isDark = isDark,
-                icon = painterResource(R.drawable.ic_maxhz_shield_24),
-                accentColor = if (isDark) Color(0xFF60A5FA) else Color(0xFF277AF6),
-                valueText = "电池健康度",
-                labelText = "实时电压/温度/循环",
+                iconTint = if (isDark) Color(0xFF38BDF8) else Color(0xFF0284C7),
+                title = "电池运行信息与健康度",
+                subtitle = "查看实时电量、温度、电流、电压、循环次数与三星原厂健康度",
+                badgeText = "实时直读",
                 onClick = onOpenBatteryInfoDialog
             )
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            BentoMetricCard(
-                modifier = Modifier.weight(1f),
-                isDark = isDark,
-                icon = painterResource(R.drawable.ic_maxhz_game_24),
-                accentColor = if (isDark) Color(0xFFFBBF24) else Color(0xFFF59E0B),
-                valueText = if (gameAutoPackageCount > 0) "${gameAutoPackageCount} 款游戏" else "配置名单",
-                labelText = "游戏高刷加速白名单",
-                onClick = onOpenGameAutoConfigClick
-            )
-            BentoMetricCard(
-                modifier = Modifier.weight(1f),
+            AdbActionRow(
                 isDark = isDark,
                 icon = painterResource(R.drawable.ic_maxhz_cpu_24),
-                accentColor = if (isDark) Color(0xFFF87171) else Color(0xFFF54A45),
-                valueText = if (isAppLaunchBoostActive) "已优化" else "AOT 预编译",
-                labelText = "应用冷启动加速与清理",
+                iconTint = if (isDark) Color(0xFFF87171) else Color(0xFFF54A45),
+                title = "应用冷启动加速与清理",
+                subtitle = "执行 Speed-Profile AOT 预编译加速应用启动，并回收系统冗余缓存",
+                badgeText = if (isAppLaunchBoostActive) "已优化" else null,
+                badgeColor = if (isAppLaunchBoostActive) Color(0xFF10B981) else null,
                 onClick = onOpenAppLaunchBoostClick
             )
-        }
-    }
-}
-
-/**
- * 3×2 矩阵中的单个快捷状态磁贴：
- * - 未启用时：纯白/深灰卡片底色 + 柔和灰图标 + 深色「未启用」
- * - 已启用时：整块磁贴变为柔和浅冰蓝 (`#EBF3FF` / `#162946`) + 主题蓝图标 + 主题蓝「已启用」
- */
-@Composable
-private fun QuickStatusTile(
-    modifier: Modifier = Modifier,
-    isDark: Boolean,
-    primaryColor: Color,
-    icon: Painter,
-    label: String,
-    activeText: String,
-    inactiveText: String,
-    active: Boolean,
-    onClick: () -> Unit
-) {
-    val haptic = LocalHapticFeedback.current
-    val bgColor = when {
-        active && isDark -> Color(0xFF162946)
-        active && !isDark -> Color(0xFFEBF3FF)
-        else -> MiuixTheme.colorScheme.surfaceContainer
-    }
-    val activeAccent = if (isDark) Color(0xFF60A5FA) else primaryColor
-    val iconColor = if (active) activeAccent else (if (isDark) Color(0xFF8E95A2) else Color(0xFF7A828E))
-    val labelColor = if (active) activeAccent.copy(alpha = 0.85f) else MiuixTheme.colorScheme.onSurfaceVariantSummary
-    val stateColor = if (active) activeAccent else MiuixTheme.colorScheme.onSurface
-
-    Card(
-        modifier = modifier,
-        cornerRadius = 18.dp,
-        colors = CardDefaults.defaultColors(color = bgColor),
-        pressFeedbackType = PressFeedbackType.Sink,
-        showIndication = true,
-        onClick = {
-            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-            onClick()
-        }
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 11.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Image(
-                painter = icon,
-                contentDescription = null,
-                colorFilter = ColorFilter.tint(iconColor),
-                modifier = Modifier.size(19.dp),
-                contentScale = ContentScale.Fit
-            )
-            Spacer(Modifier.width(8.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = label,
-                    fontSize = 11.sp,
-                    color = labelColor,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(Modifier.height(1.dp))
-                Text(
-                    text = if (active) activeText else inactiveText,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = stateColor,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
-    }
-}
-
-/**
- * 2×2 双列 Bento 指标/配置卡片：左侧浅粉彩柔光方标 + 右侧粗体数值与说明
- */
-@Composable
-private fun BentoMetricCard(
-    modifier: Modifier = Modifier,
-    isDark: Boolean,
-    icon: Painter,
-    accentColor: Color,
-    valueText: String,
-    labelText: String,
-    onClick: () -> Unit
-) {
-    val haptic = LocalHapticFeedback.current
-    Card(
-        modifier = modifier,
-        cornerRadius = 20.dp,
-        colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer),
-        pressFeedbackType = PressFeedbackType.Sink,
-        showIndication = true,
-        onClick = {
-            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-            onClick()
-        }
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(accentColor.copy(alpha = if (isDark) 0.18f else 0.12f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Image(
-                    painter = icon,
-                    contentDescription = null,
-                    colorFilter = ColorFilter.tint(accentColor),
-                    modifier = Modifier.size(21.dp),
-                    contentScale = ContentScale.Fit
-                )
-            }
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = valueText,
-                    fontSize = 15.5.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MiuixTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = labelText,
-                    fontSize = 11.5.sp,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
         }
     }
 }
@@ -2020,7 +1806,7 @@ private fun AppRulesTabContent(
             }
         }
 
-        // 常用场景预设卡（点亮式冰蓝胶囊）
+        // 常用场景预设卡（2×2 宽敞点亮式冰蓝胶囊，文案 100% 完整展示）
         item(key = "card-presets") {
             Column(modifier = if (!isInstantSwitchActive) Modifier.alpha(0.45f) else Modifier) {
                 SmallTitle(
@@ -2032,58 +1818,65 @@ private fun AppRulesTabContent(
                     cornerRadius = 20.dp,
                     colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
                 ) {
-                    Row(
+                    val presets = listOf(
+                        Triple(stringResource(R.string.rules_preset_daily), Pair(120, 10), true),
+                        Triple(stringResource(R.string.rules_preset_video), Pair(60, 60), false),
+                        Triple(stringResource(R.string.rules_preset_reading), Pair(60, 10), true),
+                        Triple(stringResource(R.string.rules_preset_game), Pair(120, 120), false)
+                    )
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        val presets = listOf(
-                            Triple(stringResource(R.string.rules_preset_daily), Pair(120, 10), true),
-                            Triple(stringResource(R.string.rules_preset_video), Pair(60, 60), false),
-                            Triple(stringResource(R.string.rules_preset_reading), Pair(60, 10), true),
-                            Triple(stringResource(R.string.rules_preset_game), Pair(120, 120), false)
-                        )
-                        presets.forEach { (name, rates, adaptive) ->
-                            val isSelected = targetMaxHz == rates.first && targetMinHz == rates.second && targetAdaptive == adaptive
-                            val chipBg = when {
-                                isSelected && isDark -> Color(0xFF162946)
-                                isSelected && !isDark -> Color(0xFFEBF3FF)
-                                isDark -> Color(0xFF21242C)
-                                else -> Color(0xFFF5F7FA)
-                            }
-                            val chipFg = if (isSelected) (if (isDark) Color(0xFF60A5FA) else primaryColor)
-                            else MiuixTheme.colorScheme.onSurface
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(48.dp)
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .background(chipBg)
-                                    .clickable {
-                                        if (!isInstantSwitchActive) {
-                                            requireAccessibility()
-                                            return@clickable
-                                        }
-                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        targetMaxHz = rates.first
-                                        targetMinHz = rates.second
-                                        targetAdaptive = adaptive
-                                    },
-                                contentAlignment = Alignment.Center
+                        presets.chunked(2).forEach { rowPresets ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(
-                                        text = name.substringBefore(" ("),
-                                        fontSize = 12.5.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = chipFg
-                                    )
-                                    Text(
-                                        text = "${rates.second}~${rates.first}Hz",
-                                        fontSize = 10.5.sp,
-                                        color = if (isSelected) chipFg.copy(alpha = 0.8f) else MiuixTheme.colorScheme.onSurfaceVariantSummary
-                                    )
+                                rowPresets.forEach { (name, rates, adaptive) ->
+                                    val isSelected = targetMaxHz == rates.first && targetMinHz == rates.second && targetAdaptive == adaptive
+                                    val chipBg = when {
+                                        isSelected && isDark -> Color(0xFF162946)
+                                        isSelected && !isDark -> Color(0xFFEBF3FF)
+                                        isDark -> Color(0xFF21242C)
+                                        else -> Color(0xFFF5F7FA)
+                                    }
+                                    val chipFg = if (isSelected) (if (isDark) Color(0xFF60A5FA) else primaryColor)
+                                    else MiuixTheme.colorScheme.onSurface
+                                    Row(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(14.dp))
+                                            .background(chipBg)
+                                            .clickable {
+                                                if (!isInstantSwitchActive) {
+                                                    requireAccessibility()
+                                                    return@clickable
+                                                }
+                                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                targetMaxHz = rates.first
+                                                targetMinHz = rates.second
+                                                targetAdaptive = adaptive
+                                            }
+                                            .padding(horizontal = 14.dp, vertical = 11.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = name.substringBefore(" ("),
+                                            fontSize = 13.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = chipFg
+                                        )
+                                        Text(
+                                            text = if (adaptive) "${rates.second}~${rates.first}Hz" else "${rates.first}Hz",
+                                            fontSize = 11.5.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = if (isSelected) chipFg.copy(alpha = 0.85f) else MiuixTheme.colorScheme.onSurfaceVariantSummary
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -2340,11 +2133,11 @@ private fun AppRulesTabContent(
             }
         }
 
-        // 流媒体高刷兼容策略指南卡 & LTPO 校准双卡
+        // 流媒体高刷兼容策略指南卡 & LTPO 校准双卡（统一分组标题，避免卡片内外标题重复）
         item(key = "card-stream-compat-guide") {
             Column {
                 SmallTitle(
-                    text = stringResource(R.string.rules_compat_policy_tip_title),
+                    text = "高刷进阶与功耗校准",
                     insideMargin = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
                 )
                 Card(
@@ -2380,38 +2173,32 @@ private fun AppRulesTabContent(
 
         // 屏幕自适应降频与功耗校准卡
         item(key = "card-calibrate-ltpo-power") {
-            Column {
-                SmallTitle(
-                    text = stringResource(R.string.rules_calibrate_ltpo_title),
-                    insideMargin = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
-                )
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    cornerRadius = 20.dp,
-                    colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
-                ) {
-                    Column(Modifier.padding(16.dp)) {
-                        Text(
-                            text = stringResource(R.string.rules_calibrate_ltpo_title),
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MiuixTheme.colorScheme.onSurface
-                        )
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            text = stringResource(R.string.rules_calibrate_ltpo_desc),
-                            fontSize = 12.5.sp,
-                            lineHeight = 18.sp,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                        )
-                        Spacer(Modifier.height(12.dp))
-                        TextButton(
-                            text = stringResource(R.string.rules_btn_calibrate_ltpo),
-                            onClick = actions.onCalibrateLtpoAdaptiveClick,
-                            colors = ButtonDefaults.textButtonColorsPrimary(),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                cornerRadius = 20.dp,
+                colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Text(
+                        text = stringResource(R.string.rules_calibrate_ltpo_title),
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MiuixTheme.colorScheme.onSurface
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = stringResource(R.string.rules_calibrate_ltpo_desc),
+                        fontSize = 12.5.sp,
+                        lineHeight = 18.sp,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    TextButton(
+                        text = stringResource(R.string.rules_btn_calibrate_ltpo),
+                        onClick = actions.onCalibrateLtpoAdaptiveClick,
+                        colors = ButtonDefaults.textButtonColorsPrimary(),
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
         }

@@ -24,26 +24,24 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Publish Release v13.7.8 (Miuix Soft-Pastel & Bento Visual Refinement)
+      - name: Publish Release v13.7.9 (Deduplicate Buttons & Fix Text Truncation)
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v13.7.8
-          name: "Shizuku Sam v13.7.8 — Miuix 视觉精修与 Bento 矩阵卡片升级"
+          tag_name: v13.7.9
+          name: "Shizuku Sam v13.7.9 — 消除重复按钮与修复卡片文案截断"
           body: |
-            ### Shizuku Sam v13.7.8 (Miuix Soft-Pastel & Bento UI Refinement)
-            - **修复并重构全系 `IconBadge` 图标徽章**：告别旧版深黑厚重渐变色块，全面升级为 **14% 柔和浅底色超椭圆（Squircle）+ 主题色矢量着色（`ColorFilter.tint`）**，所有列表项图标通透清晰。
-            - **主页大标题与核心运行横幅重构 (`HeroCard`)**：
-              - 升级为 Miuix 大字重标题（`27.sp Bold`）与柔和副标题层级；
-              - 顶栏状态大卡新增右上角裁切式**几何双环水印徽章（Watermark Emblem）**，搭配柔和状态胶囊（`#EBF3FF` / `#FFECE8`）与三联 Bento 状态磁贴。
-            - **「性能硬件」页升级为 3×2 交互式状态磁贴矩阵 + 2×2 Bento 指标双列网格**：
-              - 6 项高频开关（旁路供电、充电保护、游戏高刷、FPS 浮窗、户外强光、熄屏快睡）升级为点亮式浅蓝胶囊磁贴；
-              - 充电上限保护设置、电池健康度、游戏高刷白名单、冷启动加速升级为 2×2 Bento 指标卡片，直接展示 `85% / 100%` 阈值与实时健康状态。
-            - **全面净化卡片内分割线与副标题冗余**：移除 `Card` 内部多余的硬分割线，解耦开关行动态状态与副标题说明，保留 Miuix 20dp 圆角留白呼吸感。
+            ### Shizuku Sam v13.7.9
+            - **彻底消除主页与性能页功能重复按钮**：
+              - **「特权服务」页**：未运行状态 `HeroCard` 仅保留主操作「无线调试一键启动」，「Root 权限直接启动」归口至下方「其他特权启动方式」卡片；运行中状态 `HeroCard` 底部精简为「终端直通 (rish)」+「停止服务」双列等宽按钮，「重新连接无线调试」与「使用 Root 重启服务」统一归口至下方「特权通道与备用连接」卡片。
+              - **「性能硬件」页**：合并此前被拆分为两处的「充电保护 / 充电上限保护设置」与「游戏高刷 / 游戏高刷白名单」，移除与下方「后台与深度休眠」重复的「熄屏快睡」磁贴。
+            - **全面修复窄磁贴与双列卡片文案显示不全（`...` 截断）问题**：
+              - 「快捷硬件开关与电池健康」回归全宽 Miuix 纯净卡片（配 14% 柔和浅底彩色超椭圆图标 + 右侧胶囊角标），所有主副标题 100% 完整展示；
+              - 「应用规则」页常用场景预设由单排 4 列升级为 **2×2 双列宽敞胶囊网格**，并移除底部两张校准卡片内外的重复标题。
           files: |
-            releases/Shizuku-Sam-v13.7.8.apk
+            releases/Shizuku-Sam-v13.7.9.apk
 
       - name: Publish Future Version Tag Release
-        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8'
+        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
@@ -51,3 +49,4 @@ jobs:
           generate_release_notes: true
           files: |
             releases/Shizuku-Sam-${{ github.ref_name }}.apk
+

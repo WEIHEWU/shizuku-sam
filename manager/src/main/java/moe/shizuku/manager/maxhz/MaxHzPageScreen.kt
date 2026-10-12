@@ -310,9 +310,15 @@ private fun EntryRow(
             }
         )
     } else {
+        val isShortStatus = !statusText.isNullOrBlank() && statusText.length <= 8
+        val displaySummary = if (!statusText.isNullOrBlank() && !isShortStatus) {
+            "${entry.subtitle}\n当前状态：$statusText"
+        } else {
+            entry.subtitle
+        }
         ArrowPreference(
             title = entry.title,
-            summary = entry.subtitle,
+            summary = displaySummary,
             onClick = entry.onClick,
             startAction = {
                 Box(Modifier.padding(end = 12.dp)) {
@@ -323,7 +329,7 @@ private fun EntryRow(
                 }
             },
             endActions = {
-                if (!statusText.isNullOrBlank()) {
+                if (isShortStatus && statusText != null) {
                     Text(
                         text = statusText,
                         fontSize = 12.5.sp,
