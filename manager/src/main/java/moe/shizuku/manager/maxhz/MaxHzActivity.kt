@@ -9823,7 +9823,11 @@ open class MaxHzActivity : AppBarActivity() {
                 }
 
                 addSpacedView(TextView(this@MaxHzActivity).apply {
-                    text = "当前策略：进游戏切「$targetLabel」 · 离开缓冲 ${exitDelaySeconds}s · 名单 ${packages.size} 款"
+                    val customCount = packages.count {
+                        MaxHzPrefs.gamePackageCustomProfile(this@MaxHzActivity, it) != null
+                    }
+                    val customHint = if (customCount > 0) "（已为 ${customCount} 款单独指定）" else ""
+                    text = "当前策略：默认切「$targetLabel」$customHint · 离开缓冲 ${exitDelaySeconds}s · 名单 ${packages.size} 款"
                     textSize = 12.5f
                     setTextColor(themeColors.onSurfaceVariant)
                     includeFontPadding = false
@@ -9833,12 +9837,19 @@ open class MaxHzActivity : AppBarActivity() {
             // 卡片 2：目标模式与温控策略
             addSpacedView(card {
                 addView(TextView(this@MaxHzActivity).apply {
-                    text = "进入游戏目标模式"
+                    text = "默认进游戏目标模式"
                     textSize = 15f
                     setTextColor(themeColors.onSurface)
                     setTypeface(typeface, android.graphics.Typeface.BOLD)
                     includeFontPadding = false
                 })
+                addSpacedView(TextView(this@MaxHzActivity).apply {
+                    text = "作为未单独指定游戏的默认档位；下方游戏名单支持为每款游戏分别指定「系统默认」或「性能模式」。"
+                    textSize = 12f
+                    setTextColor(themeColors.onSurfaceVariant)
+                    includeFontPadding = false
+                    setLineSpacing(0f, 1.25f)
+                }, dp(4))
                 addSpacedView(horizontalActions(
                     button(if (currentTarget == MaxHzPrefs.GAME_PROFILE_DEFAULT) "系统默认 ✓" else "系统默认") {
                         if (!MaxHzShell.isReady()) {
@@ -9846,7 +9857,7 @@ open class MaxHzActivity : AppBarActivity() {
                             return@button
                         }
                         MaxHzPrefs.setGameAutoTargetProfile(this@MaxHzActivity, MaxHzPrefs.GAME_PROFILE_DEFAULT)
-                        Toast.makeText(this@MaxHzActivity, "进游戏将切换为：系统默认", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@MaxHzActivity, "默认进游戏模式已设为：系统默认", Toast.LENGTH_SHORT).show()
                         renderDetail()
                     },
                     button(if (currentTarget == MaxHzPrefs.GAME_PROFILE_SAVER) "省电自适应高刷 ✓" else "省电自适应高刷") {
@@ -9855,7 +9866,7 @@ open class MaxHzActivity : AppBarActivity() {
                             return@button
                         }
                         MaxHzPrefs.setGameAutoTargetProfile(this@MaxHzActivity, MaxHzPrefs.GAME_PROFILE_SAVER)
-                        Toast.makeText(this@MaxHzActivity, "进游戏将切换为：省电自适应高刷", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@MaxHzActivity, "默认进游戏模式已设为：省电自适应高刷", Toast.LENGTH_SHORT).show()
                         renderDetail()
                     },
                     button(if (currentTarget == MaxHzPrefs.GAME_PROFILE_PERFORMANCE) "游戏性能模式 ✓" else "游戏性能模式") {
@@ -9864,7 +9875,7 @@ open class MaxHzActivity : AppBarActivity() {
                             return@button
                         }
                         MaxHzPrefs.setGameAutoTargetProfile(this@MaxHzActivity, MaxHzPrefs.GAME_PROFILE_PERFORMANCE)
-                        Toast.makeText(this@MaxHzActivity, "进游戏将切换为：游戏性能模式", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@MaxHzActivity, "默认进游戏模式已设为：游戏性能模式", Toast.LENGTH_SHORT).show()
                         renderDetail()
                     }
                 ), dp(10))
@@ -9922,7 +9933,7 @@ open class MaxHzActivity : AppBarActivity() {
                     }
                     showGameAutoAppPicker { app ->
                         MaxHzPrefs.addGameAutoPerformancePackage(this@MaxHzActivity, app.packageName)
-                        Toast.makeText(this@MaxHzActivity, "已加入 ${app.label}", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@MaxHzActivity, "已加入 ${app.label}（点击右侧模式按钮可单独切换默认/性能）", Toast.LENGTH_SHORT).show()
                         renderDetail()
                     }
                 })
@@ -9962,7 +9973,7 @@ open class MaxHzActivity : AppBarActivity() {
                     includeFontPadding = false
                 })
                 addSpacedView(TextView(this@MaxHzActivity).apply {
-                    text = "• 零后台轮询：仅在前台应用切换事件到达时瞬间触发，平时完全休眠，不耗待机电量。\n• 状态完整还原：退出游戏或超过保持时间后，完整恢复到进游戏前的模式与设置，不留耗电尾巴。\n• 临时切出缓冲：游戏过程中临时回微信、接电话不会立刻中断模式，体验丝滑。"
+                    text = "• 零后台轮询：仅在前台应用切换事件到达时瞬间触发，平时完全休眠，不耗待机电量。\n• 按游戏独立分档：日常开「省电自适应」时，可将轻度游戏设为「系统默认」（仅解除省电限制不发热），重度游戏设为「性能模式」。\n• 状态完整还原：退出游戏或超过保持时间后，100% 恢复到进游戏前的日常模式与设置，不留耗电尾巴。"
                     textSize = 12.5f
                     setTextColor(themeColors.onSurfaceVariant)
                     setLineSpacing(0f, 1.35f)
@@ -10013,8 +10024,29 @@ open class MaxHzActivity : AppBarActivity() {
                     setLineSpacing(0f, 1.3f)
                 })
             } else {
+                addView(TextView(this@MaxHzActivity).apply {
+                    text = "💡 点击每款游戏右侧的模式胶囊，可单独指定该游戏进前台时切「系统默认」或「性能模式」。"
+                    textSize = 12f
+                    setTextColor(themeColors.onSurfaceVariant)
+                    includeFontPadding = false
+                    setLineSpacing(0f, 1.25f)
+                    setPadding(0, 0, 0, dp(6))
+                })
                 packages.forEachIndexed { index, packageName ->
                     val info = loadAppDisplayInfo(packageName)
+                    val customProfile = MaxHzPrefs.gamePackageCustomProfile(this@MaxHzActivity, packageName)
+                    val effectiveProfile = MaxHzPrefs.gamePackageTargetProfile(this@MaxHzActivity, packageName)
+                    val modePillText = when (effectiveProfile) {
+                        MaxHzPrefs.GAME_PROFILE_DEFAULT -> "系统默认 ▾"
+                        MaxHzPrefs.GAME_PROFILE_SAVER -> "省电高刷 ▾"
+                        else -> "性能模式 ▾"
+                    }
+                    val (pillBg, pillFg) = when (effectiveProfile) {
+                        MaxHzPrefs.GAME_PROFILE_DEFAULT -> themeColors.secondaryContainer to themeColors.onSecondaryContainer
+                        MaxHzPrefs.GAME_PROFILE_SAVER -> themeColors.tertiaryContainer to themeColors.onTertiaryContainer
+                        else -> themeColors.primaryContainer to themeColors.onPrimaryContainer
+                    }
+                    val subtitlePrefix = if (customProfile != null) "专属档位" else "跟随默认"
                     val row = LinearLayout(this@MaxHzActivity).apply {
                         orientation = LinearLayout.HORIZONTAL
                         gravity = Gravity.CENTER_VERTICAL
@@ -10028,6 +10060,9 @@ open class MaxHzActivity : AppBarActivity() {
                     row.addView(iconView, LinearLayout.LayoutParams(dp(36), dp(36)).apply { rightMargin = dp(12) })
                     row.addView(LinearLayout(this@MaxHzActivity).apply {
                         orientation = LinearLayout.VERTICAL
+                        setOnClickListener {
+                            showGamePackageProfileDialog(packageName, info.label)
+                        }
                         addView(TextView(this@MaxHzActivity).apply {
                             text = info.label
                             textSize = 13.5f
@@ -10038,7 +10073,7 @@ open class MaxHzActivity : AppBarActivity() {
                             ellipsize = TextUtils.TruncateAt.END
                         })
                         addView(TextView(this@MaxHzActivity).apply {
-                            text = packageName
+                            text = "$subtitlePrefix · $packageName"
                             textSize = 11.5f
                             setTextColor(themeColors.onSurfaceVariant)
                             includeFontPadding = false
@@ -10047,11 +10082,30 @@ open class MaxHzActivity : AppBarActivity() {
                             setPadding(0, dp(3), 0, 0)
                         })
                     }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                    val modePill = TextView(this@MaxHzActivity).apply {
+                        text = modePillText
+                        textSize = 12f
+                        setTextColor(pillFg)
+                        setTypeface(typeface, android.graphics.Typeface.BOLD)
+                        gravity = Gravity.CENTER
+                        includeFontPadding = false
+                        setPadding(dp(10), dp(7), dp(10), dp(7))
+                        background = rounded(pillBg, dp(10).toFloat())
+                        setOnClickListener {
+                            showGamePackageProfileDialog(packageName, info.label)
+                        }
+                    }
+                    row.addView(modePill, LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply {
+                        rightMargin = dp(6)
+                    })
                     row.addView(button("删除") {
                         MaxHzPrefs.removeGameAutoPerformancePackage(this@MaxHzActivity, packageName)
                         Toast.makeText(this@MaxHzActivity, "已移除 ${info.label}", Toast.LENGTH_SHORT).show()
                         renderDetail()
-                    }, LinearLayout.LayoutParams(dp(76), LinearLayout.LayoutParams.WRAP_CONTENT))
+                    }, LinearLayout.LayoutParams(dp(64), LinearLayout.LayoutParams.WRAP_CONTENT))
                     addView(row)
                     if (index < packages.lastIndex) {
                         addView(divider())
@@ -10059,6 +10113,50 @@ open class MaxHzActivity : AppBarActivity() {
                 }
             }
         }
+    }
+
+    private fun showGamePackageProfileDialog(packageName: String, appLabel: String) {
+        val globalTarget = MaxHzPrefs.gameAutoTargetProfile(this)
+        val globalLabel = when (globalTarget) {
+            MaxHzPrefs.GAME_PROFILE_DEFAULT -> "系统默认"
+            MaxHzPrefs.GAME_PROFILE_SAVER -> "省电自适应高刷"
+            else -> "游戏性能模式"
+        }
+        val currentCustom = MaxHzPrefs.gamePackageCustomProfile(this, packageName)
+        val optionValues = listOf<String?>(
+            null,
+            MaxHzPrefs.GAME_PROFILE_DEFAULT,
+            MaxHzPrefs.GAME_PROFILE_PERFORMANCE,
+            MaxHzPrefs.GAME_PROFILE_SAVER
+        )
+        val optionLabels = arrayOf(
+            "跟随全局默认（当前：$globalLabel）",
+            "系统默认（解除省电降频，标准高刷不发热）",
+            "游戏性能模式（满血 CPU/GPU 与触控加速）",
+            "省电自适应高刷（维持省电与自适应高刷）"
+        )
+        val checkedIndex = optionValues.indexOf(currentCustom).coerceAtLeast(0)
+        MaterialAlertDialogBuilder(this)
+            .setTitle("$appLabel · 进游戏模式")
+            .setSingleChoiceItems(optionLabels, checkedIndex) { dialog, which ->
+                val selectedProfile = optionValues.getOrNull(which)
+                MaxHzPrefs.setGamePackageCustomProfile(this, packageName, selectedProfile)
+                val effectiveLabel = when (selectedProfile ?: globalTarget) {
+                    MaxHzPrefs.GAME_PROFILE_DEFAULT -> "系统默认"
+                    MaxHzPrefs.GAME_PROFILE_SAVER -> "省电自适应高刷"
+                    else -> "游戏性能模式"
+                }
+                val prefix = if (selectedProfile == null) "已设为跟随默认" else "已单独设为"
+                Toast.makeText(
+                    this,
+                    "$appLabel $prefix：$effectiveLabel",
+                    Toast.LENGTH_SHORT
+                ).show()
+                dialog.dismiss()
+                renderDetail()
+            }
+            .setNegativeButton("取消", null)
+            .show()
     }
 
     private fun dashboardRow(label: String, value: String): LinearLayout {

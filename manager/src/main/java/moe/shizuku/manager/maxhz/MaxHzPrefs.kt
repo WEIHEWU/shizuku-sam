@@ -98,6 +98,7 @@ object MaxHzPrefs {
     private const val KEY_M_DEXOPT_ENABLED = "m_dexopt_enabled"
     private const val KEY_GAME_AUTO_PERFORMANCE_ENABLED = "game_auto_performance_enabled"
     private const val KEY_GAME_AUTO_PERFORMANCE_PACKAGES = "game_auto_performance_packages"
+    private const val KEY_GAME_AUTO_PACKAGE_PROFILES = "game_auto_package_profiles"
     /** @deprecated 三档档位已废弃，保留 key 只为把「极限」档迁移到 [KEY_GAME_AUTO_THERMAL_RELAXED] */
     private const val KEY_GAME_AUTO_PERFORMANCE_PROFILE = "game_auto_performance_profile"
     private const val KEY_GAME_AUTO_PERFORMANCE_EXIT_DELAY_SECONDS = "game_auto_performance_exit_delay_seconds"
@@ -641,7 +642,12 @@ object MaxHzPrefs {
             .map { it.trim() }
             .filter { it.matches(PACKAGE_NAME_PATTERN) }
             .toSet()
-        prefs(context).edit().putStringSet(KEY_GAME_AUTO_PERFORMANCE_PACKAGES, normalized).apply()
+        val prunedProfiles = gameAutoPackageProfiles(context)
+            .filterKeys { it in normalized }
+        prefs(context).edit()
+            .putStringSet(KEY_GAME_AUTO_PERFORMANCE_PACKAGES, normalized)
+            .putString(KEY_GAME_AUTO_PACKAGE_PROFILES, serializeGamePackageProfiles(prunedProfiles))
+            .apply()
     }
 
     fun addGameAutoPerformancePackage(context: Context, packageName: String) {
@@ -651,7 +657,71 @@ object MaxHzPrefs {
     }
 
     fun removeGameAutoPerformancePackage(context: Context, packageName: String) {
-        setGameAutoPerformancePackages(context, gameAutoPerformancePackages(context) - packageName.trim())
+        val normalized = packageName.trim()
+        setGameAutoPerformancePackages(context, gameAutoPerformancePackages(context) - normalized)
+    }
+
+    private fun isValidGameProfile(profile: String?): Boolean {
+        return profile == GAME_PROFILE_DEFAULT ||
+            profile == GAME_PROFILE_SAVER ||
+            profile == GAME_PROFILE_PERFORMANCE
+    }
+
+    private fun serializeGamePackageProfiles(profiles: Map<String, String>): String {
+        return profiles.entries
+            .filter { (pkg, profile) -> pkg.matches(PACKAGE_NAME_PATTERN) && isValidGameProfile(profile) }
+            .sortedBy { it.key }
+            .joinToString(";") { "${it.key}=${it.value}" }
+    }
+
+    fun gameAutoPackageProfiles(context: Context): Map<String, String> {
+        val raw = prefs(context).getString(KEY_GAME_AUTO_PACKAGE_PROFILES, "").orEmpty()
+        if (raw.isBlank()) return emptyMap()
+        val result = linkedMapOf<String, String>()
+        for (entry in raw.split(';')) {
+            val trimmed = entry.trim()
+            if (trimmed.isEmpty()) continue
+            val sep = trimmed.indexOf('=')
+            if (sep <= 0 || sep >= trimmed.lastIndex) continue
+            val pkg = trimmed.substring(0, sep).trim()
+            val profile = trimmed.substring(sep + 1).trim()
+            if (pkg.matches(PACKAGE_NAME_PATTERN) && isValidGameProfile(profile)) {
+                result[pkg] = profile
+            }
+        }
+        return result
+    }
+
+    /**
+     * 获取指定游戏包名单独配置的专属模式；若未单独指定则返回 null（表示跟随全局默认模式）。
+     */
+    fun gamePackageCustomProfile(context: Context, packageName: String?): String? {
+        val pkg = packageName?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        return gameAutoPackageProfiles(context)[pkg]
+    }
+
+    /**
+     * 获取指定游戏包名最终生效的目标模式：优先使用单游戏专属档位，否则回退到全局默认档位。
+     */
+    fun gamePackageTargetProfile(context: Context, packageName: String?): String {
+        return gamePackageCustomProfile(context, packageName) ?: gameAutoTargetProfile(context)
+    }
+
+    /**
+     * 设置或清除指定游戏包名的专属目标模式（传 null 表示恢复跟随全局默认）。
+     */
+    fun setGamePackageCustomProfile(context: Context, packageName: String, profile: String?) {
+        val normalizedPkg = packageName.trim()
+        if (!normalizedPkg.matches(PACKAGE_NAME_PATTERN)) return
+        val current = gameAutoPackageProfiles(context).toMutableMap()
+        if (profile == null || !isValidGameProfile(profile)) {
+            current.remove(normalizedPkg)
+        } else {
+            current[normalizedPkg] = profile
+        }
+        prefs(context).edit()
+            .putString(KEY_GAME_AUTO_PACKAGE_PROFILES, serializeGamePackageProfiles(current))
+            .apply()
     }
 
     /**
@@ -730,22 +800,27 @@ object MaxHzPrefs {
     }
 
     /**
-     * 当前游戏会话的档位标识。
-     *
-     * 三档档位（均衡 / 高性能 / 极限）已废弃，进游戏现在只有一种目标状态 ——
-     * 极致性能。这个值只为保持会话记录的格式不变（恢复会话时用它拼 target 字符串），
-     * 不再承载任何实际含义。
+     * 当前游戏会话生效的档位标识（default / saver / performance）。
      */
     fun gameAutoActiveProfile(context: Context): String {
-        return prefs(context).getString(KEY_GAME_AUTO_ACTIVE_PROFILE, GAME_AUTO_PROFILE_SUPER)
-            ?: GAME_AUTO_PROFILE_SUPER
+        val activePkg = gameAutoActivePackage(context)
+        val saved = prefs(context).getString(KEY_GAME_AUTO_ACTIVE_PROFILE, null)
+        return when (saved) {
+            GAME_PROFILE_DEFAULT, GAME_PROFILE_SAVER, GAME_PROFILE_PERFORMANCE -> saved
+            else -> gamePackageTargetProfile(context, activePkg)
+        }
     }
 
-    fun setGameAutoActiveSession(context: Context, packageName: String) {
+    fun setGameAutoActiveSession(
+        context: Context,
+        packageName: String,
+        profile: String = gamePackageTargetProfile(context, packageName)
+    ) {
         val safePackage = packageName.takeIf { it.matches(PACKAGE_NAME_PATTERN) } ?: return
+        val normalizedProfile = if (isValidGameProfile(profile)) profile else gamePackageTargetProfile(context, safePackage)
         prefs(context).edit()
             .putString(KEY_GAME_AUTO_ACTIVE_PACKAGE, safePackage)
-            .putString(KEY_GAME_AUTO_ACTIVE_PROFILE, GAME_AUTO_PROFILE_SUPER)
+            .putString(KEY_GAME_AUTO_ACTIVE_PROFILE, normalizedProfile)
             .apply()
     }
 

@@ -284,7 +284,7 @@ class MaxHzAccessibilityService : AccessibilityService() {
             pendingGameAutoGeneration != null &&
             pendingGameAutoGeneration == gameAutoApplyingGeneration
         val target = if (isGameForeground) {
-            GAME_AUTO_TARGET_ENTRY_PENDING
+            "$GAME_AUTO_TARGET_ENTRY:${MaxHzPrefs.gamePackageTargetProfile(this, foregroundPackage)}"
         } else {
             if (
                 !hasActiveGameAutoSession() &&
@@ -458,6 +458,9 @@ class MaxHzAccessibilityService : AccessibilityService() {
                                 if (activeGameAutoPackage == foregroundPackage) {
                                     activeGameAutoPackage = null
                                     MaxHzPrefs.clearGameAutoActiveSession(this@MaxHzAccessibilityService)
+                                    if (!MaxHzPrefs.gameAutoSessionActive(this@MaxHzAccessibilityService)) {
+                                        MaxHzPrefs.clearGameAutoSnapshot(this@MaxHzAccessibilityService)
+                                    }
                                 }
                             }
                         }
@@ -547,7 +550,7 @@ class MaxHzAccessibilityService : AccessibilityService() {
             gameAutoDiagnostic("RECONCILE_SKIPPED reason=not_listed package=$actualPackage generation=$generation")
             return
         }
-        val requestTarget = GAME_AUTO_TARGET_ENTRY_PENDING
+        val requestTarget = "$GAME_AUTO_TARGET_ENTRY:${MaxHzPrefs.gamePackageTargetProfile(this, actualPackage)}"
         val decision = synchronized(gameAutoStateLock) {
             lastSeenPackage = actualPackage
             decideGameAutoEntry(actualPackage, requestTarget, gameAutoEntryState())
@@ -645,7 +648,9 @@ class MaxHzAccessibilityService : AccessibilityService() {
         if (!MaxHzPrefs.gameAutoPerformanceEnabled(this)) return hasActiveGameAutoSession()
         val isGame = packageName in MaxHzPrefs.gameAutoPerformancePackages(this)
         return if (isGame) {
+            val desiredTarget = "$GAME_AUTO_TARGET_ENTRY:${MaxHzPrefs.gamePackageTargetProfile(this, packageName)}"
             lastAppliedGameAutoTarget?.startsWith("$GAME_AUTO_TARGET_ENTRY:") != true ||
+                lastAppliedGameAutoTarget != desiredTarget ||
                 activeGameAutoPackage != packageName
         } else {
             hasActiveGameAutoSession() &&
@@ -826,9 +831,11 @@ class MaxHzAccessibilityService : AccessibilityService() {
      * **先拍快照再改状态** —— 退出游戏时按快照还原，见 [applyGameAutoExit]。
      */
     private fun applyGameAutoEntry(): GameAutoOperation {
-        MaxHzPrefs.captureGameAutoSnapshot(this)
-        val targetProfile = MaxHzPrefs.gameAutoTargetProfile(this)
+        if (!MaxHzPrefs.gameAutoSessionActive(this) || MaxHzPrefs.gameAutoSnapshot(this) == null) {
+            MaxHzPrefs.captureGameAutoSnapshot(this)
+        }
         val gamePkg = activeGameAutoPackage
+        val targetProfile = MaxHzPrefs.gamePackageTargetProfile(this, gamePkg)
         val steps = mutableListOf<GameAutoStep>()
         when (targetProfile) {
             MaxHzPrefs.GAME_PROFILE_DEFAULT -> {
@@ -1032,7 +1039,7 @@ class MaxHzAccessibilityService : AccessibilityService() {
      * 系统已经是极致性能态、开关却显示「关闭」。
      */
     private fun markGameAutoEntryApplied() {
-        val targetProfile = MaxHzPrefs.gameAutoTargetProfile(this)
+        val targetProfile = MaxHzPrefs.gamePackageTargetProfile(this, activeGameAutoPackage)
         when (targetProfile) {
             MaxHzPrefs.GAME_PROFILE_DEFAULT -> {
                 MaxHzPrefs.markSuperPerformanceState(this, false)

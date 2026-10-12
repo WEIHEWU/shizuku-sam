@@ -1,59 +1,87 @@
 # Shizuku Sam
 
-[English](README.en.md) · **[📥 点击直接下载最新安装包 (Shizuku-Sam-v13.8.1.apk · 3.4 MB)](https://github.com/WEIHEWU/shizuku-sam/raw/main/releases/Shizuku-Sam-v13.8.1.apk)** · [Releases 历史版本页面](https://github.com/WEIHEWU/shizuku-sam/releases)
+[English](README.en.md) · **[📥 点击直接下载最新安装包 (Shizuku-Sam-v13.8.2.apk · 3.4 MB)](https://github.com/WEIHEWU/shizuku-sam/releases/download/v13.8.2/Shizuku-Sam-v13.8.2.apk)** · [Releases 历史版本页面](https://github.com/WEIHEWU/shizuku-sam/releases)
 
-基于官方 **Shizuku (`moe.shizuku.privileged.api`)** 深度定制的三星 One UI 8.5 / Galaxy 旗舰增强版，采用 **Miuix (HyperOS / MIUIX KMP)** 原生阻尼与 Bento 卡片交互体系，集成 **无 Wi-Fi 重启自启（Loopback 端口扫描直连）**、**三通道权限引擎（Root / Shizuku / Device Owner）** 以及 **100% 真实生效的系统硬件与显示深度调校套件**。
+基于官方 **Shizuku (`moe.shizuku.privileged.api`)** 深度定制的三星 One UI / Galaxy 旗舰增强版，采用 **Miuix (`top.yukonga.miuix.kmp`)** 视觉组件体系与悬浮毛玻璃导航架构，集成**无线调试无障碍自动配对**、**无 Wi-Fi 环境下开机自启**、**Device Owner (Dhizuku) 免 Root 特权模式**，以及专为三星旗舰打造的**性能调度、按游戏独立分档加速、充电保护与分应用 LTPO 刷新率控制中枢**。
 
-当前版本：`13.8.1`（`versionCode 130801`）。
+当前最新版本：`v13.8.2`（`versionCode 130802`）。
 
-> 针对三星 Galaxy S24 Ultra（One UI 8.5 / Android 16）深度适配与实机验证，同时完全兼容标准 Shizuku API 生态。
+---
 
-## 核心特性
+## 核心功能一览（100% 对应应用真实模块）
 
-### 1. Shizuku 增强内核与无 Wi-Fi 重启自启
-- **100% 兼容官方 Shizuku 生态**：保持 `moe.shizuku.privileged.api` 包名与 Binder 服务接口，所有依赖 Shizuku 的第三方应用无缝调用。
-- **无 Wi-Fi 环境下开机自启**：
-  - 结合 `WRITE_SECURE_SETTINGS` 自动拉起系统无线调试（`adb_wifi_enabled=1`），并在无 Wi-Fi 或 mDNS 广播受阻时通过本地回环（`127.0.0.1`）高并发端口扫描探测 ADB TLS 端口完成自启。
-- **三通道执行引擎 (`SimEngine`)**：
-  - 自动按 **Root (`su`) → Shizuku (`rish`/Binder) → Device Owner (DPM)** 优先级路由底层指令，实时校验硬件节点与系统表项回读结果。
+应用主界面分为 **【特权服务】**、**【性能硬件】**、**【应用规则】** 三大核心标签页：
 
-### 2. 显示与触控精调（零安慰剂，全量底层直写）
-- **全局高刷锁定与 LTPO 帧率控制**：真实读写 `Settings.Secure [refresh_rate_mode]`、`Settings.System [peak_refresh_rate]` 与 `min_refresh_rate`（支持自适应 120Hz / 强制全局 120Hz / 标准 60Hz），并提供 `SurfaceFlinger` 硬件图层锁帧与零延迟实时 FPS 悬浮窗（`dumpsys SurfaceFlinger --latency`）。
-- **三星游戏 Service Mode 240Hz 触控采样率**：实时检测 `sec_tsp` 触控芯片状态（`get_game_mode`）与 `game_touch_sampling_rate` 表项，并提供可视化实时多指触控采样率 / 报点延迟测试面板。
-- **屏幕色彩模式与 AMOLED 硬件级极暗 (`Reduce Bright Colors`)**：直写 `sec_display_preset_index` 与 `reduce_bright_colors_activated` / `reduce_bright_colors_level`。
-- **三星原生双击亮屏 (`double_tab_to_wake_up`) 与双击锁屏 (`double_tab_to_sleep`)**。
-- **自定义 DPI / 分辨率缩放与无级过渡动画倍速（`0.0x ~ 2.0x`）**：内置防黑屏安全边界与一键恢复出厂默认尺寸/密度。
+### 一、【特权服务】—— Shizuku 核心与多通道激活中枢
+- **100% 兼容官方 Shizuku 生态**：保持 `moe.shizuku.privileged.api` 包名与标准 Binder IPC 接口，所有依赖 Shizuku 的第三方应用均可无缝授权调用，内置 `rish` 高权限终端脚本导出。
+- **无障碍自动配对助手 (`AdbPairingDetector`)**：在开发者选项点开「使用配对码配对设备」弹窗时，无障碍服务自动识别 6 位配对码与端口并后台静默完成配对，无需手动输入或分屏。
+- **无 Wi-Fi 环境下开机自启**：结合 `WRITE_SECURE_SETTINGS` 自动拉起无线调试（`adb_wifi_enabled=1`），在无 Wi-Fi 连接或 mDNS 受阻时通过本地回环（`127.0.0.1`）并发扫描 ADB TLS 端口完成自启。
+- **多通道特权支持（ADB / Root / Device Owner）**：支持无线调试 ADB、Root (`su`) 以及 Device Owner（设备所有者免 Root 持久特权）三种运行与辅佐模式。
 
-### 3. 性能、调度与内存管理
-- **SoC 硬件频率与州长（Governor）锁定**：支持按 CPU Cluster 独立调节 `scaling_governor` 与 `scaling_min_freq` / `scaling_max_freq`（需 Root）。
-- **三星性能模式直控**：直接读写 `sem_enhanced_cpu_responsiveness` 与 `low_power` 系统状态。
-- **后台进程上限 (`ActivityManager.setProcessLimit`) 与三星 RAM Plus (`ram_expand_size`) 调节**。
-- **应用 DEX 编译加速（支持自选指定应用 `-m speed` 极速全编译 / `-m speed-profile` 热点编译 / 全量与核心应用预编译）** 与全量应用缓存回收（`pm trim-caches`）。
-- **内核级内存回收 (`drop_caches`) 与 `fstrim` 闪存碎片整理**。
+---
 
-### 4. 电池健康、充电控制与网络净化
-- **三星硬件充电保护 (`protect_battery` / `battery_protection_threshold`) 与快充总成控制**：Miuix 原生居中弹窗调节充电阈值，直通 `adaptive_fast_charging`、`super_fast_charging`、`wireless_fast_charging` 与游戏旁路直供电（`pass_through`）。
-- **深度 Doze 一键休眠 (`dumpsys deviceidle force-idle`) 与待机策略优化**。
-- **Private DNS (DoT) 加密解析**：内置 AdGuard DNS、Cloudflare `1.1.1.1`、阿里 DNS、腾讯 DNSPod 与自定义 DoT 主机名一键切换。
-- **沉浸状态栏 (`policy_control`)、状态栏图标精简 (`icon_blacklist`)、多任务后台模糊防窥与剪切板隐私守护**。
+### 二、【性能硬件】—— 三星调度、游戏分档加速、电池保护与后台治理
+
+#### 1. 核心性能调度（支持快捷设置磁贴一键切换）
+- **系统默认（日常均衡）**：恢复三星原厂标准 CPU/GPU 调度与 LTPO 自适应高刷策略。
+- **省电自适应（续航优先）**：开启系统省电模式降低日常功耗，同时突破三星省电模式强制锁 60Hz 的限制，保持 10~120Hz 自适应丝滑高刷。
+- **游戏性能（满血释放）**：开启高性能调度、GPU 与 Vulkan 渲染加速、游戏触控采样率加速及满血 120Hz 高刷。
+
+#### 2. 游戏自动高刷加速（`v13.8.2` 新增：按游戏独立指定档位）
+- **零后台轮询**：基于无障碍窗口切换事件即时触发，平时完全休眠不耗电。
+- **按游戏独立分档（Per-Game Profile）**：
+  - 支持在「全局默认目标模式」基础上，点击游戏名单中任意游戏右侧的**模式胶囊（`[系统默认 ▾]` / `[性能模式 ▾]` / `[省电高刷 ▾]`）**单独指定该游戏的专属模式：
+  - **日常开「省电自适应」用户的最佳拍档**：可将轻中度/休闲游戏单独设为**「系统默认」**（进入游戏自动解除省电降频限制、恢复均衡高刷且不发热），将大型重度 3D 游戏设为**「游戏性能模式」**（满血释放性能）。
+- **跨游戏无缝升降档 & 退出 100% 状态还原**：进入首款游戏前自动拍摄日常状态快照；在不同档位游戏间直接切换时自动升降档且保护初始快照不丢失；退出游戏并度过后台保持缓冲期（支持 `30秒 / 60秒 / 120秒`）后，**100% 精准还原回进游戏前的日常模式**。
+
+#### 3. 电池健康、旁路供电与显示工具
+- **旁路供电（Pass-Through）**：边玩边充时电流直接绕过电池为手机主板供电，从根源降低边充边玩发热与电池损耗（需连接支持 PPS 的充电器且电量 ≥ 20%）。
+- **充电上限保护（自定义停充 / 复充阈值）**：采用 Miuix 顶层 `WindowDialog` 弹窗，内置 `80/75 日常`、`85/80 均衡`、`90/85 出行` 三档预设，并支持自定义任意停充上限（50%~100%）与恢复充电阈值。
+- **电池运行信息与健康度实时直读**：实时读取硬件级电量、温度、充电状态、实时电流/电压、电池循环次数与三星原厂电池健康度百分比。
+- **实时 FPS 帧率与功耗浮窗**：在屏幕左上角实时显示 `SurfaceFlinger` 硬件合成帧率（FPS）与实时电池功耗（W / mA）。
+- **阳光激发模式（高亮度模式）**：强光环境下手动激发屏幕峰值高亮度，支持下拉快捷设置磁贴开关。
+
+#### 4. 应用冷启动加速与清理（ART 机器码预编译）
+- **指定应用预编译（`v13.8.1` 新增）**：支持搜索、按「未达满血 / 已是 speed / 全部」筛选并多选任意应用，自由选择：
+  - **极速全量机器码 (`-m speed -f`)**：将选中应用 100% 编译为本地机器码，彻底消除运行期 JIT 卡顿（最推荐核心日常与大型应用使用）；
+  - **均衡热点机器码 (`-m speed-profile -f`)**：仅编译高频热点路径，兼顾启动速度与存储空间；
+  - **重置编译状态 (`--reset`)**：清理指定应用的预编译产物。
+- **全量应用一键加速与冗余缓存回收**：支持全机用户应用批量 `speed-profile` 编译及冗余代码缓存清理。
+
+#### 5. 后台与深度休眠治理
+- **后台进程休眠（墓碑 Freezer）**：启用 Android 原生 Cached App Freezer 冻结后台缓存进程，杜绝后台偷跑 CPU。
+- **熄屏深度休眠参数（Quick Doze）**：熄屏后加快进入深度 Doze 睡眠，支持自定义维护步进窗口参数。
+- **限制后台自启 / 限制后台定位（30 分钟节流） / 限制后台隐式扫描与同步**。
+- **待机异常唤醒排查（Night Wakeup Guard）**：分析待机期间频繁唤醒系统的毒瘤应用并支持一键加入待机护栏。
+- **强制所有应用分屏/小窗** & **极客实验室**（一键解锁 Android 受限设置、后台省电白名单管理、系统状态诊断、一键恢复系统默认）。
+
+---
+
+### 三、【应用规则】—— 分应用自定义刷新率与 LTPO 校准
+- **场景化刷新率预设**：内置 `日常滑动 (10~120Hz)`、`视频播放 (60Hz)`、`静态阅读 (10~60Hz)`、`满帧游戏 (120Hz)` 一键套用。
+- **分应用独立规则配置**：支持为任意已安装应用独立设置「自适应刷新率 / 固定刷新率」、最高刷新率上限（`120Hz / 90Hz / 60Hz / 48Hz`）与最低 LTPO 降频下限（`60Hz / 48Hz / 30Hz / 24Hz / 10Hz`）。
+- **流媒体高刷兼容策略直达**：支持一键打开开发者选项并自动滚动定位至「停用应用兼容性策略」，解决部分视频/流媒体应用锁 60Hz 问题。
+- **屏幕自适应降频与功耗校准**：一键校准 LTPO 屏幕静止降频策略与显示状态表项。
+
+---
 
 ## 构建说明
 
-需要 JDK 21 与 Android SDK（`compileSdk 37` / `NDK 29.0.13113456`）。
+环境要求：JDK 21、Android SDK（`compileSdk 37` / `NDK 29.0.13113456`）。
 
 ```bash
 ./gradlew :manager:assembleRelease
 ```
 
-构建产物位于 `manager/build/outputs/apk/release/shizuku-v13.8.1-release.apk`。
-- 若根目录存在 `signing.properties`（配置 `KEYSTORE_FILE`、`KEYSTORE_PASSWORD`、`KEYSTORE_ALIAS`、`KEYSTORE_ALIAS_PASSWORD`），将使用正式签名密钥构建；
+构建产物位于：`manager/build/outputs/apk/release/shizuku-v13.8.2-release.apk`。
+- 若项目根目录存在 `signing.properties`（配置 `KEYSTORE_FILE`、`KEYSTORE_PASSWORD`、`KEYSTORE_ALIAS`、`KEYSTORE_ALIAS_PASSWORD`），将使用正式签名证书构建；
 - 若未提供 `signing.properties`，构建脚本会自动回退至 Android Debug Keystore，克隆仓库后即可直接编译运行。
 
 ## 免责声明
 
-本项目仅供个人学习、系统研究与设备调试使用。修改系统底层属性、频率节点或分辨率存在一定风险，请自行评估并承担相应后果。
+本项目仅供个人学习、系统研究与设备调试使用。修改系统底层设置表项与电源管理策略存在一定风险，请自行评估并承担相应后果；若需卸载或还原，可使用应用内的「恢复系统默认」功能一键复位。
 
 ## License
 
 Apache License 2.0。详见 [LICENSE](LICENSE)。
-基于 [RikkaApps/Shizuku](https://github.com/RikkaApps/Shizuku) 开源项目构建。
+基于 [RikkaApps/Shizuku](https://github.com/RikkaApps/Shizuku) 开源项目构建，UI 组件基于 [compose-miuix-ui/miuix](https://github.com/compose-miuix-ui/miuix)。
