@@ -13,73 +13,90 @@
 
 ## 📌 Overview
 
-**Shizuku Sam** integrates the **Shizuku privileged service** with a purpose-built **Samsung Galaxy (One UI) hardware scheduler, charging protection, background freezer, and per-app refresh rate controller** in a single cohesive app.
+**Shizuku Sam** integrates the **Shizuku privileged service** with a purpose-built **Samsung Galaxy (One UI) system scheduler & hardware enhancer, background & deep sleep controller, and per-app refresh rate rule manager** in a single cohesive application.
 
-The entire app is organized around a **3-tab Liquid Glass floating dock (`Shizuku` · `Hardware` · `App Rules`)** and **Miuix cards and top-level `WindowDialog` modals**.
+The entire app is built around a **3-tab Liquid Glass floating dock (`Shizuku` · `Hardware` · `App Rules`)** and **Miuix cards and top-level `WindowDialog` modals**. Every section, card title, switch, and secondary screen listed below corresponds 1:1 with the actual `v13.8.2` app UI.
 
 ---
 
-## ✨ Real App Features (100% Matched to the Actual UI)
+## ✨ Complete UI & Secondary Screen Reference
 
-### 1. Tab 1: `Shizuku` (Privileged Service & Wireless Pairing)
+### 1. Tab 1: `Shizuku` (Wireless Pairing & Privileged Service Channel)
 
 1. **Hero Status Card (`Shizuku Sam`)**
-   - **When Stopped**: Shows local wireless debugging port detection status and a one-tap **`Start via Wireless Debugging`** button.
-   - **When Running**: Displays **Service Version**, **Execution Mode (`ROOT Mode` / `ADB Mode`)**, and **Authorized Apps count**, with quick actions:
-     - **`Manage Authorized Apps`**: Grant or revoke Shizuku access for third-party apps.
-     - **`Terminal (rish)`**: Export and run privileged shell commands in terminal apps.
-     - **`Stop Service`**: Safely stop Shizuku via a Miuix `WindowDialog` confirmation prompt.
+   - **When Stopped (`Pending`)**: Shows wireless debugging environment or local loopback port detection status, with a primary **`Start via Wireless Debugging`** button.
+   - **When Running (`Root / ADB · v13.x`)**: Displays three status tiles (**`Service Version`**, **`Execution Mode` (`ROOT Mode` / `ADB Mode`)**, and **`Authorized Apps`**) and three action buttons:
+     - **`Manage Authorized Apps`**: Manage third-party apps granted Shizuku permission.
+     - **`Terminal (rish)`**: Export `rish` scripts to run privileged shell commands in terminal apps.
+     - **`Stop Service`**: Opens a top-level Miuix `WindowDialog` confirmation prompt to stop the Shizuku service.
 2. **`Wireless Debugging Pairing` (Shown when stopped)**
-   - **`Hands-Free Auto Pairing`**: Uses the Accessibility Service to automatically detect the wireless debugging pairing dialog and fill in the 6-digit pairing code without manual split-screen typing.
-   - **`Wireless Pairing Wizard`**: Step-by-step pairing guide or manual 6-digit code entry.
-   - **`Developer Options`**: Jump directly to System Developer Options -> Wireless Debugging.
-3. **`More Launch Methods` / `Management & Backup Channels`**
-   - **`Start via Root` / `Restart via Root`**: Instant one-tap startup for rooted devices (Magisk / KernelSU / APatch) without PC or Wi-Fi.
-   - **`Start via PC` / `PC ADB Launch Command`**: View and copy the `adb` starter script command.
-   - **`Reconnect Debugging`** (Shown in ADB mode): Rescan local loopback wireless debugging ports and refresh the ADB connection.
+   - **`Hands-Free Auto Pairing`**: Enable the Accessibility Service to automatically detect the wireless debugging pairing dialog and enter the 6-digit pairing code.
+   - **`Wireless Pairing Wizard`**: View step-by-step pairing instructions or manually enter the 6-digit code.
+   - **`Developer Options`**: Jump directly to System Settings -> Developer Options -> Wireless Debugging.
+3. **`More Launch Methods` (Shown when stopped)**
+   - **`Start via Root`**: One-tap direct startup for rooted devices without PC or Wi-Fi.
+   - **`Start via PC`**: Connect your phone to a PC via USB and run the starter script in terminal.
+4. **`Management & Backup Channels` (Shown when running)**
+   - **`Reconnect Debugging`** (ADB mode only): Rescan local loopback wireless debugging ports and refresh the ADB token connection.
+   - **`Restart via Root`**: Switch the running service to Root mode.
+   - **`PC ADB Launch Command`**: View and copy the PC `adb` starter command.
 
 ---
 
 ### 2. Tab 2: `Hardware` (System Scheduling & Hardware Enhancements)
 
 #### 1. `Performance Mode` (3-Mode Segmented Switch)
-- **`System Default` (Balanced)**: Restores stock Samsung scheduling and native adaptive refresh rate, clearing all custom overrides.
-- **`Adaptive Saver` (Battery Priority)**: Enables system power saving while unlocking **120Hz adaptive high refresh rate + Quick Doze**, solving One UI's stock 60Hz lock in Power Saving mode.
-- **`Game Max` (Full Performance)**: Unlocks full CPU/GPU performance scheduling, high touch sampling, and 120Hz refresh rate for gaming.
+- **`System Default` (`Balanced`)**: Restores stock Samsung scheduling and adaptive refresh rate, clearing all custom scripts and limits.
+- **`Adaptive Saver` (`Battery Priority`)**: Enables light system power saving while unlocking **120Hz adaptive high refresh rate + Quick Doze**.
+- **`Game Max` (`Full Performance`)**: Locks CPU/GPU full performance scheduling and fast touch response with unthrottled refresh rate.
 
 #### 2. `Hardware & Experience Enhancements`
-- **`Bypass Charging (Pass-Through)`**: Powers the motherboard directly from a PPS charger during gaming, bypassing battery charging to reduce heat and cycle wear (requires a PPS charger and battery ≥ 20%).
-- **`Battery Charging Protection`**: Toggle directly via the switch or tap the row to open the Miuix `WindowDialog` and customize **Stop Charging (%)** and **Resume Charging (%)** thresholds (includes `80/75 Daily`, `85/80 Balanced`, and `90/85 Travel` presets).
-- **`Game Auto High-Hz Boost` (`v13.8.2` Per-Game Target Profile Override)**:
-  - Automatically switches performance and refresh rate when entering configured games, and **restores your exact pre-game daily snapshot upon exiting**.
-  - Tap to configure the game list, set the **Global Default Target Profile**, or **assign an independent profile to each individual game**:
-    - **`Follow Global Default`**
-    - **`System Default (Lift Saver Throttle · Cool)`**: Ideal for lightweight games when your daily mode is `Adaptive Saver`—lifts Battery Saver CPU throttling without forcing maximum heat.
-    - **`Game Performance Mode (Full Boost)`**: Ideal for heavy 3D games.
-    - **`Adaptive Saver High-Hz (Saver + 120Hz)`**: Ideal for ultra-light casual/card games.
-- **`Real-Time FPS Overlay`**: Displays zero-latency SurfaceFlinger real-time FPS and power draw in the top-left corner.
-- **`Outdoor High Brightness Mode`**: Temporarily boosts peak physical brightness (HBM) under direct sunlight, with Quick Settings tile support.
-- **`Battery Info & Health`**: Opens a Miuix `WindowDialog` displaying real-time battery level, temperature, charging status, current, voltage, **cycle count**, and **Samsung factory battery health (%)**.
-- **`App Cold Launch Boost & Cleanup` (`v13.8.1` Per-App Selection)**:
-  - Run ART compilation on **all third-party apps** or **specific user-selected apps**.
-  - Supports three compilation modes: **`speed` (full AOT machine code compilation)**, **`speed-profile` (profile-guided compilation)**, and **`--reset` (reset compiled artifacts)**, plus one-tap system cache cleanup.
+- **`Bypass Charging (Pass-Through)`**: Powers the motherboard directly while gaming on a charger, keeping the phone cool and protecting battery lifespan (requires a PPS charger and battery ≥ 20%).
+- **`Battery Charging Protection (80% / 75%)`**:
+  - Toggle the right-hand switch to start/stop charging protection directly;
+  - Tap the row to open the Miuix `WindowDialog` with **`80/75 Daily`**, **`85/80 Balanced`**, and **`90/85 Travel`** presets, custom **Stop Charging (%)** and **Resume Charging (%)** inputs, **`Restore Default`**, and **`Apply & Enable`**.
+- **`Game Auto High-Hz Boost`** (Tap to open the **`Game Mode Auto Switch`** secondary screen):
+  - **`Game Mode Auto Switch`**: Master switch **`Enable Game Auto Switch`**; detects foreground games to apply target performance and restores your pre-game daily snapshot upon exit.
+  - **`Default In-Game Target Mode`**: Choose **`System Default`** / **`Adaptive Saver High-Hz`** / **`Game Performance Mode`** as the global fallback for games without a custom override.
+  - **`Background Hold Duration`**: Choose **`30s`** / **`60s (Recommended)`** / **`120s`**.
+  - **`Game List` (`v13.8.2` Per-Game Target Profile Override)**:
+    - Action buttons: **`Add Game`**, **`Add to Quick Settings`** (adds the Game Mode QS Tile), and **`Clear List`**;
+    - Each game row includes a dedicated mode pill (**`System Default ▾`** / **`Performance Mode ▾`** / **`Saver High-Hz ▾`**) to assign a per-game target profile:
+      1. **`Follow Global Default`**
+      2. **`System Default (Lift Saver Throttle · Cool)`** (ideal when daily mode is `Adaptive Saver`—lifts Battery Saver CPU throttling for lightweight games without excess heat)
+      3. **`Game Performance Mode (Full Boost)`** (ideal for heavy 3D games)
+      4. **`Adaptive Saver High-Hz (Saver + 120Hz)`** (ideal for casual/card games)
+- **`Real-Time FPS Overlay`**: Displays zero-latency SurfaceFlinger real-time FPS and power consumption in the top-left corner.
+- **`Outdoor High Brightness Mode`**: Temporarily boosts peak physical brightness under direct sunlight.
+- **`Battery Info & Health`**: Opens a scrollable Miuix `WindowDialog` reading real-time battery level, temperature, charging status, current, voltage, cycle count, and Samsung factory health, with a **`Refresh Data`** button.
+- **`App Cold Launch Boost & Cleanup`** (Tap to open the **`App Launch Boost`** secondary screen):
+  - Card 1 **`ART Machine Code Precompilation`**: Four action buttons:
+    - **`Selected Apps Precompile`** (`v13.8.1`): Opens a multi-select app picker supporting **`Full Speed (`speed`)`**, **`Profile-Guided (`speed-profile`)`**, and **`Reset Cache (`--reset`)`** modes, **`User Apps` / `All` / `System Apps`** filters, search, select all/clear, and real-time per-app compilation progress;
+    - **`Core Apps Precompile`**: Compiles system and core high-frequency apps;
+    - **`All Apps Precompile`**: Runs `speed-profile` compilation across all apps;
+    - **`Clear Compiled Cache`**: Resets compiled state.
+  - Card 2 **`App Cache & Cached Process Cleanup`**: Tap **`Clean & Release Now`** to run `pm trim-caches` and `am kill-all`.
 
 #### 3. `Background & Deep Sleep`
-- **`Background Process Freezer (Tombstone)`**: Enables Android's native Freezer to freeze cached background processes and stop rogue CPU usage.
-- **`Screen-Off Deep Sleep (Quick Doze)`**: Enters deep Doze rapidly after screen-off; tap the row to customize Doze step parameters and maintenance window intervals.
+- **`Background Process Freezer (Tombstone)`**: Enables Android's native Freezer to freeze cached background processes.
+- **`Screen-Off Deep Sleep Parameters`** (Tap to open the **`Screen-Off Deep Sleep`** secondary screen):
+  - Master **`On / Off`** switch;
+  - Maintenance settings: **`No Maintenance`** switch + **`Initial Maintenance Window Interval`** slider (`10 min ~ 120 min`);
+  - **`Manage Battery Usage`** card: **`Check Current Standby State`**, **`Standby Wakeup Guard`**, **`Background Protection List`**, **`Recent Doze History`**, and **`Manage Battery Usage`**.
 - **`Limit Background Autostart`**: Blocks background broadcast autostart and chain wakeups.
-- **`Limit Background Location`**: Throttles background location requests to 30-minute intervals.
+- **`Limit Background Location`**: Limits background location request intervals to 30 minutes.
 - **`Limit Scanning & Sync`**: Disables background implicit Wi-Fi / Bluetooth / nearby scanning and redundant auto-sync.
 
 #### 4. `System Maintenance & Extensions`
-- **`Force All Apps Resizable / Multi-Window`**: Allows all apps to run in split-screen and freeform pop-up windows.
-- **`Standby Wakeup Guard`**: Identifies abnormal background wakeups and standby drain with one-tap suppression.
-- **`Geek Lab`**:
-  - **`Unlock Restricted Settings`**: Grants `ACCESS_RESTRICTED_SETTINGS` via privileged shell to bypass Android 13+ Accessibility restricted settings blocks.
-  - **`Background Protection Whitelist`**: Manage the Doze battery optimization whitelist.
-  - **`Quick System Diagnostics`**: Inspect current privileged channel, Accessibility service, and hardware node status.
-- **`Restore System Defaults`**: Resets all custom scheduling, power saving, refresh rate, and system tweaks back to stock defaults.
-- **`User Manual & Help`**: View documentation, usage guides, and troubleshooting tips.
+- **`Force All Apps Resizable / Multi-Window`**: Unlocks window restrictions so all apps support split-screen and pop-up view.
+- **`Standby Wakeup Guard`** (Tap to open secondary screen):
+  - Includes **`Enable Standby Wakeup Guard`**, **`Start Scan`** (analyzes battery/alarm/standby bucket stats to recommend abnormal apps with **`One-Tap Add Suggested`**), and **`Guard List`** management.
+- **`Geek Lab`** (Opens 3-item dialog):
+  - **`Unlock Restricted Settings`**: Grants `ACCESS_RESTRICTED_SETTINGS` via privileged command to bypass Android 13+ Accessibility restricted settings blocks;
+  - **`Background Protection Whitelist`** (Opens **`Background Protection List`**): Filter by **`All` / `User Apps` / `System Apps`**, search, and toggle Doze whitelist protection or AppOps background restriction per app;
+  - **`Quick System Diagnostics`**: Inspects active privileged channel, Accessibility service, and bypass charging node support.
+- **`Restore System Defaults`**: Clears all custom scheduling, power saving, refresh rate, and system tweaks back to stock defaults.
+- **`User Manual & Help`**: Opens documentation and troubleshooting guides.
 
 ---
 
@@ -92,11 +109,23 @@ The entire app is organized around a **3-tab Liquid Glass floating dock (`Shizuk
    - **`Reading` (`10~60Hz`)**
    - **`Gaming Max` (`120Hz`)**
 3. **`App Rule Configuration`**
-   - Pick any installed app and configure **`Adaptive Refresh Rate`**, **`Max Refresh Rate` (`120Hz` / `90Hz` / `60Hz` / `48Hz`)**, and **`Min Refresh Rate` (`60Hz` / `48Hz` / `30Hz` / `24Hz` / `10Hz`)**.
-4. **`Configured Rules`**: Lists all active per-app rules with one-tap editing, individual deletion, or **`Clear All Rules`**.
+   - Select any installed app, toggle **`Adaptive Refresh Rate`**, choose **`Max Refresh Rate`** (`120Hz` / `90Hz` / `60Hz` / `48Hz`) and **`Min Refresh Rate`** (`60Hz` / `48Hz` / `30Hz` / `24Hz` / `10Hz`) via top-level Miuix `WindowDropdownPreference` menus, and **`Save Rule`** or **`Delete Rule`**.
+4. **`Configured Rules (N)`**: Displays all configured per-app rules with one-tap editing, individual `✕` removal, or **`Clear All Rules`**.
 5. **`Advanced High-Hz & Power Calibration`**
    - **`Why Some Apps (e.g. TikTok) Lock at 60Hz?`**: Tap **`Open Developer Options`** to jump to Developer Options and automatically scroll to Samsung's **"More settings" -> "Disable app compatibility policies"** to unlock 120Hz in video/streaming apps.
-   - **`LTPO Adaptive Calibration`**: Tap **`Activate Adaptive Refresh`** to calibrate 1Hz~120Hz hardware adaptive scaling and clear residual refresh locks.
+   - **`LTPO Adaptive Calibration`**: Tap **`Activate Adaptive Refresh`** to activate 1Hz~120Hz hardware adaptive refresh and clear residual locks.
+
+---
+
+### 4. Quick Settings Tiles & Top-Right `Settings`
+
+- **Quick Settings Tiles**:
+  - **`Game Mode` Tile**: Cycle through `System Default` / `Adaptive Saver` / `Game Max` from the notification shade.
+  - **`Outdoor Mode` Tile**: Toggle peak outdoor brightness (HBM) from the notification shade.
+- **Top-Right `Settings` Screen (`SettingsGlassScreen`)**:
+  - **`Startup & Persistence`**: `Start on boot (root)`, `Watchdog service`, `Keep ADB TCP mode after wireless start`, `ADB TCP port`.
+  - **`Appearance & Theme`**: `Dark theme` (Follow system / Always on / Always off), `Black night theme` (Pure black OLED), `Use system theme color` (Android 12+).
+  - **`Language & Internationalization`**: Switch app display language.
 
 ---
 
