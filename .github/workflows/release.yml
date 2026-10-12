@@ -24,26 +24,27 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Publish Release v13.8.1 (Miuix WindowDialog Anti-Occlusion & Per-App ART Precompilation)
+      - name: Publish Release v13.8.2 (Per-Game Target Profile Override & Accurate README)
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v13.8.1
-          name: "Shizuku Sam v13.8.1 — 弹窗顶层防遮挡修复与指定应用 ART 极速预编译"
+          tag_name: v13.8.2
+          name: "Shizuku Sam v13.8.2 — 游戏自动高刷支持按游戏独立指定档位 & 文档全面重写"
           body: |
-            ### Shizuku Sam v13.8.1
-            - **彻底修复底部悬浮栏遮挡弹窗与下拉菜单问题 (`HomeGlassScreen.kt`)**：
-              - 将「电池运行信息与健康度」、「充电上限保护」、「停止 Shizuku 服务确认」三处弹窗从页内 `OverlayDialog` 全面升级为系统独立顶层窗口 `WindowDialog`，遮罩层完整覆盖底部悬浮导航栏，彻底解决弹窗底部操作按钮被遮挡的问题；
-              - 将「应用规则」页的「最高刷新率上限」与「最低刷新率下限」下拉菜单升级为顶层窗口级 `WindowDropdownPreference`；
-              - 为「电池运行信息与健康度」的数据框增加最大高度约束 (`320.dp`) 与内部纵向平滑滚动，避免多行诊断文本撑满全屏。
-            - **新增「指定应用 ART 机器码预编译加速」 (`MaxHzActivity.kt`)**：
-              - 在「应用启动加速 -> ART 机器码预编译加速」中新增 **「指定应用预编译」** 按钮；
-              - 支持 **极速全编译 (`speed`，100% 机器码编译)**、**热点编译 (`speed-profile`)** 与 **重置缓存 (`--reset`)** 三档模式切换；
-              - 支持按应用名称/包名搜索、按「用户应用 / 全部 / 系统应用」分类筛选、一键全选/清空以及多选勾选应用并显示实时编译进度百分比。
+            ### Shizuku Sam v13.8.2
+            - **新增「按游戏独立指定目标档位」 (`MaxHzPrefs.kt` / `MaxHzAccessibilityService.kt` / `MaxHzActivity.kt`)**：
+              - 针对日常常驻 **「省电自适应」** 的用户，在「性能硬件 -> 游戏自动高刷加速 -> 已加入自动加速的游戏」列表中，支持为每一款游戏单独点击右侧胶囊切换专属档位：
+                - **跟随全局默认**
+                - **系统默认（解除省电限频·不发热）**：适合轻中度游戏，进入游戏自动解除系统省电模式的 CPU 70% 限频并保持 120Hz 自适应高刷，不强开满血、不额外发热；
+                - **游戏性能模式（满血释放）**：适合重度大型游戏，锁定 CPU/GPU 满血调度与 120Hz 高刷；
+                - **省电自适应高刷（省电+120Hz）**：适合棋牌/文字类超轻度休闲游戏；
+              - 支持从游戏 A 直接切到游戏 B 时按各自独立档位无缝切换，并在彻底退回桌面或日常应用时，严格按照进入第一款游戏前保存的快照自动恢复原日常模式（如「省电自适应」）。
+            - **全面重写 `README.md` 与 `README.en.md`**：
+              - 100% 严格对齐当前真实 App 三栏结构（`Shizuku` · `性能硬件` · `应用规则`）与真实功能条目，剔除所有旧版残留与不实描述。
           files: |
-            releases/Shizuku-Sam-v13.8.1.apk
+            releases/Shizuku-Sam-v13.8.2.apk
 
       - name: Publish Future Version Tag Release
-        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1'
+        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
@@ -51,5 +52,3 @@ jobs:
           generate_release_notes: true
           files: |
             releases/Shizuku-Sam-${{ github.ref_name }}.apk
-
-
