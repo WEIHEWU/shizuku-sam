@@ -244,7 +244,7 @@ private fun GroupGlassCard(
         if (expanded) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                cornerRadius = 16.dp,
+                cornerRadius = 20.dp,
                 colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
             ) {
                 Column {
@@ -282,17 +282,12 @@ private fun EntryRow(
     var busy by remember { mutableStateOf(false) }
 
     val colors = LiquidGlassTheme.categoryColorsFor(entry.title)
-    val summaryText = if (!statusText.isNullOrBlank()) {
-        "${entry.subtitle} · $statusText"
-    } else {
-        entry.subtitle
-    }
 
     if (entry.toggle != null) {
         val enabled = remember(cacheKey) { entry.toggle.isEnabled() }
         SwitchPreference(
             title = entry.title,
-            summary = summaryText,
+            summary = entry.subtitle,
             checked = isOn,
             enabled = enabled,
             onCheckedChange = { want ->
@@ -306,10 +301,12 @@ private fun EntryRow(
                 }
             },
             startAction = {
-                IconBadge(
-                    painter = painterResource(featureIconRes(entry.title)),
-                    colors = Pair(colors.first.toLong(), colors.second.toLong())
-                )
+                Box(Modifier.padding(end = 12.dp)) {
+                    IconBadge(
+                        painter = painterResource(featureIconRes(entry.title)),
+                        colors = Pair(colors.first.toLong(), colors.second.toLong())
+                    )
+                }
             }
         )
     } else {
@@ -318,16 +315,18 @@ private fun EntryRow(
             summary = entry.subtitle,
             onClick = entry.onClick,
             startAction = {
-                IconBadge(
-                    painter = painterResource(featureIconRes(entry.title)),
-                    colors = Pair(colors.first.toLong(), colors.second.toLong())
-                )
+                Box(Modifier.padding(end = 12.dp)) {
+                    IconBadge(
+                        painter = painterResource(featureIconRes(entry.title)),
+                        colors = Pair(colors.first.toLong(), colors.second.toLong())
+                    )
+                }
             },
             endActions = {
                 if (!statusText.isNullOrBlank()) {
                     Text(
                         text = statusText,
-                        fontSize = 13.sp,
+                        fontSize = 12.5.sp,
                         color = MiuixTheme.colorScheme.onSurfaceVariantActions
                     )
                 }

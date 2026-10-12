@@ -1,10 +1,10 @@
 # Shizuku Sam
 
-[中文说明](README.md) · **[📥 Direct Download Latest APK (Shizuku-Sam-v13.7.7.apk · 3.4 MB)](https://github.com/WEIHEWU/shizuku-sam/raw/main/releases/Shizuku-Sam-v13.7.7.apk)** · [Releases](https://github.com/WEIHEWU/shizuku-sam/releases)
+[中文说明](README.md) · **[📥 Direct Download Latest APK (Shizuku-Sam-v13.7.8.apk · 3.4 MB)](https://github.com/WEIHEWU/shizuku-sam/raw/main/releases/Shizuku-Sam-v13.7.8.apk)** · [Releases](https://github.com/WEIHEWU/shizuku-sam/releases)
 
 An enhanced edition of **Shizuku (`moe.shizuku.privileged.api`)** tailored for Samsung One UI 8.5 / Galaxy flagships, built with **Miuix (`top.yukonga.miuix.kmp`)** UI, featuring **Wi-Fi-free Boot Auto-Start (Loopback ADB TLS port scanner)**, a **3-Channel Execution Engine (Root / Shizuku / Device Owner)**, and a **100% genuine, zero-placebo hardware & system tuning suite**.
 
-Current version: `13.7.7` (`versionCode 130707`).
+Current version: `13.7.8` (`versionCode 130708`).
 
 > Tested and verified on Samsung Galaxy S24 Ultra (One UI 8.5 / Android 16), while remaining 100% compatible with the standard Shizuku API ecosystem.
 
@@ -44,7 +44,7 @@ Requires JDK 21 and Android SDK (`compileSdk 37` / `NDK 29.0.13113456`).
 ./gradlew :manager:assembleRelease
 ```
 
-Output APK: `manager/build/outputs/apk/release/shizuku-v13.7.7-release.apk`.
+Output APK: `manager/build/outputs/apk/release/shizuku-v13.7.8-release.apk`.
 - If `signing.properties` is present in the project root, the release keystore is used.
 - Otherwise, the build script automatically falls back to the Android Debug Keystore so cloned repositories build out of the box.
 

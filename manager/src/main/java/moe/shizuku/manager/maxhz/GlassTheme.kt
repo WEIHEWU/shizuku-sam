@@ -106,17 +106,17 @@ fun GlassAppTheme(
             top.yukonga.miuix.kmp.theme.darkColorScheme(
                 primary = primaryColor,
                 primaryVariant = primaryColor,
-                surface = Color(0xFF000000),
-                background = Color(0xFF000000),
-                surfaceContainer = Color(0xFF1F1F23),
-                surfaceVariant = Color(0xFF1F1F23)
+                surface = Color(0xFF0D0F12),
+                background = Color(0xFF0D0F12),
+                surfaceContainer = Color(0xFF181A20),
+                surfaceVariant = Color(0xFF181A20)
             )
         } else {
             top.yukonga.miuix.kmp.theme.lightColorScheme(
                 primary = primaryColor,
                 primaryVariant = primaryColor,
-                surface = Color(0xFFF7F7F7),
-                background = Color(0xFFF7F7F7),
+                surface = Color(0xFFF5F6F9),
+                background = Color(0xFFF5F6F9),
                 surfaceContainer = Color(0xFFFFFFFF),
                 surfaceVariant = Color(0xFFFFFFFF)
             )

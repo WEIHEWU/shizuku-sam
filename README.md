@@ -1,10 +1,10 @@
 # Shizuku Sam
 
-[English](README.en.md) · **[📥 点击直接下载最新安装包 (Shizuku-Sam-v13.7.7.apk · 3.4 MB)](https://github.com/WEIHEWU/shizuku-sam/raw/main/releases/Shizuku-Sam-v13.7.7.apk)** · [Releases 历史版本页面](https://github.com/WEIHEWU/shizuku-sam/releases)
+[English](README.en.md) · **[📥 点击直接下载最新安装包 (Shizuku-Sam-v13.7.8.apk · 3.4 MB)](https://github.com/WEIHEWU/shizuku-sam/raw/main/releases/Shizuku-Sam-v13.7.8.apk)** · [Releases 历史版本页面](https://github.com/WEIHEWU/shizuku-sam/releases)
 
-基于官方 **Shizuku (`moe.shizuku.privileged.api`)** 深度定制的三星 One UI 8.5 / Galaxy 旗舰增强版，采用 **Miuix (HyperOS / MIUIX KMP)** 原生阻尼与卡片交互体系，集成 **无 Wi-Fi 重启自启（Loopback 端口扫描直连）**、**三通道权限引擎（Root / Shizuku / Device Owner）** 以及 **100% 真实生效的系统硬件与显示深度调校套件**。
+基于官方 **Shizuku (`moe.shizuku.privileged.api`)** 深度定制的三星 One UI 8.5 / Galaxy 旗舰增强版，采用 **Miuix (HyperOS / MIUIX KMP)** 原生阻尼与 Bento 卡片交互体系，集成 **无 Wi-Fi 重启自启（Loopback 端口扫描直连）**、**三通道权限引擎（Root / Shizuku / Device Owner）** 以及 **100% 真实生效的系统硬件与显示深度调校套件**。
 
-当前版本：`13.7.7`（`versionCode 130707`）。
+当前版本：`13.7.8`（`versionCode 130708`）。
 
 > 针对三星 Galaxy S24 Ultra（One UI 8.5 / Android 16）深度适配与实机验证，同时完全兼容标准 Shizuku API 生态。
 
@@ -45,7 +45,7 @@
 ./gradlew :manager:assembleRelease
 ```
 
-构建产物位于 `manager/build/outputs/apk/release/shizuku-v13.7.7-release.apk`。
+构建产物位于 `manager/build/outputs/apk/release/shizuku-v13.7.8-release.apk`。
 - 若根目录存在 `signing.properties`（配置 `KEYSTORE_FILE`、`KEYSTORE_PASSWORD`、`KEYSTORE_ALIAS`、`KEYSTORE_ALIAS_PASSWORD`），将使用正式签名密钥构建；
 - 若未提供 `signing.properties`，构建脚本会自动回退至 Android Debug Keystore，克隆仓库后即可直接编译运行。
 

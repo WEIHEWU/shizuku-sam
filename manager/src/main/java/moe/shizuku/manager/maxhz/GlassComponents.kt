@@ -78,7 +78,7 @@ fun GlassCard(
     if (onClick != null) {
         top.yukonga.miuix.kmp.basic.Card(
             modifier = modifier,
-            cornerRadius = 16.dp,
+            cornerRadius = 20.dp,
             colors = top.yukonga.miuix.kmp.basic.CardDefaults.defaultColors(color = cardBgColor),
             pressFeedbackType = top.yukonga.miuix.kmp.utils.PressFeedbackType.Sink,
             showIndication = true,
@@ -92,7 +92,7 @@ fun GlassCard(
     } else {
         top.yukonga.miuix.kmp.basic.Card(
             modifier = modifier,
-            cornerRadius = 16.dp,
+            cornerRadius = 20.dp,
             colors = top.yukonga.miuix.kmp.basic.CardDefaults.defaultColors(color = cardBgColor)
         ) {
             Box(Modifier.fillMaxWidth()) { content() }
@@ -100,28 +100,26 @@ fun GlassCard(
     }
 }
 
-/** 图标徽章：Miuix Squircle 圆角底座 + 白色图标 */
+/** 图标徽章：柔和浅粉彩圆角底座 (14% alpha) + 同色系高清着色图标 */
 @Composable
 fun IconBadge(
     painter: Painter,
     colors: Pair<Long, Long>,
-    sizeDp: Int = 36
+    sizeDp: Int = 38
 ) {
+    val accent = Color(colors.first)
     Box(
         Modifier
             .size(sizeDp.dp)
-            .clip(RoundedCornerShape((sizeDp * 0.28f).dp))
-            .background(
-                Brush.linearGradient(
-                    listOf(Color(colors.first), Color(colors.second))
-                )
-            ),
+            .clip(RoundedCornerShape((sizeDp * 0.30f).dp))
+            .background(accent.copy(alpha = 0.14f)),
         contentAlignment = Alignment.Center
     ) {
         Image(
             painter = painter,
             contentDescription = null,
-            modifier = Modifier.size((sizeDp * 0.58f).dp),
+            colorFilter = ColorFilter.tint(accent),
+            modifier = Modifier.size((sizeDp * 0.54f).dp),
             contentScale = ContentScale.Fit
         )
     }
