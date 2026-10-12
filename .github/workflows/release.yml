@@ -24,23 +24,26 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Publish Release v13.8.0 (Refined Compact Miuix Typography & Row Proportions)
+      - name: Publish Release v13.8.1 (Miuix WindowDialog Anti-Occlusion & Per-App ART Precompilation)
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v13.8.0
-          name: "Shizuku Sam v13.8.0 — 精细化全局字号层级与紧凑列表行距"
+          tag_name: v13.8.1
+          name: "Shizuku Sam v13.8.1 — 弹窗顶层防遮挡修复与指定应用 ART 极速预编译"
           body: |
-            ### Shizuku Sam v13.8.0
-            - **重构 `MiuixTheme` 全局字号体系 (`GlassTheme.kt`)**：
-              - 修复 Miuix 默认 `17.sp` 列表标题与 `14.sp` 副标题偏大问题，全局收敛至 **列表主标题 `14.sp`、副标题 `11.5.sp`、分组标题 `12.sp`、按钮 `13.sp`**，与「调度档位」胶囊字号比例完全对齐，`充电上限保护 (80% / 75%)` 等长标题单行完整显示不再折行。
-            - **优化页面副横幅 (`SectionHeader`) 与主状态卡 (`HeroCard`) 字号**：
-              - 顶栏下方 `SectionHeader` 由 `27.sp` 收敛至精致的 `15.5.sp`（副标题 `11.5.sp`），不再与顶部 Toolbar 标题抢占视觉重心；
-              - 列表项内边距收紧为 `14.dp × 11.dp`，搭配 `34.dp` 柔和粉彩圆角图标底座，一屏可容纳更多核心开关且呼吸感更佳。
+            ### Shizuku Sam v13.8.1
+            - **彻底修复底部悬浮栏遮挡弹窗与下拉菜单问题 (`HomeGlassScreen.kt`)**：
+              - 将「电池运行信息与健康度」、「充电上限保护」、「停止 Shizuku 服务确认」三处弹窗从页内 `OverlayDialog` 全面升级为系统独立顶层窗口 `WindowDialog`，遮罩层完整覆盖底部悬浮导航栏，彻底解决弹窗底部操作按钮被遮挡的问题；
+              - 将「应用规则」页的「最高刷新率上限」与「最低刷新率下限」下拉菜单升级为顶层窗口级 `WindowDropdownPreference`；
+              - 为「电池运行信息与健康度」的数据框增加最大高度约束 (`320.dp`) 与内部纵向平滑滚动，避免多行诊断文本撑满全屏。
+            - **新增「指定应用 ART 机器码预编译加速」 (`MaxHzActivity.kt`)**：
+              - 在「应用启动加速 -> ART 机器码预编译加速」中新增 **「指定应用预编译」** 按钮；
+              - 支持 **极速全编译 (`speed`，100% 机器码编译)**、**热点编译 (`speed-profile`)** 与 **重置缓存 (`--reset`)** 三档模式切换；
+              - 支持按应用名称/包名搜索、按「用户应用 / 全部 / 系统应用」分类筛选、一键全选/清空以及多选勾选应用并显示实时编译进度百分比。
           files: |
-            releases/Shizuku-Sam-v13.8.0.apk
+            releases/Shizuku-Sam-v13.8.1.apk
 
       - name: Publish Future Version Tag Release
-        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0'
+        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}

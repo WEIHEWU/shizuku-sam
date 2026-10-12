@@ -4777,10 +4777,15 @@ open class MaxHzActivity : AppBarActivity() {
         val aotBadge = statusBadge(enabledState(MaxHzPrefs.mDexoptEnabled(this@MaxHzActivity)))
         parent.addSpacedView(featureCard(
             "ART 机器码预编译加速",
-            "为系统核心与常用应用预编译机器码，冷启动提速 30%。支持流式编译与实时进度百分比。",
+            "支持自选指定应用（可选 speed 全量极速编译或 speed-profile 热点编译）、系统核心或全量应用预编译机器码，大幅提升应用冷启动与滑屏流畅度。",
             headerBadges(aotBadge)
         ) {
             addSpacedView(horizontalActions(
+                button("指定应用预编译") {
+                    showAotSpecificAppsPickerDialog {
+                        updateStatusText(aotBadge, enabledState(true))
+                    }
+                },
                 button("核心应用预编译") {
                     runAotCompilationWithProgress("核心应用预编译", isFull = false) {
                         updateStatusText(aotBadge, enabledState(true))
@@ -4819,6 +4824,440 @@ open class MaxHzActivity : AppBarActivity() {
             { MaxHzController.applyMQuickTrim() },
             refreshServiceAfter = false
         ), gap)
+    }
+
+    private fun showAotSpecificAppsPickerDialog(onCompleteState: () -> Unit) {
+        val loadingDialog = MaterialAlertDialogBuilder(this)
+            .setTitle("指定应用 ART 预编译")
+            .setView(emptyText("正在加载已安装应用列表，请稍候..."))
+            .setNegativeButton("取消", null)
+            .show()
+
+        lifecycleScope.launch {
+            val allApps = withContext(Dispatchers.IO) {
+                val installed = try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        packageManager.getInstalledApplications(PackageManager.ApplicationInfoFlags.of(0))
+                    } else {
+                        @Suppress("DEPRECATION")
+                        packageManager.getInstalledApplications(0)
+                    }
+                } catch (_: Throwable) {
+                    emptyList<ApplicationInfo>()
+                }
+                installed
+                    .asSequence()
+                    .filter { it.enabled && !it.packageName.isNullOrBlank() && it.packageName != packageName }
+                    .map { info ->
+                        val label = safeLoadLabel(info)
+                        val isUser = (info.flags and ApplicationInfo.FLAG_SYSTEM) == 0 ||
+                            (info.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
+                        val trustClass = MaxHzPackagePolicy.trustClass(this@MaxHzActivity, info)
+                        UserAppChoice(
+                            label = label,
+                            packageName = info.packageName,
+                            systemApp = !isUser,
+                            trustClass = trustClass
+                        )
+                    }
+                    .distinctBy { it.packageName }
+                    .sortedWith(compareBy<UserAppChoice> { it.systemApp }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.label })
+                    .toList()
+            }
+
+            if (!loadingDialog.isShowing) return@launch
+            runCatching { loadingDialog.dismiss() }
+
+            if (allApps.isEmpty()) {
+                Toast.makeText(this@MaxHzActivity, "未读取到可优化的应用列表", Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+
+            val selectedPackages = linkedSetOf<String>()
+            var selectedFilter = if (allApps.any { !it.systemApp }) AppListFilter.USER else AppListFilter.ALL
+            var compileMode = "speed" // "speed" | "speed-profile" | "reset"
+            var searchQuery = ""
+            val visibleApps = mutableListOf<UserAppChoice>()
+
+            lateinit var modeContainer: LinearLayout
+            lateinit var modeDescView: TextView
+            lateinit var filterContainer: LinearLayout
+            lateinit var selectionCountView: TextView
+            lateinit var listAdapter: ArrayAdapter<UserAppChoice>
+
+            fun filteredApps(): List<UserAppChoice> {
+                return allApps.filter { app ->
+                    val matchesFilter = when (selectedFilter) {
+                        AppListFilter.ALL -> true
+                        AppListFilter.USER -> !app.systemApp
+                        AppListFilter.SYSTEM -> app.systemApp
+                    }
+                    if (!matchesFilter) return@filter false
+                    if (searchQuery.isBlank()) return@filter true
+                    val q = searchQuery.lowercase(Locale.getDefault())
+                    app.label.lowercase(Locale.getDefault()).contains(q) ||
+                        app.packageName.lowercase(Locale.getDefault()).contains(q)
+                }
+            }
+
+            fun updateSelectionSummary() {
+                selectionCountView.text = "已勾选 ${selectedPackages.size} 个应用"
+            }
+
+            fun refreshList() {
+                visibleApps.clear()
+                visibleApps.addAll(filteredApps())
+                listAdapter.notifyDataSetChanged()
+                updateSelectionSummary()
+            }
+
+            fun updateModeChips() {
+                modeContainer.removeAllViews()
+                val modes = listOf(
+                    "speed" to "极速全编译",
+                    "speed-profile" to "热点编译",
+                    "reset" to "重置缓存"
+                )
+                modes.forEachIndexed { idx, (modeKey, label) ->
+                    modeContainer.addView(
+                        filterChip(label, compileMode == modeKey) {
+                            compileMode = modeKey
+                            updateModeChips()
+                        },
+                        LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                            if (idx > 0) leftMargin = dp(6)
+                        }
+                    )
+                }
+                modeDescView.text = when (compileMode) {
+                    "speed" -> "模式说明：强制将所选应用 100% 字节码编译为本地机器码（-m speed -f），无需等待系统收集热点，冷启动与滑屏提速最彻底。"
+                    "speed-profile" -> "模式说明：基于已记录的热点方法进行 AOT 编译（-m speed-profile -f），编译速度快、空间占用小。"
+                    else -> "模式说明：清除所选应用的 AOT 编译产物（--reset），还原为系统初始编译状态。"
+                }
+            }
+
+            fun updateFilterChips() {
+                filterContainer.removeAllViews()
+                listOf(
+                    AppListFilter.USER to "用户应用",
+                    AppListFilter.ALL to "全部",
+                    AppListFilter.SYSTEM to "系统应用"
+                ).forEachIndexed { idx, (filter, label) ->
+                    filterContainer.addView(
+                        filterChip(label, selectedFilter == filter) {
+                            selectedFilter = filter
+                            updateFilterChips()
+                            refreshList()
+                        },
+                        LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                            if (idx > 0) leftMargin = dp(6)
+                        }
+                    )
+                }
+            }
+
+            val listView = ListView(this@MaxHzActivity).apply {
+                dividerHeight = 0
+                listAdapter = object : ArrayAdapter<UserAppChoice>(
+                    this@MaxHzActivity,
+                    android.R.layout.simple_list_item_1,
+                    visibleApps
+                ) {
+                    override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                        val app = getItem(position) ?: visibleApps[position]
+                        val isChecked = selectedPackages.contains(app.packageName)
+                        return LinearLayout(this@MaxHzActivity).apply {
+                            orientation = LinearLayout.HORIZONTAL
+                            gravity = Gravity.CENTER_VERTICAL
+                            minimumHeight = dp(52)
+                            setPadding(dp(12), dp(6), dp(12), dp(6))
+                            layoutParams = AbsListView.LayoutParams(
+                                AbsListView.LayoutParams.MATCH_PARENT,
+                                AbsListView.LayoutParams.WRAP_CONTENT
+                            )
+                            addView(LinearLayout(this@MaxHzActivity).apply {
+                                orientation = LinearLayout.VERTICAL
+                                addView(TextView(this@MaxHzActivity).apply {
+                                    text = app.label
+                                    textSize = 14f
+                                    setTextColor(if (isChecked) themeColors.primary else themeColors.onSurface)
+                                    setTypeface(typeface, if (isChecked) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
+                                    includeFontPadding = false
+                                    maxLines = 1
+                                    ellipsize = TextUtils.TruncateAt.END
+                                })
+                                addView(TextView(this@MaxHzActivity).apply {
+                                    text = "${app.packageName} · ${if (app.systemApp) "系统" else "用户"}"
+                                    textSize = 11.5f
+                                    setTextColor(themeColors.onSurfaceVariant)
+                                    includeFontPadding = false
+                                    setPadding(0, dp(2), 0, 0)
+                                    maxLines = 1
+                                    ellipsize = TextUtils.TruncateAt.END
+                                })
+                            }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                            addView(CheckBox(this@MaxHzActivity).apply {
+                                this.isChecked = isChecked
+                                isClickable = false
+                                isFocusable = false
+                                buttonTintList = ColorStateList.valueOf(themeColors.primary)
+                            })
+                        }
+                    }
+                }
+                adapter = listAdapter
+                setOnItemClickListener { _, _, which, _ ->
+                    val app = visibleApps.getOrNull(which) ?: return@setOnItemClickListener
+                    if (selectedPackages.contains(app.packageName)) {
+                        selectedPackages.remove(app.packageName)
+                    } else {
+                        selectedPackages.add(app.packageName)
+                    }
+                    listAdapter.notifyDataSetChanged()
+                    updateSelectionSummary()
+                }
+            }
+
+            val rootView = LinearLayout(this@MaxHzActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(18), dp(8), dp(18), 0)
+
+                modeContainer = LinearLayout(this@MaxHzActivity).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    setPadding(0, 0, 0, dp(6))
+                }
+                addView(modeContainer)
+
+                modeDescView = TextView(this@MaxHzActivity).apply {
+                    textSize = 11.5f
+                    setTextColor(themeColors.onSurfaceVariant)
+                    setLineSpacing(0f, 1.2f)
+                    setPadding(dp(2), 0, dp(2), dp(8))
+                }
+                addView(modeDescView)
+
+                addView(EditText(this@MaxHzActivity).apply {
+                    hint = "搜索应用名称或包名"
+                    textSize = 13.5f
+                    setSingleLine(true)
+                    inputType = InputType.TYPE_CLASS_TEXT
+                    setTextColor(themeColors.onSurface)
+                    setHintTextColor(themeColors.onSurfaceVariant)
+                    includeFontPadding = false
+                    gravity = Gravity.CENTER_VERTICAL
+                    setPadding(dp(14), 0, dp(14), 0)
+                    background = rounded(themeColors.surfaceContainerHigh, dp(20).toFloat())
+                    minHeight = dp(40)
+                    addTextChangedListener(object : TextWatcher {
+                        override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+                        override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                            searchQuery = s?.toString().orEmpty()
+                            refreshList()
+                        }
+                        override fun afterTextChanged(s: Editable?) = Unit
+                    })
+                }, LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    dp(40)
+                ).apply { bottomMargin = dp(8) })
+
+                filterContainer = LinearLayout(this@MaxHzActivity).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    setPadding(0, 0, 0, dp(6))
+                }
+                addView(filterContainer)
+
+                addView(LinearLayout(this@MaxHzActivity).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    setPadding(dp(4), 0, dp(4), dp(6))
+                    selectionCountView = TextView(this@MaxHzActivity).apply {
+                        text = "已勾选 0 个应用"
+                        textSize = 12f
+                        setTextColor(themeColors.primary)
+                        setTypeface(typeface, android.graphics.Typeface.BOLD)
+                    }
+                    addView(selectionCountView, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                    addView(TextView(this@MaxHzActivity).apply {
+                        text = "全选当前"
+                        textSize = 12f
+                        setTextColor(themeColors.primary)
+                        setTypeface(typeface, android.graphics.Typeface.BOLD)
+                        setPadding(dp(10), dp(4), dp(10), dp(4))
+                        setOnClickListener {
+                            visibleApps.forEach { selectedPackages.add(it.packageName) }
+                            listAdapter.notifyDataSetChanged()
+                            updateSelectionSummary()
+                        }
+                    })
+                    addView(TextView(this@MaxHzActivity).apply {
+                        text = "清空"
+                        textSize = 12f
+                        setTextColor(themeColors.onSurfaceVariant)
+                        setPadding(dp(10), dp(4), dp(4), dp(4))
+                        setOnClickListener {
+                            selectedPackages.clear()
+                            listAdapter.notifyDataSetChanged()
+                            updateSelectionSummary()
+                        }
+                    })
+                })
+
+                addView(listView, LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    dp(330)
+                ))
+
+                updateModeChips()
+                updateFilterChips()
+                refreshList()
+            }
+
+            val pickerDialog = MaterialAlertDialogBuilder(this@MaxHzActivity)
+                .setTitle("指定应用 ART 预编译加速")
+                .setView(rootView)
+                .setNegativeButton("取消", null)
+                .setPositiveButton("开始执行", null)
+                .show()
+
+            pickerDialog.getButton(android.content.DialogInterface.BUTTON_POSITIVE)?.setOnClickListener {
+                if (selectedPackages.isEmpty()) {
+                    Toast.makeText(this@MaxHzActivity, "请至少勾选 1 个需要操作的应用", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                val appMap = allApps.associateBy { it.packageName }
+                val targetList = selectedPackages.mapNotNull { pkg ->
+                    val app = appMap[pkg]
+                    pkg to (app?.label ?: pkg)
+                }
+                pickerDialog.dismiss()
+                runSelectedAppsAotWithProgress(targetList, compileMode, onCompleteState)
+            }
+        }
+    }
+
+    private fun runSelectedAppsAotWithProgress(
+        appList: List<Pair<String, String>>,
+        compileMode: String,
+        onCompleteState: () -> Unit
+    ) {
+        if (appList.isEmpty()) return
+        val isReset = compileMode == "reset"
+        val modeTitle = when (compileMode) {
+            "speed" -> "指定应用极速全编译 (speed)"
+            "speed-profile" -> "指定应用热点预编译 (speed-profile)"
+            else -> "重置指定应用编译缓存 (--reset)"
+        }
+        var isCancelled = false
+        val isDark = isDarkMode()
+        val progressBar = ProgressBar(this@MaxHzActivity, null, android.R.attr.progressBarStyleHorizontal).apply {
+            isIndeterminate = false
+            max = 100
+            progress = 0
+            progressTintList = ColorStateList.valueOf(themeColors.primary)
+            progressBackgroundTintList = ColorStateList.valueOf(if (isDark) 0x33FFFFFF.toInt() else 0x1A000000.toInt())
+        }
+        val statusTextView = TextView(this@MaxHzActivity).apply {
+            text = "准备处理 [0/${appList.size}] (0%)"
+            textSize = 15f
+            setTextColor(themeColors.onSurface)
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+        }
+        val currentAppTextView = TextView(this@MaxHzActivity).apply {
+            text = "正在初始化 ART 编译器环境..."
+            textSize = 13f
+            setTextColor(themeColors.onSurfaceVariant)
+        }
+
+        val contentLayout = LinearLayout(this@MaxHzActivity).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(24), dp(16), dp(24), dp(16))
+            addView(statusTextView)
+            addView(progressBar, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(10)
+            ).apply {
+                topMargin = dp(14)
+                bottomMargin = dp(12)
+            })
+            addView(currentAppTextView)
+        }
+
+        val progressDialog = MaterialAlertDialogBuilder(this@MaxHzActivity)
+            .setTitle(modeTitle)
+            .setView(contentLayout)
+            .setCancelable(false)
+            .setNegativeButton("取消") { d, _ ->
+                isCancelled = true
+                d.dismiss()
+            }
+            .show()
+
+        lifecycleScope.launch {
+            var successCount = 0
+            val total = appList.size
+
+            withContext(Dispatchers.IO) {
+                for (i in 0 until total) {
+                    if (isCancelled) break
+                    val (pkg, label) = appList[i]
+                    val currentStep = i + 1
+                    val progressPercent = (currentStep * 100) / total
+
+                    withContext(Dispatchers.Main) {
+                        if (progressDialog.isShowing && !isCancelled) {
+                            progressBar.progress = progressPercent
+                            statusTextView.text = if (isReset) {
+                                "正在重置 [$currentStep/$total] ($progressPercent%)"
+                            } else {
+                                "正在预编译 [$currentStep/$total] ($progressPercent%)"
+                            }
+                            currentAppTextView.text = "当前应用：$label\n($pkg)"
+                        }
+                    }
+
+                    val cmd = when (compileMode) {
+                        "speed" -> "cmd package compile -m speed -f \"$pkg\" 2>/dev/null || cmd package compile -m speed \"$pkg\""
+                        "speed-profile" -> "cmd package compile -m speed-profile -f \"$pkg\" 2>/dev/null || cmd package compile -m speed-profile \"$pkg\""
+                        else -> "cmd package compile --reset \"$pkg\""
+                    }
+                    val res = MaxHzShell.execRaw(
+                        cmd,
+                        timeoutMs = if (compileMode == "speed") 60000 else 30000
+                    )
+                    if (res.code == 0) {
+                        successCount++
+                    }
+                }
+            }
+
+            if (progressDialog.isShowing) {
+                runCatching { progressDialog.dismiss() }
+            }
+
+            if (isCancelled) {
+                Toast.makeText(
+                    this@MaxHzActivity,
+                    "已停止操作（已完成 $successCount / $total 个应用）",
+                    Toast.LENGTH_LONG
+                ).show()
+            } else if (isReset) {
+                MaterialAlertDialogBuilder(this@MaxHzActivity)
+                    .setTitle("✅ 编译缓存已重置")
+                    .setMessage("已成功重置 $successCount / $total 个指定应用的编译缓存。")
+                    .setPositiveButton("确定", null)
+                    .show()
+            } else {
+                MaxHzPrefs.setMDexoptEnabled(this@MaxHzActivity, true)
+                onCompleteState()
+                val modeDesc = if (compileMode == "speed") "极速全量机器码 (speed)" else "热点配置机器码 (speed-profile)"
+                MaterialAlertDialogBuilder(this@MaxHzActivity)
+                    .setTitle("🎉 指定应用预编译已完成")
+                    .setMessage("已成功为 $successCount / $total 个指定应用完成 [$modeDesc] 编译！\n所选应用的冷启动速度与界面滑动流畅度已显著提升。")
+                    .setPositiveButton("确定", null)
+                    .show()
+            }
+        }
     }
 
     private fun runAotCompilationWithProgress(
@@ -6894,7 +7333,8 @@ open class MaxHzActivity : AppBarActivity() {
                 text.contains("清除") ||
                 text.contains("恢复护栏") -> ButtonRole.DANGER
 
-            text.contains("应用护栏") ||
+            text.contains("指定应用") ||
+                text.contains("应用护栏") ||
                 text.contains("应用设置") ||
                 text.contains("开启 FPS") ||
                 text.contains("开始扫描") ||

@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -23,8 +24,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -78,21 +81,21 @@ import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
-import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.preference.ArrowPreference
-import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
+import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.PressFeedbackType
 import top.yukonga.miuix.kmp.utils.overScrollVertical
+import top.yukonga.miuix.kmp.window.WindowDialog
 
 
 /**
  * Miuix 风格全面重构的主控制台：
  *
  * - 统一采用 `top.yukonga.miuix.kmp` 组件库（`Scaffold`、`Card`、`SmallTitle`、`SwitchPreference`、
- *   `ArrowPreference`、`OverlayDropdownPreference`、`OverlayDialog`、`TextButton`、`TextField`、`overScrollVertical`）
- * - 所有核心弹窗（充电上限保护、电池运行信息与健康度、停止服务确认）均使用 Miuix 原生 `OverlayDialog` 弹簧弹窗渲染
+ *   `ArrowPreference`、`WindowDropdownPreference`、`WindowDialog`、`TextButton`、`TextField`、`overScrollVertical`）
+ * - 所有核心弹窗（充电上限保护、电池运行信息与健康度、停止服务确认）均使用 Miuix 顶层窗口级 `WindowDialog` 弹簧弹窗渲染，彻底杜绝底部悬浮栏遮挡
  */
 
 /** 首页所有交互回调（实现方为 HomeActivity） */
@@ -404,9 +407,9 @@ fun ShizukuHomeScreen(
         }
 
         // ==========================================================
-        // Miuix OverlayDialog 1：停止 Shizuku 服务确认弹窗
+        // Miuix WindowDialog 1：停止 Shizuku 服务确认弹窗（独立顶层 Window，不惧底部悬浮栏遮挡）
         // ==========================================================
-        OverlayDialog(
+        WindowDialog(
             show = showStopConfirmDialog,
             title = "停止 Shizuku 服务",
             summary = stringResource(R.string.dialog_stop_message),
@@ -434,7 +437,7 @@ fun ShizukuHomeScreen(
         }
 
         // ==========================================================
-        // Miuix OverlayDialog 2：充电上限保护弹窗
+        // Miuix WindowDialog 2：充电上限保护弹窗
         // ==========================================================
         MiuixBatteryProtectionDialog(
             show = showBatteryProtectionDialog,
@@ -452,7 +455,7 @@ fun ShizukuHomeScreen(
         )
 
         // ==========================================================
-        // Miuix OverlayDialog 3：电池运行信息与健康度弹窗
+        // Miuix WindowDialog 3：电池运行信息与健康度弹窗
         // ==========================================================
         MiuixBatteryInfoDialog(
             show = showBatteryInfoDialog,
@@ -488,7 +491,7 @@ private fun MiuixBatteryProtectionDialog(
     }
     var isWorking by remember(show) { mutableStateOf(false) }
 
-    OverlayDialog(
+    WindowDialog(
         show = show,
         title = "充电上限保护",
         summary = "自定义充电截止电量与恢复充电阈值，达到上限后自动停止充电以延长电池循环寿命。",
@@ -641,7 +644,7 @@ private fun MiuixBatteryInfoDialog(
         }
     }
 
-    OverlayDialog(
+    WindowDialog(
         show = show,
         title = "电池运行信息与健康度",
         summary = "显示当前电量、温度、充电状态、电流、电压、循环数、三星健康度等实时硬件信息。",
@@ -654,8 +657,10 @@ private fun MiuixBatteryInfoDialog(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .heightIn(max = 320.dp)
                     .clip(RoundedCornerShape(14.dp))
                     .background(if (isDark) Color(0xFF28282D) else Color(0xFFF0F2F6))
+                    .verticalScroll(rememberScrollState())
                     .padding(14.dp)
             ) {
                 Text(
@@ -1946,7 +1951,7 @@ private fun AppRulesTabContent(
                     val maxRates = listOf(120, 90, 60, 48)
                     val maxRateLabels = maxRates.map { "${it}Hz" }
                     val selectedMaxIndex = maxRates.indexOf(targetMaxHz).coerceAtLeast(0)
-                    OverlayDropdownPreference(
+                    WindowDropdownPreference(
                         title = stringResource(R.string.rules_label_max_hz),
                         summary = "应用在前台时允许达到的最高刷新率上限",
                         items = maxRateLabels,
@@ -1963,7 +1968,7 @@ private fun AppRulesTabContent(
                         val minRates = listOf(60, 48, 30, 24, 10).filter { it <= targetMaxHz }
                         val minRateLabels = minRates.map { "${it}Hz" }
                         val selectedMinIndex = minRates.indexOf(targetMinHz).coerceAtLeast(0)
-                        OverlayDropdownPreference(
+                        WindowDropdownPreference(
                             title = stringResource(R.string.rules_label_min_hz),
                             summary = "画面静止时允许 LTPO 降频到的最低刷新率下限",
                             items = minRateLabels,
