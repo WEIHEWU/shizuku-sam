@@ -24,27 +24,30 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Publish Release v13.8.2 (Per-Game Target Profile Override & Accurate README)
+      - name: Publish Release v13.8.4 (Full-App Unified Miuix UI & On-Demand Subtitle Toggle)
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v13.8.2
-          name: "Shizuku Sam v13.8.2 — 游戏自动高刷支持按游戏独立指定档位 & 文档全面重写"
+          tag_name: v13.8.4
+          name: "Shizuku Sam v13.8.4 — 全应用一级/二级/三级页面及弹窗全面统一 Miuix 视觉组件与按需说明开关"
           body: |
-            ### Shizuku Sam v13.8.2
-            - **新增「按游戏独立指定目标档位」 (`MaxHzPrefs.kt` / `MaxHzAccessibilityService.kt` / `MaxHzActivity.kt`)**：
-              - 针对日常常驻 **「省电自适应」** 的用户，在「性能硬件 -> 游戏自动高刷加速 -> 已加入自动加速的游戏」列表中，支持为每一款游戏单独点击右侧胶囊切换专属档位：
-                - **跟随全局默认**
-                - **系统默认（解除省电限频·不发热）**：适合轻中度游戏，进入游戏自动解除系统省电模式的 CPU 70% 限频并保持 120Hz 自适应高刷，不强开满血、不额外发热；
-                - **游戏性能模式（满血释放）**：适合重度大型游戏，锁定 CPU/GPU 满血调度与 120Hz 高刷；
-                - **省电自适应高刷（省电+120Hz）**：适合棋牌/文字类超轻度休闲游戏；
-              - 支持从游戏 A 直接切到游戏 B 时按各自独立档位无缝切换，并在彻底退回桌面或日常应用时，严格按照进入第一款游戏前保存的快照自动恢复原日常模式（如「省电自适应」）。
-            - **全面重写 `README.md` 与 `README.en.md`**：
-              - 100% 严格对齐当前真实 App 三栏结构（`Shizuku` · `性能硬件` · `应用规则`）与真实功能条目，剔除所有旧版残留与不实描述。
+            ### Shizuku Sam v13.8.4
+            - **全应用 100% 统一 Miuix (`top.yukonga.miuix.kmp`) 视觉与组件体系**：
+              - **二级/三级 Compose 子页面全面重构为原生 Miuix**：
+                - **设置中心 (`SettingsGlassScreen.kt`)**：升级为 Miuix `Scaffold` + `overScrollVertical()` 弹性阻尼滚动 + 无描边 `20.dp` Miuix `Card` + Miuix `SwitchPreference` / `ArrowPreference`；端口号修改弹窗与主题选择弹窗全部升级为 Miuix `WindowDialog`、`TextField` 与 `TextButton`。
+                - **应用授权管理页 (`ApplicationManagementActivity.kt`)**：重构为 Miuix Compose 页面（`MiuixSubPageTopBar` + Miuix `Card` + Miuix `BasicComponent` + Miuix `Switch` + Miuix `WindowDialog`）。
+                - **无线调试配对教程与手动配对弹窗 (`AdbPairingTutorialActivity.kt`)**：重构为原生 Miuix Compose 页面与 `MiuixManualPairingDialog`（Miuix `WindowDialog` + `TextField` + `TextButton` + `AdbMdns` 自动端口发现）。
+                - **终端授权教程页 (`ShellTutorialActivity.kt`) 与服务启动终端页 (`StarterActivity.kt`)**：重构为原生 Miuix Compose 页面与 Miuix `WindowDialog` 异常诊断弹窗。
+              - **MaxHz 二级/三级详情页全面对齐 Miuix 规范 (`LiquidGlassTheme.kt` / `MaxHzActivity.kt`)**：
+                - 统一亮色 `#F5F6F9` / 深色 `#0D0F12` 页面底色、无描边纯色 `20dp` Miuix 卡片（亮色 `#FFFFFF` / 深色 `#181A20`）、Miuix 蓝开关轨道（`#3482FF` / `#277AF7`）、Miuix 柔和浅色圆角图标底座与 `14dp` 圆角按钮。
+            - **全应用统一「方案 B：按需展开说明」极简交互（一级/二级/三级页面全覆盖）**：
+              - 所有页面默认仅展示干净利落的单行主标题，彻底消除多行小字视觉噪点；
+              - **长按任意单行或卡片**：即可在原位平滑展开/收起该功能的详细说明或包名；
+              - **分组/页面右上角 `显示说明 / 隐藏说明` 胶囊开关**：一键切换当前分组或整页全部说明的显示与隐藏。
           files: |
-            releases/Shizuku-Sam-v13.8.2.apk
+            releases/Shizuku-Sam-v13.8.4.apk
 
       - name: Publish Future Version Tag Release
-        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2'
+        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2' && github.ref_name != 'v13.8.3' && github.ref_name != 'v13.8.4'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}

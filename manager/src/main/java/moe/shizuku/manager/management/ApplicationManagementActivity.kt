@@ -1,26 +1,71 @@
 package moe.shizuku.manager.management
 
+import android.content.pm.PackageInfo
+import android.content.res.Configuration
+import android.graphics.Bitmap
 import android.os.Bundle
 import android.util.TypedValue
-import android.view.MenuItem
 import android.widget.Toast
-import androidx.recyclerview.widget.RecyclerView.AdapterDataObserver
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
+import kotlinx.coroutines.withContext
 import moe.shizuku.manager.Helps
 import moe.shizuku.manager.R
-import moe.shizuku.manager.app.AppBarActivity
-import moe.shizuku.manager.databinding.AppsActivityBinding
-import moe.shizuku.manager.maxhz.LiquidGlassTheme
+import moe.shizuku.manager.app.AppActivity
+import moe.shizuku.manager.app.ThemeHelper
+import moe.shizuku.manager.authorization.AuthorizationManager
+import moe.shizuku.manager.home.GroupHeaderWithToggle
+import moe.shizuku.manager.home.MiuixSubPageTopBar
+import moe.shizuku.manager.home.onLongPressToggle
+import moe.shizuku.manager.ktx.toHtml
+import moe.shizuku.manager.maxhz.GlassAppTheme
+import moe.shizuku.manager.utils.AppIconCache
 import moe.shizuku.manager.utils.CustomTabsHelper
+import moe.shizuku.manager.utils.ShizukuSystemApis
+import moe.shizuku.manager.utils.UserHandleCompat
+import rikka.html.text.HtmlCompat
 import rikka.lifecycle.Status
-import rikka.recyclerview.addEdgeSpacing
-import rikka.recyclerview.fixEdgeEffect
 import rikka.shizuku.Shizuku
-import java.util.*
+import top.yukonga.miuix.kmp.basic.BasicComponent
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CardDefaults
+import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.Switch
+import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.utils.overScrollVertical
+import top.yukonga.miuix.kmp.window.WindowDialog
+import java.util.Objects
 
-class ApplicationManagementActivity : AppBarActivity() {
+class ApplicationManagementActivity : AppActivity() {
 
     private val viewModel by appsViewModel()
-    private val adapter = AppsAdapter()
+    private val packagesState = mutableStateOf<List<PackageInfo>>(emptyList())
+    private val isLoadingState = mutableStateOf(true)
+    private val refreshTickState = mutableIntStateOf(0)
 
     private val binderDeadListener = Shizuku.OnBinderDeadListener {
         if (!isFinishing) {
@@ -36,27 +81,24 @@ class ApplicationManagementActivity : AppBarActivity() {
             return
         }
 
-        val binding = AppsActivityBinding.inflate(layoutInflater)
-        setContentView(binding.root)
-
-        // 玻璃页面背景，与设置页、主页面保持一致
-        LiquidGlassTheme.attachGlassPageBackground(this)
-
-        supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
 
         viewModel.packages.observe(this) {
             when (it.status) {
                 Status.SUCCESS -> {
-                    adapter.updateData(it.data)
+                    packagesState.value = it.data ?: emptyList()
+                    isLoadingState.value = false
+                    refreshTickState.intValue++
                 }
                 Status.ERROR -> {
+                    isLoadingState.value = false
                     finish()
                     val tr = it.error
                     Toast.makeText(this, Objects.toString(tr, "unknown"), Toast.LENGTH_SHORT).show()
-                    tr.printStackTrace()
+                    tr?.printStackTrace()
                 }
                 Status.LOADING -> {
-
+                    isLoadingState.value = true
                 }
             }
         }
@@ -64,32 +106,346 @@ class ApplicationManagementActivity : AppBarActivity() {
             viewModel.load()
         }
 
-        val recyclerView = binding.list
-        recyclerView.adapter = adapter
-        recyclerView.fixEdgeEffect()
-        recyclerView.addEdgeSpacing(top = 8f, bottom = 8f, unit = TypedValue.COMPLEX_UNIT_DIP)
-        // 列表尺寸不随内容变：跳过每次数据更新后的 onLayout 全表测量；
-        // 加大离屏缓存，回滚时少重绑（图标也就少解码）
-        recyclerView.setHasFixedSize(true)
-        recyclerView.setItemViewCacheSize(8)
-
-        adapter.registerAdapterDataObserver(object : AdapterDataObserver() {
-            override fun onItemRangeChanged(positionStart: Int, itemCount: Int, payload: Any?) {
-                viewModel.load(true)
-            }
-        })
-
         Shizuku.addBinderDeadListener(binderDeadListener)
+
+        val isDark = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+        val isBlackNight = isDark && ThemeHelper.isBlackNightTheme(this)
+
+        val primaryColorInt = runCatching {
+            val tv = TypedValue()
+            if (theme.resolveAttribute(androidx.appcompat.R.attr.colorPrimary, tv, true)) tv.data
+            else if (isDark) 0xFF277AF7.toInt() else 0xFF3482FF.toInt()
+        }.getOrDefault(if (isDark) 0xFF277AF7.toInt() else 0xFF3482FF.toInt())
+
+        setContent {
+            GlassAppTheme(isDark = isDark) {
+                ApplicationManagementMiuixScreen(
+                    isDark = isDark,
+                    isBlackNightTheme = isBlackNight,
+                    primaryColor = Color(primaryColorInt),
+                    packages = packagesState.value,
+                    isLoading = isLoadingState.value,
+                    refreshTick = refreshTickState.intValue,
+                    onBackClick = { finish() },
+                    onReloadCount = {
+                        viewModel.load(true)
+                        refreshTickState.intValue++
+                    }
+                )
+            }
+        }
     }
 
     override fun onDestroy() {
         super.onDestroy()
-
         Shizuku.removeBinderDeadListener(binderDeadListener)
     }
 
     override fun onResume() {
         super.onResume()
-        adapter.notifyDataSetChanged()
+        refreshTickState.intValue++
+    }
+}
+
+@Composable
+private fun ApplicationManagementMiuixScreen(
+    isDark: Boolean,
+    isBlackNightTheme: Boolean,
+    primaryColor: Color,
+    packages: List<PackageInfo>,
+    isLoading: Boolean,
+    refreshTick: Int,
+    onBackClick: () -> Unit,
+    onReloadCount: () -> Unit
+) {
+    val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
+    val density = LocalDensity.current
+    val iconSizePx = with(density) { 42.dp.roundToPx() }
+
+    var groupExpanded by remember { mutableStateOf(false) }
+    var showAdbLimitedDialog by remember { mutableStateOf(false) }
+
+    val bgColor = if (isBlackNightTheme) {
+        Color.Black
+    } else {
+        MiuixTheme.colorScheme.surface
+    }
+
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        containerColor = bgColor,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
+    ) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .overScrollVertical(),
+            contentPadding = PaddingValues(
+                top = 54.dp,
+                start = 14.dp,
+                end = 14.dp,
+                bottom = 48.dp
+            ),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item(key = "header-top") {
+                MiuixSubPageTopBar(
+                    title = stringResource(R.string.home_app_management_title),
+                    subtitle = "管理所有请求 Shizuku 权限的应用，长按单行或点击右上角按钮可展开/隐藏应用包名",
+                    isDark = isDark,
+                    primaryColor = primaryColor,
+                    expanded = groupExpanded,
+                    onToggleExpand = { groupExpanded = !groupExpanded },
+                    onBackClick = onBackClick
+                )
+            }
+
+            if (isLoading && packages.isEmpty()) {
+                item(key = "card-loading") {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        cornerRadius = 20.dp,
+                        colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 36.dp, horizontal = 20.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "正在读取已安装应用列表...",
+                                fontSize = 14.sp,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                            )
+                        }
+                    }
+                }
+            } else if (packages.isEmpty()) {
+                item(key = "card-empty") {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        cornerRadius = 20.dp,
+                        colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 36.dp, horizontal = 20.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "暂未发现声明 Shizuku 权限的应用",
+                                fontSize = 14.sp,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                            )
+                        }
+                    }
+                }
+            } else {
+                item(key = "section-apps") {
+                    Column {
+                        GroupHeaderWithToggle(
+                            text = "授权应用列表 (${packages.size})",
+                            isDark = isDark,
+                            primaryColor = primaryColor,
+                            expanded = groupExpanded,
+                            onToggle = { groupExpanded = !groupExpanded }
+                        )
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            cornerRadius = 20.dp,
+                            colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+                        ) {
+                            Column {
+                                packages.forEach { pkgInfo ->
+                                    val ai = pkgInfo.applicationInfo ?: return@forEach
+                                    val uid = ai.uid
+                                    val pkgName = pkgInfo.packageName
+                                    key("${pkgName}_${uid}") {
+                                        AppManagementMiuixRow(
+                                            pkgInfo = pkgInfo,
+                                            isDark = isDark,
+                                            iconSizePx = iconSizePx,
+                                            groupExpanded = groupExpanded,
+                                            refreshTick = refreshTick,
+                                            onAdbLimited = { showAdbLimitedDialog = true },
+                                            onToggled = onReloadCount
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Miuix 窗口级弹窗：ADB 权限受限提示
+    WindowDialog(
+        show = showAdbLimitedDialog,
+        title = stringResource(R.string.app_management_dialog_adb_is_limited_title),
+        onDismissRequest = { showAdbLimitedDialog = false }
+    ) {
+        val rawMsg = remember {
+            context.getString(R.string.app_management_dialog_adb_is_limited_message, Helps.ADB.get())
+                .toHtml(HtmlCompat.FROM_HTML_OPTION_TRIM_WHITESPACE)
+                .toString()
+        }
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Text(
+                text = rawMsg,
+                fontSize = 13.5.sp,
+                lineHeight = 19.sp,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                TextButton(
+                    text = "查看文档",
+                    onClick = {
+                        showAdbLimitedDialog = false
+                        CustomTabsHelper.launchUrlOrCopy(context, Helps.ADB.get())
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+                TextButton(
+                    text = stringResource(android.R.string.ok),
+                    colors = ButtonDefaults.textButtonColorsPrimary(),
+                    onClick = { showAdbLimitedDialog = false },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AppManagementMiuixRow(
+    pkgInfo: PackageInfo,
+    isDark: Boolean,
+    iconSizePx: Int,
+    groupExpanded: Boolean,
+    refreshTick: Int,
+    onAdbLimited: () -> Unit,
+    onToggled: () -> Unit
+) {
+    val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
+    val pm = context.packageManager
+    val ai = pkgInfo.applicationInfo ?: return
+    val pkgName = pkgInfo.packageName
+    val uid = ai.uid
+
+    var rowToggled by remember(groupExpanded) { mutableStateOf(false) }
+    val showSubtitle = groupExpanded xor rowToggled
+
+    val appLabel = remember(pkgName, uid) {
+        val userId = UserHandleCompat.getUserId(uid)
+        val baseLabel = ai.loadLabel(pm).toString()
+        if (userId != UserHandleCompat.myUserId()) {
+            val userInfo = ShizukuSystemApis.getUserInfo(userId)
+            "$baseLabel - ${userInfo.name} ($userId)"
+        } else {
+            baseLabel
+        }
+    }
+
+    val requiresRoot = remember(pkgName, uid) {
+        ai.metaData != null && ai.metaData.getBoolean("moe.shizuku.client.V3_REQUIRES_ROOT")
+    }
+
+    var granted by remember(pkgName, uid, refreshTick) {
+        mutableStateOf(runCatching { AuthorizationManager.granted(pkgName, uid) }.getOrDefault(false))
+    }
+
+    val iconBitmap by produceState<Bitmap?>(initialValue = null, pkgName, uid) {
+        value = withContext(AppIconCache.dispatcher()) {
+            runCatching {
+                AppIconCache.getOrLoadBitmap(context, ai, uid / 100000, iconSizePx)
+            }.getOrNull()
+        }
+    }
+
+    val toggleGrant: () -> Unit = {
+        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        try {
+            if (AuthorizationManager.granted(pkgName, uid)) {
+                AuthorizationManager.revoke(pkgName, uid)
+            } else {
+                AuthorizationManager.grant(pkgName, uid)
+            }
+            granted = AuthorizationManager.granted(pkgName, uid)
+            onToggled()
+        } catch (e: SecurityException) {
+            val serverUid = runCatching { Shizuku.getUid() }.getOrDefault(-1)
+            if (serverUid != 0 && serverUid != -1) {
+                onAdbLimited()
+            }
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .onLongPressToggle(haptic) { rowToggled = !rowToggled }
+    ) {
+        BasicComponent(
+            title = appLabel,
+            summary = if (showSubtitle) pkgName else null,
+            insideMargin = PaddingValues(horizontal = 14.dp, vertical = 11.dp),
+            onClick = toggleGrant,
+            startAction = {
+                Box(
+                    modifier = Modifier
+                        .padding(end = 12.dp)
+                        .size(38.dp)
+                        .clip(RoundedCornerShape(10.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    val bmp = iconBitmap
+                    if (bmp != null) {
+                        Image(
+                            bitmap = bmp.asImageBitmap(),
+                            contentDescription = appLabel,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Image(
+                            painter = painterResource(R.drawable.ic_default_app_icon),
+                            contentDescription = appLabel,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                }
+            },
+            endActions = {
+                if (requiresRoot) {
+                    Text(
+                        text = "Root",
+                        fontSize = 10.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (isDark) Color(0xFFF87171) else Color(0xFFDC2626),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(7.dp))
+                            .background(if (isDark) Color(0x2EF87171) else Color(0xFFFFECE8))
+                            .padding(horizontal = 7.dp, vertical = 3.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                }
+                Switch(
+                    checked = granted,
+                    onCheckedChange = { toggleGrant() }
+                )
+            }
+        )
     }
 }

@@ -29,6 +29,9 @@ class AppViewHolder(private val binding: AppListItemBinding) : BaseViewHolder<Pa
     companion object {
         @JvmField
         val CREATOR = Creator<PackageInfo> { inflater: LayoutInflater, parent: ViewGroup? -> AppViewHolder(AppListItemBinding.inflate(inflater, parent, false)) }
+
+        var showAllSubtitles: Boolean = false
+        val expandedPackages = mutableSetOf<String>()
     }
 
 
@@ -41,6 +44,21 @@ class AppViewHolder(private val binding: AppListItemBinding) : BaseViewHolder<Pa
     init {
         itemView.filterTouchesWhenObscured = true
         itemView.setOnClickListener(this)
+        itemView.isLongClickable = true
+        itemView.setOnLongClickListener { v ->
+            v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+            val key = "${packageName}_${uid}"
+            if (!expandedPackages.remove(key)) {
+                expandedPackages.add(key)
+            }
+            pkg.visibility = if (showAllSubtitles || expandedPackages.contains(key)) View.VISIBLE else View.GONE
+            true
+        }
+        pkg.setOnClickListener {
+            val key = "${packageName}_${uid}"
+            expandedPackages.remove(key)
+            pkg.visibility = View.GONE
+        }
     }
 
     private inline val packageName get() = data.packageName
@@ -96,6 +114,8 @@ class AppViewHolder(private val binding: AppListItemBinding) : BaseViewHolder<Pa
             ai.loadLabel(pm)
         }
         pkg.text = ai.packageName
+        val key = "${packageName}_${uid}"
+        pkg.visibility = if (showAllSubtitles || expandedPackages.contains(key)) View.VISIBLE else View.GONE
         switchWidget.isChecked = AuthorizationManager.granted(packageName, uid)
         root.visibility = if (ai.metaData != null && ai.metaData.getBoolean("moe.shizuku.client.V3_REQUIRES_ROOT")) View.VISIBLE else View.GONE
 
@@ -103,6 +123,8 @@ class AppViewHolder(private val binding: AppListItemBinding) : BaseViewHolder<Pa
     }
 
     override fun onBind(payloads: List<Any>) {
+        val key = "${packageName}_${uid}"
+        pkg.visibility = if (showAllSubtitles || expandedPackages.contains(key)) View.VISIBLE else View.GONE
         switchWidget.isChecked = AuthorizationManager.granted(packageName, uid)
     }
 

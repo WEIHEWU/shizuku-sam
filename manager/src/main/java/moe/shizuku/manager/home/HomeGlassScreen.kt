@@ -1,11 +1,18 @@
 package moe.shizuku.manager.home
 
 import android.net.Uri
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -49,7 +56,10 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -62,6 +72,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.withTimeoutOrNull
 import moe.shizuku.manager.R
 import moe.shizuku.manager.maxhz.GLASS_DOCK_CLEARANCE_DP
 import moe.shizuku.manager.maxhz.GlassButtonStyle
@@ -217,6 +228,7 @@ fun ShizukuHomeScreen(
                 // ==========================================================
                 // Tab 0：【特权服务】（Miuix 风格核心控制台）
                 // ==========================================================
+                var tab0HeaderExpanded by remember { mutableStateOf(false) }
                 LazyColumn(
                     Modifier
                         .fillMaxSize()
@@ -236,7 +248,9 @@ fun ShizukuHomeScreen(
                             subtitle = if (ok) stringResource(R.string.home_header_shizuku_running_subtitle)
                             else stringResource(R.string.home_header_shizuku_stopped_subtitle),
                             isDark = isDark,
-                            primaryColor = primaryColor
+                            primaryColor = primaryColor,
+                            expanded = tab0HeaderExpanded,
+                            onToggle = { tab0HeaderExpanded = !tab0HeaderExpanded }
                         )
                     }
 
@@ -249,6 +263,7 @@ fun ShizukuHomeScreen(
                             activePort = activePort,
                             isWifiConnected = isWifiConnected,
                             isDeviceOwner = isDeviceOwner,
+                            groupExpanded = tab0HeaderExpanded,
                             actions = actions,
                             onRequestStopDialog = { showStopConfirmDialog = true }
                         )
@@ -267,6 +282,7 @@ fun ShizukuHomeScreen(
                         item(key = "adb-alt", contentType = "alt") {
                             PrivilegeLaunchMethodsCard(
                                 isDark = isDark,
+                                primaryColor = primaryColor,
                                 isDeviceOwner = isDeviceOwner,
                                 actions = actions
                             )
@@ -275,6 +291,7 @@ fun ShizukuHomeScreen(
                         item(key = "adb-running-tools", contentType = "tools") {
                             AdbRunningToolsCard(
                                 isDark = isDark,
+                                primaryColor = primaryColor,
                                 isRoot = status?.uid == 0,
                                 isDeviceOwner = isDeviceOwner,
                                 actions = actions
@@ -291,6 +308,7 @@ fun ShizukuHomeScreen(
                 // ==========================================================
                 // Tab 1：【性能硬件】（Miuix 风格三星调度与电池/后台中枢）
                 // ==========================================================
+                var tab1HeaderExpanded by remember { mutableStateOf(false) }
                 LazyColumn(
                     Modifier
                         .fillMaxSize()
@@ -311,7 +329,9 @@ fun ShizukuHomeScreen(
                             subtitle = if (isRootEnv) "Root 硬件直通 · " + stringResource(R.string.home_header_hardware_subtitle)
                             else "Shizuku 模式 · " + stringResource(R.string.home_header_hardware_subtitle),
                             isDark = isDark,
-                            primaryColor = primaryColor
+                            primaryColor = primaryColor,
+                            expanded = tab1HeaderExpanded,
+                            onToggle = { tab1HeaderExpanded = !tab1HeaderExpanded }
                         )
                     }
 
@@ -442,6 +462,7 @@ fun ShizukuHomeScreen(
         MiuixBatteryProtectionDialog(
             show = showBatteryProtectionDialog,
             isDark = isDark,
+            primaryColor = primaryColor,
             isActive = isBatteryProtectionActive,
             initialLimit = batteryProtectionLimit,
             initialRecharge = batteryProtectionRecharge,
@@ -460,9 +481,224 @@ fun ShizukuHomeScreen(
         MiuixBatteryInfoDialog(
             show = showBatteryInfoDialog,
             isDark = isDark,
+            primaryColor = primaryColor,
             onDismiss = { showBatteryInfoDialog = false },
             onFetchBatteryInfo = actions.onFetchBatteryInfo
         )
+    }
+}
+
+// ==================================================================
+// 方案 B 全局公共手势与分组标题组件
+// ==================================================================
+
+/**
+ * 方案 B 核心手势拦截：
+ * 在 PointerEventPass.Initial 监听原地长按（不阻碍普通点击、Switch 切换、下拉弹窗与列表滑动）。
+ * 一旦达到长按阈值且手指未滑出 touchSlop，触发震动与回调，并在 Initial 阶段消费后续抬手事件，
+ * 彻底防止长按松手时误触整行点击或开关切换。
+ */
+fun Modifier.onLongPressToggle(
+    haptic: HapticFeedback,
+    onLongPress: () -> Unit
+): Modifier = this.pointerInput(onLongPress) {
+    awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+        val longPressTimeout = viewConfiguration.longPressTimeoutMillis
+        val touchSlop = viewConfiguration.touchSlop
+        val startPos = down.position
+
+        val releasedOrMoved = withTimeoutOrNull(longPressTimeout) {
+            while (true) {
+                val event = awaitPointerEvent(PointerEventPass.Initial)
+                val change = event.changes.firstOrNull { it.id == down.id } ?: return@withTimeoutOrNull true
+                if (!change.pressed) {
+                    return@withTimeoutOrNull true
+                }
+                if ((change.position - startPos).getDistance() > touchSlop) {
+                    return@withTimeoutOrNull true
+                }
+            }
+        }
+
+        if (releasedOrMoved == null) {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            onLongPress()
+            while (true) {
+                val event = awaitPointerEvent(PointerEventPass.Initial)
+                event.changes.forEach { it.consume() }
+                if (event.changes.none { it.pressed }) break
+            }
+        }
+    }
+}
+
+/**
+ * 方案 B 分组标题栏：左侧显示分组标题，右侧提供轻量「显示说明 / 隐藏说明」一键展开/收起按钮。
+ */
+@Composable
+fun GroupHeaderWithToggle(
+    text: String,
+    isDark: Boolean,
+    primaryColor: Color,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val haptic = LocalHapticFeedback.current
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(start = 10.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = text,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+        )
+        val pillBg = if (expanded) {
+            if (isDark) primaryColor.copy(alpha = 0.22f) else Color(0xFFEBF3FF)
+        } else {
+            Color.Transparent
+        }
+        val pillFg = if (expanded) {
+            if (isDark) Color(0xFF60A5FA) else primaryColor
+        } else {
+            MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.85f)
+        }
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(50))
+                .background(pillBg)
+                .clickable {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onToggle()
+                }
+                .padding(horizontal = 8.dp, vertical = 2.5.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = if (expanded) "隐藏说明" else "显示说明",
+                fontSize = 11.5.sp,
+                fontWeight = if (expanded) FontWeight.SemiBold else FontWeight.Medium,
+                color = pillFg
+            )
+        }
+    }
+}
+
+/**
+ * Miuix 二级/三级页面统一顶栏：
+ * - 左侧 Miuix 圆角返回按钮
+ * - 中间大标题（支持长按展开/收起副标题）
+ * - 右侧可选「显示说明 / 隐藏说明」胶囊按钮（用于单分组二级页全局切换）
+ */
+@Composable
+fun MiuixSubPageTopBar(
+    title: String,
+    subtitle: String? = null,
+    isDark: Boolean,
+    primaryColor: Color,
+    expanded: Boolean? = null,
+    onToggleExpand: (() -> Unit)? = null,
+    backSymbol: String = "‹",
+    onBackClick: () -> Unit
+) {
+    val haptic = LocalHapticFeedback.current
+    var localToggled by remember(expanded) { mutableStateOf(false) }
+    val showSub = (expanded ?: false) xor localToggled
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .onLongPressToggle(haptic) {
+                if (onToggleExpand != null) onToggleExpand() else localToggled = !localToggled
+            }
+            .padding(start = 4.dp, end = 4.dp, top = 4.dp, bottom = 4.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (isDark) Color(0xFF21242C) else Color(0xFFEFF2F7))
+                    .clickable {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onBackClick()
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = backSymbol,
+                    fontSize = if (backSymbol == "‹") 24.sp else 16.sp,
+                    fontWeight = if (backSymbol == "‹") FontWeight.Light else FontWeight.Bold,
+                    color = MiuixTheme.colorScheme.onSurface
+                )
+            }
+            Spacer(Modifier.width(14.dp))
+            Text(
+                text = title,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = MiuixTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f)
+            )
+            if (onToggleExpand != null && expanded != null) {
+                val pillBg = if (expanded) {
+                    if (isDark) primaryColor.copy(alpha = 0.22f) else Color(0xFFEBF3FF)
+                } else {
+                    if (isDark) Color(0xFF21242C) else Color(0xFFEFF2F7)
+                }
+                val pillFg = if (expanded) {
+                    if (isDark) Color(0xFF60A5FA) else primaryColor
+                } else {
+                    MiuixTheme.colorScheme.onSurfaceVariantSummary
+                }
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(pillBg)
+                        .clickable {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onToggleExpand()
+                        }
+                        .padding(horizontal = 10.dp, vertical = 4.5.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = if (expanded) "隐藏说明" else "显示说明",
+                        fontSize = 11.5.sp,
+                        fontWeight = if (expanded) FontWeight.SemiBold else FontWeight.Medium,
+                        color = pillFg
+                    )
+                }
+            }
+        }
+        AnimatedVisibility(
+            visible = showSub && !subtitle.isNullOrBlank(),
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut()
+        ) {
+            if (!subtitle.isNullOrBlank()) {
+                Text(
+                    text = subtitle,
+                    fontSize = 12.sp,
+                    lineHeight = 16.5.sp,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    modifier = Modifier
+                        .padding(start = 52.dp, top = 4.dp)
+                        .clickable {
+                            if (onToggleExpand != null) onToggleExpand() else localToggled = !localToggled
+                        }
+                )
+            }
+        }
     }
 }
 
@@ -474,6 +710,7 @@ fun ShizukuHomeScreen(
 private fun MiuixBatteryProtectionDialog(
     show: Boolean,
     isDark: Boolean,
+    primaryColor: Color,
     isActive: Boolean,
     initialLimit: Int,
     initialRecharge: Int,
@@ -481,6 +718,8 @@ private fun MiuixBatteryProtectionDialog(
     onApply: (Int, Int, (Boolean, String) -> Unit) -> Unit,
     onRestoreDefault: ((Boolean, String) -> Unit) -> Unit
 ) {
+    val haptic = LocalHapticFeedback.current
+    var showDesc by remember(show) { mutableStateOf(false) }
     var limitText by remember(show, initialLimit) { mutableStateOf(initialLimit.toString()) }
     var rechargeText by remember(show, initialRecharge) { mutableStateOf(initialRecharge.toString()) }
     var statusMessage by remember(show, isActive, initialLimit, initialRecharge) {
@@ -494,26 +733,45 @@ private fun MiuixBatteryProtectionDialog(
     WindowDialog(
         show = show,
         title = "充电上限保护",
-        summary = "自定义充电截止电量与恢复充电阈值，达到上限后自动停止充电以延长电池循环寿命。",
+        summary = if (showDesc) "自定义充电截止电量与恢复充电阈值，达到上限后自动停止充电以延长电池循环寿命。" else null,
         onDismissRequest = { if (!isWorking) onDismiss() }
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .onLongPressToggle(haptic) { showDesc = !showDesc },
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // 当前状态卡片
-            Box(
+            // 当前状态卡片 + 右侧显示说明按钮
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
                     .background(if (isDark) Color(0xFF28282D) else Color(0xFFF0F2F6))
-                    .padding(horizontal = 14.dp, vertical = 10.dp)
+                    .padding(horizontal = 12.dp, vertical = 9.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = statusMessage,
                     fontSize = 12.5.sp,
                     fontWeight = FontWeight.Medium,
-                    color = if (isActive) Color(0xFF10B981) else MiuixTheme.colorScheme.onSurface
+                    color = if (isActive) Color(0xFF10B981) else MiuixTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = if (showDesc) "隐藏说明" else "显示说明",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (isDark) Color(0xFF60A5FA) else primaryColor,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .clickable {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            showDesc = !showDesc
+                        }
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
                 )
             }
 
@@ -627,9 +885,12 @@ private fun MiuixBatteryProtectionDialog(
 private fun MiuixBatteryInfoDialog(
     show: Boolean,
     isDark: Boolean,
+    primaryColor: Color,
     onDismiss: () -> Unit,
     onFetchBatteryInfo: ((String) -> Unit) -> Unit
 ) {
+    val haptic = LocalHapticFeedback.current
+    var showDesc by remember(show) { mutableStateOf(false) }
     var infoText by remember { mutableStateOf("正在读取硬件电池实时状态...") }
     var isRefreshing by remember { mutableStateOf(false) }
 
@@ -647,13 +908,34 @@ private fun MiuixBatteryInfoDialog(
     WindowDialog(
         show = show,
         title = "电池运行信息与健康度",
-        summary = "显示当前电量、温度、充电状态、电流、电压、循环数、三星健康度等实时硬件信息。",
+        summary = if (showDesc) "显示当前电量、温度、充电状态、电流、电压、循环数、三星健康度等实时硬件信息。" else null,
         onDismissRequest = onDismiss
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .onLongPressToggle(haptic) { showDesc = !showDesc },
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                Text(
+                    text = if (showDesc) "隐藏说明" else "显示说明",
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (isDark) Color(0xFF60A5FA) else primaryColor,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .clickable {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            showDesc = !showDesc
+                        }
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                )
+            }
+
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -701,7 +983,7 @@ private fun MiuixBatteryInfoDialog(
 }
 
 // ==================================================================
-// 0. Miuix 大字页面标题组件
+// 0. Miuix 大字页面标题组件（支持方案 B：默认仅显示主标题，右侧可切换「显示说明/隐藏说明」或长按展开）
 // ==================================================================
 
 @Composable
@@ -709,23 +991,82 @@ private fun SectionHeader(
     title: String,
     subtitle: String? = null,
     isDark: Boolean,
-    primaryColor: Color
+    primaryColor: Color,
+    expanded: Boolean = false,
+    onToggle: (() -> Unit)? = null
 ) {
-    Column(Modifier.padding(start = 6.dp, end = 6.dp, top = 4.dp, bottom = 2.dp)) {
-        Text(
-            text = title,
-            fontSize = 15.5.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = MiuixTheme.colorScheme.onSurface
-        )
-        if (subtitle != null) {
-            Spacer(Modifier.height(2.dp))
+    val haptic = LocalHapticFeedback.current
+    var localToggled by remember(expanded) { mutableStateOf(false) }
+    val showSubtitle = expanded xor localToggled
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .onLongPressToggle(haptic) {
+                if (onToggle != null) onToggle() else localToggled = !localToggled
+            }
+            .padding(start = 6.dp, end = 6.dp, top = 4.dp, bottom = 2.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Text(
-                text = subtitle,
-                fontSize = 11.5.sp,
-                lineHeight = 15.5.sp,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                text = title,
+                fontSize = 15.5.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MiuixTheme.colorScheme.onSurface
             )
+            if (subtitle != null) {
+                val pillBg = if (showSubtitle) {
+                    if (isDark) primaryColor.copy(alpha = 0.22f) else Color(0xFFEBF3FF)
+                } else {
+                    Color.Transparent
+                }
+                val pillFg = if (showSubtitle) {
+                    if (isDark) Color(0xFF60A5FA) else primaryColor
+                } else {
+                    MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.85f)
+                }
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(pillBg)
+                        .clickable {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            if (onToggle != null) onToggle() else localToggled = !localToggled
+                        }
+                        .padding(horizontal = 8.dp, vertical = 2.5.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = if (showSubtitle) "隐藏说明" else "显示说明",
+                        fontSize = 11.5.sp,
+                        fontWeight = if (showSubtitle) FontWeight.SemiBold else FontWeight.Medium,
+                        color = pillFg
+                    )
+                }
+            }
+        }
+        AnimatedVisibility(
+            visible = showSubtitle && subtitle != null,
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut()
+        ) {
+            if (subtitle != null) {
+                Text(
+                    text = subtitle,
+                    fontSize = 11.5.sp,
+                    lineHeight = 15.5.sp,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    modifier = Modifier
+                        .padding(top = 3.dp)
+                        .clickable {
+                            if (onToggle != null) onToggle() else localToggled = !localToggled
+                        }
+                )
+            }
         }
     }
 }
@@ -743,9 +1084,14 @@ private fun HeroCard(
     activePort: Int,
     isWifiConnected: Boolean,
     isDeviceOwner: Boolean = false,
+    groupExpanded: Boolean = false,
     actions: HomeActions,
     onRequestStopDialog: () -> Unit
 ) {
+    val haptic = LocalHapticFeedback.current
+    var rowToggled by remember(groupExpanded) { mutableStateOf(false) }
+    val showSubtitle = groupExpanded xor rowToggled
+
     val ok = status?.isRunning == true
     val isRoot = status?.uid == 0
     val apiVersion = status?.apiVersion ?: 0
@@ -753,7 +1099,9 @@ private fun HeroCard(
     val runningModeName = if (isRoot) "Root" else "ADB"
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .onLongPressToggle(haptic) { rowToggled = !rowToggled },
         cornerRadius = 20.dp,
         colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
     ) {
@@ -875,18 +1223,24 @@ private fun HeroCard(
                     }
                 }
 
-                Spacer(Modifier.height(6.dp))
-
-                Text(
-                    text = if (ok) stringResource(R.string.home_status_activated_summary, runningModeName, apiVersion, patchVersion, "")
-                    else if (activePort > 0) stringResource(R.string.home_status_hint_port_found, activePort)
-                    else if (!isWifiConnected) stringResource(R.string.home_status_hint_no_wifi)
-                    else stringResource(R.string.home_status_hint_ready),
-                    fontSize = 12.sp,
-                    lineHeight = 16.5.sp,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    modifier = Modifier.padding(end = 48.dp)
-                )
+                AnimatedVisibility(
+                    visible = showSubtitle,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+                ) {
+                    Text(
+                        text = if (ok) stringResource(R.string.home_status_activated_summary, runningModeName, apiVersion, patchVersion, "")
+                        else if (activePort > 0) stringResource(R.string.home_status_hint_port_found, activePort)
+                        else if (!isWifiConnected) stringResource(R.string.home_status_hint_no_wifi)
+                        else stringResource(R.string.home_status_hint_ready),
+                        fontSize = 12.sp,
+                        lineHeight = 16.5.sp,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        modifier = Modifier
+                            .padding(top = 6.dp, end = 48.dp)
+                            .clickable { rowToggled = !rowToggled }
+                    )
+                }
 
                 Spacer(Modifier.height(14.dp))
 
@@ -964,7 +1318,7 @@ private fun HeroCard(
 }
 
 // ==================================================================
-// 2. 未运行状态：无线调试配对中枢卡 (Miuix SmallTitle + Card + ArrowPreference)
+// 2. 未运行状态：无线调试配对中枢卡 (Miuix GroupHeaderWithToggle + Card + ArrowPreference)
 // ==================================================================
 
 @Composable
@@ -974,10 +1328,14 @@ private fun AdbPairingHubCard(
     isAutoPairingEnabled: Boolean,
     actions: HomeActions
 ) {
+    var groupExpanded by remember { mutableStateOf(false) }
     Column {
-        SmallTitle(
+        GroupHeaderWithToggle(
             text = stringResource(R.string.home_card_pairing_hub_title),
-            insideMargin = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+            isDark = isDark,
+            primaryColor = primaryColor,
+            expanded = groupExpanded,
+            onToggle = { groupExpanded = !groupExpanded }
         )
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -992,6 +1350,7 @@ private fun AdbPairingHubCard(
                 subtitle = stringResource(R.string.home_action_auto_pairing_subtitle),
                 badgeText = if (isAutoPairingEnabled) stringResource(R.string.home_badge_enabled) else null,
                 badgeColor = if (isAutoPairingEnabled) Color(0xFF10B981) else null,
+                groupExpanded = groupExpanded,
                 onClick = actions.onAutoPairingAssistantClick
             )
             AdbActionRow(
@@ -1000,6 +1359,7 @@ private fun AdbPairingHubCard(
                 iconTint = if (isDark) Color(0xFFA78BFA) else Color(0xFF7C3AED),
                 title = stringResource(R.string.home_action_manual_pairing_title),
                 subtitle = stringResource(R.string.home_action_manual_pairing_subtitle),
+                groupExpanded = groupExpanded,
                 onClick = actions.onWirelessPairClick
             )
             AdbActionRow(
@@ -1008,6 +1368,7 @@ private fun AdbPairingHubCard(
                 iconTint = if (isDark) Color(0xFF38BDF8) else Color(0xFF0284C7),
                 title = stringResource(R.string.home_action_open_dev_settings_title),
                 subtitle = stringResource(R.string.home_action_open_dev_settings_subtitle),
+                groupExpanded = groupExpanded,
                 onClick = actions.onOpenDevSettingsClick
             )
         }
@@ -1021,13 +1382,18 @@ private fun AdbPairingHubCard(
 @Composable
 private fun PrivilegeLaunchMethodsCard(
     isDark: Boolean,
+    primaryColor: Color,
     isDeviceOwner: Boolean,
     actions: HomeActions
 ) {
+    var groupExpanded by remember { mutableStateOf(false) }
     Column {
-        SmallTitle(
+        GroupHeaderWithToggle(
             text = stringResource(R.string.home_card_launch_methods_title),
-            insideMargin = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+            isDark = isDark,
+            primaryColor = primaryColor,
+            expanded = groupExpanded,
+            onToggle = { groupExpanded = !groupExpanded }
         )
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -1040,6 +1406,7 @@ private fun PrivilegeLaunchMethodsCard(
                 iconTint = if (isDark) Color(0xFFF87171) else Color(0xFFF54A45),
                 title = stringResource(R.string.home_action_root_start_title),
                 subtitle = stringResource(R.string.home_action_root_start_subtitle),
+                groupExpanded = groupExpanded,
                 onClick = actions.onStartRootClick
             )
             AdbActionRow(
@@ -1048,6 +1415,7 @@ private fun PrivilegeLaunchMethodsCard(
                 iconTint = if (isDark) Color(0xFFFBBF24) else Color(0xFFF59E0B),
                 title = stringResource(R.string.home_action_pc_start_title),
                 subtitle = stringResource(R.string.home_action_pc_start_subtitle),
+                groupExpanded = groupExpanded,
                 onClick = actions.onStartAdbClick
             )
             if (isDeviceOwner) {
@@ -1059,6 +1427,7 @@ private fun PrivilegeLaunchMethodsCard(
                     subtitle = stringResource(R.string.dhizuku_remove_owner_btn),
                     badgeText = stringResource(R.string.home_badge_activated),
                     badgeColor = Color(0xFF0284C7),
+                    groupExpanded = groupExpanded,
                     onClick = actions.onDhizukuClick
                 )
             }
@@ -1073,14 +1442,19 @@ private fun PrivilegeLaunchMethodsCard(
 @Composable
 private fun AdbRunningToolsCard(
     isDark: Boolean,
+    primaryColor: Color,
     isRoot: Boolean = false,
     isDeviceOwner: Boolean,
     actions: HomeActions
 ) {
+    var groupExpanded by remember { mutableStateOf(false) }
     Column {
-        SmallTitle(
+        GroupHeaderWithToggle(
             text = stringResource(R.string.home_card_running_tools_title),
-            insideMargin = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+            isDark = isDark,
+            primaryColor = primaryColor,
+            expanded = groupExpanded,
+            onToggle = { groupExpanded = !groupExpanded }
         )
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -1094,6 +1468,7 @@ private fun AdbRunningToolsCard(
                     iconTint = if (isDark) Color(0xFF60A5FA) else Color(0xFF277AF6),
                     title = stringResource(R.string.home_btn_reconnect_debugging),
                     subtitle = "重新扫描本地回环无线调试端口并刷新 ADB 令牌连接",
+                    groupExpanded = groupExpanded,
                     onClick = actions.onWirelessStartClick
                 )
             }
@@ -1103,6 +1478,7 @@ private fun AdbRunningToolsCard(
                 iconTint = if (isDark) Color(0xFFF87171) else Color(0xFFF54A45),
                 title = stringResource(R.string.home_action_root_restart_title),
                 subtitle = stringResource(R.string.home_action_root_restart_subtitle),
+                groupExpanded = groupExpanded,
                 onClick = actions.onStartRootClick
             )
             AdbActionRow(
@@ -1111,6 +1487,7 @@ private fun AdbRunningToolsCard(
                 iconTint = if (isDark) Color(0xFFFBBF24) else Color(0xFFF59E0B),
                 title = stringResource(R.string.home_action_pc_view_title),
                 subtitle = stringResource(R.string.home_action_pc_view_subtitle),
+                groupExpanded = groupExpanded,
                 onClick = actions.onStartAdbClick
             )
             if (isDeviceOwner) {
@@ -1122,6 +1499,7 @@ private fun AdbRunningToolsCard(
                     subtitle = stringResource(R.string.dhizuku_remove_owner_btn),
                     badgeText = stringResource(R.string.home_badge_activated),
                     badgeColor = Color(0xFF0284C7),
+                    groupExpanded = groupExpanded,
                     onClick = actions.onDhizukuClick
                 )
             }
@@ -1141,14 +1519,22 @@ private fun PerformanceModeCard(
     onModeChange: (Int) -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
+    var groupExpanded by remember { mutableStateOf(false) }
+    var cardToggled by remember(groupExpanded) { mutableStateOf(false) }
+    val showSubtitle = groupExpanded xor cardToggled
 
     Column {
-        SmallTitle(
+        GroupHeaderWithToggle(
             text = stringResource(R.string.home_card_perf_mode_title),
-            insideMargin = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+            isDark = isDark,
+            primaryColor = primaryColor,
+            expanded = showSubtitle,
+            onToggle = { groupExpanded = !showSubtitle }
         )
         Card(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .onLongPressToggle(haptic) { cardToggled = !cardToggled },
             cornerRadius = 20.dp,
             colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
         ) {
@@ -1198,39 +1584,47 @@ private fun PerformanceModeCard(
                                 color = activeFg,
                                 maxLines = 1
                             )
-                            Spacer(Modifier.height(2.dp))
-                            Text(
-                                text = if (selected) "● $tag" else tag,
-                                fontSize = 11.sp,
-                                fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
-                                color = subFg,
-                                maxLines = 1
-                            )
+                            if (showSubtitle) {
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    text = if (selected) "● $tag" else tag,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
+                                    color = subFg,
+                                    maxLines = 1
+                                )
+                            }
                         }
                     }
                 }
 
-                Spacer(Modifier.height(10.dp))
-
-                val desc = when (currentMode) {
-                    1 -> stringResource(R.string.home_perf_mode_desc_saver)
-                    2 -> stringResource(R.string.home_perf_mode_desc_game)
-                    else -> stringResource(R.string.home_perf_mode_desc_default)
+                AnimatedVisibility(
+                    visible = showSubtitle,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+                ) {
+                    val desc = when (currentMode) {
+                        1 -> stringResource(R.string.home_perf_mode_desc_saver)
+                        2 -> stringResource(R.string.home_perf_mode_desc_game)
+                        else -> stringResource(R.string.home_perf_mode_desc_default)
+                    }
+                    Text(
+                        text = desc,
+                        fontSize = 12.sp,
+                        lineHeight = 17.sp,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        modifier = Modifier
+                            .padding(top = 10.dp, start = 4.dp, end = 4.dp)
+                            .clickable { cardToggled = !cardToggled }
+                    )
                 }
-                Text(
-                    text = desc,
-                    fontSize = 12.sp,
-                    lineHeight = 17.sp,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    modifier = Modifier.padding(horizontal = 4.dp)
-                )
             }
         }
     }
 }
 
 // ==================================================================
-// 6. 快捷硬件开关与电池健康卡（全宽 Miuix 纯净卡片，零按钮重复、100% 完整文案）
+// 6. 快捷硬件开关与电池健康卡（全宽 Miuix 纯净卡片，支持方案 B）
 // ==================================================================
 
 @Composable
@@ -1260,10 +1654,14 @@ private fun QuickSwitchesCard(
     onOpenBatteryInfoDialog: () -> Unit = {},
     onOpenAppLaunchBoostClick: () -> Unit = {}
 ) {
+    var groupExpanded by remember { mutableStateOf(false) }
     Column {
-        SmallTitle(
+        GroupHeaderWithToggle(
             text = stringResource(R.string.home_card_quick_switches_title),
-            insideMargin = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+            isDark = isDark,
+            primaryColor = primaryColor,
+            expanded = groupExpanded,
+            onToggle = { groupExpanded = !groupExpanded }
         )
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -1277,6 +1675,7 @@ private fun QuickSwitchesCard(
                 title = stringResource(R.string.home_switch_passthrough_title),
                 subtitle = stringResource(R.string.home_switch_passthrough_subtitle),
                 checked = isPassThroughActive,
+                groupExpanded = groupExpanded,
                 onCheckedChange = onTogglePassThrough
             )
             SwitchItemRow(
@@ -1288,6 +1687,7 @@ private fun QuickSwitchesCard(
                 badgeText = "调参 ›",
                 holdDownState = holdDownBatteryProtection,
                 checked = isBatteryProtectionActive,
+                groupExpanded = groupExpanded,
                 onCheckedChange = onToggleBatteryProtection,
                 onRowClick = onOpenBatteryProtectionConfigClick
             )
@@ -1303,6 +1703,7 @@ private fun QuickSwitchesCard(
                 subtitle = "识别前台游戏自动接管高刷与触控采样，点击此行配置加速名单",
                 badgeText = "选游戏 ›",
                 checked = isGameAutoSwitchActive,
+                groupExpanded = groupExpanded,
                 onCheckedChange = onToggleGameAutoSwitch,
                 onRowClick = onOpenGameAutoConfigClick
             )
@@ -1313,6 +1714,7 @@ private fun QuickSwitchesCard(
                 title = "实时 FPS 帧率浮窗",
                 subtitle = "在屏幕左上角显示 SurfaceFlinger 纳秒级零延迟实时帧率与功耗",
                 checked = isFpsMonitorActive,
+                groupExpanded = groupExpanded,
                 onCheckedChange = onToggleFpsMonitor
             )
             SwitchItemRow(
@@ -1322,6 +1724,7 @@ private fun QuickSwitchesCard(
                 title = stringResource(R.string.home_switch_outdoor_title),
                 subtitle = stringResource(R.string.home_switch_outdoor_subtitle),
                 checked = isOutdoorModeActive,
+                groupExpanded = groupExpanded,
                 onCheckedChange = onToggleOutdoorMode
             )
             AdbActionRow(
@@ -1331,6 +1734,7 @@ private fun QuickSwitchesCard(
                 title = "电池运行信息与健康度",
                 subtitle = "查看实时电量、温度、电流、电压、循环次数与三星原厂健康度",
                 badgeText = "实时直读",
+                groupExpanded = groupExpanded,
                 onClick = onOpenBatteryInfoDialog
             )
             AdbActionRow(
@@ -1341,6 +1745,7 @@ private fun QuickSwitchesCard(
                 subtitle = "执行 Speed-Profile AOT 预编译加速应用启动，并回收系统冗余缓存",
                 badgeText = if (isAppLaunchBoostActive) "已优化" else null,
                 badgeColor = if (isAppLaunchBoostActive) Color(0xFF10B981) else null,
+                groupExpanded = groupExpanded,
                 onClick = onOpenAppLaunchBoostClick
             )
         }
@@ -1363,10 +1768,14 @@ private fun BackgroundPowerCard(
     onToggleLocationThrottle: (Boolean) -> Unit,
     onToggleScanGuard: (Boolean) -> Unit
 ) {
+    var groupExpanded by remember { mutableStateOf(false) }
     Column {
-        SmallTitle(
+        GroupHeaderWithToggle(
             text = "后台与深度休眠",
-            insideMargin = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+            isDark = isDark,
+            primaryColor = primaryColor,
+            expanded = groupExpanded,
+            onToggle = { groupExpanded = !groupExpanded }
         )
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -1380,6 +1789,7 @@ private fun BackgroundPowerCard(
                 title = "后台进程休眠（墓碑）",
                 subtitle = "启用 Android 原生 Freezer 冻结后台缓存进程，防止偷跑 CPU",
                 checked = isTombstoneActive,
+                groupExpanded = groupExpanded,
                 onCheckedChange = onToggleTombstone
             )
             SwitchItemRow(
@@ -1390,6 +1800,7 @@ private fun BackgroundPowerCard(
                 subtitle = "熄屏后快速进入深度 Doze 睡眠，点击可调节休眠步进参数",
                 badgeText = "调参 ›",
                 checked = isQuickDozeActive,
+                groupExpanded = groupExpanded,
                 onCheckedChange = onToggleQuickDoze,
                 onRowClick = onOpenQuickDozeConfigClick
             )
@@ -1400,6 +1811,7 @@ private fun BackgroundPowerCard(
                 title = "限制后台自启",
                 subtitle = "拦截后台广播偷起常驻服务与链式关联互拉，保持后台纯净",
                 checked = isAutostartLimitActive,
+                groupExpanded = groupExpanded,
                 onCheckedChange = onToggleAutostartLimit
             )
             SwitchItemRow(
@@ -1409,6 +1821,7 @@ private fun BackgroundPowerCard(
                 title = "限制后台定位",
                 subtitle = "将后台应用定位请求间隔限制为 30 分钟，降低待机耗电",
                 checked = isLocationThrottleActive,
+                groupExpanded = groupExpanded,
                 onCheckedChange = onToggleLocationThrottle
             )
             SwitchItemRow(
@@ -1418,6 +1831,7 @@ private fun BackgroundPowerCard(
                 title = "限制扫描与同步",
                 subtitle = "关闭后台隐式 Wi-Fi / 蓝牙 / 附近设备扫描与无用同步",
                 checked = isScanGuardActive,
+                groupExpanded = groupExpanded,
                 onCheckedChange = onToggleScanGuard
             )
         }
@@ -1425,7 +1839,7 @@ private fun BackgroundPowerCard(
 }
 
 /**
- * Miuix 风格开关项：
+ * Miuix 风格开关项（支持方案 B：默认仅显示单行主标题，长按单行或点击分组「显示说明」展开副标题）：
  * - 若无独立 `onRowClick`，直接使用 Miuix `SwitchPreference`
  * - 若带 `onRowClick`（如点击行弹出配置、点击右侧 Switch 直接启停），使用 Miuix `BasicComponent` + `Switch`
  */
@@ -1440,65 +1854,77 @@ private fun SwitchItemRow(
     onCheckedChange: (Boolean) -> Unit,
     badgeText: String? = null,
     holdDownState: Boolean = false,
+    groupExpanded: Boolean = false,
     onRowClick: (() -> Unit)? = null
 ) {
+    val haptic = LocalHapticFeedback.current
+    var rowToggled by remember(groupExpanded) { mutableStateOf(false) }
+    val showSubtitle = groupExpanded xor rowToggled
+    val effectiveSummary = if (showSubtitle && subtitle.isNotBlank()) subtitle else null
     val rowPadding = PaddingValues(horizontal = 14.dp, vertical = 11.dp)
-    if (onRowClick == null && badgeText == null) {
-        SwitchPreference(
-            title = title,
-            summary = subtitle,
-            checked = checked,
-            holdDownState = holdDownState,
-            insideMargin = rowPadding,
-            onCheckedChange = onCheckedChange,
-            startAction = {
-                MiuixRowIcon(isDark = isDark, icon = icon, iconTint = iconTint)
-            }
-        )
-    } else {
-        BasicComponent(
-            title = title,
-            summary = subtitle,
-            holdDownState = holdDownState,
-            insideMargin = rowPadding,
-            onClick = {
-                if (onRowClick != null) {
-                    onRowClick()
-                } else {
-                    onCheckedChange(!checked)
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .onLongPressToggle(haptic) { rowToggled = !rowToggled }
+    ) {
+        if (onRowClick == null && badgeText == null) {
+            SwitchPreference(
+                title = title,
+                summary = effectiveSummary,
+                checked = checked,
+                holdDownState = holdDownState,
+                insideMargin = rowPadding,
+                onCheckedChange = onCheckedChange,
+                startAction = {
+                    MiuixRowIcon(isDark = isDark, icon = icon, iconTint = iconTint)
                 }
-            },
-            startAction = {
-                MiuixRowIcon(isDark = isDark, icon = icon, iconTint = iconTint)
-            },
-            endActions = {
-                if (badgeText != null) {
-                    Box(
-                        modifier = Modifier
-                            .padding(end = 6.dp)
-                            .clip(RoundedCornerShape(7.dp))
-                            .background(iconTint.copy(alpha = if (isDark) 0.18f else 0.12f))
-                            .padding(horizontal = 7.dp, vertical = 3.dp)
-                    ) {
-                        Text(
-                            text = badgeText,
-                            fontSize = 10.5.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = iconTint
-                        )
+            )
+        } else {
+            BasicComponent(
+                title = title,
+                summary = effectiveSummary,
+                holdDownState = holdDownState,
+                insideMargin = rowPadding,
+                onClick = {
+                    if (onRowClick != null) {
+                        onRowClick()
+                    } else {
+                        onCheckedChange(!checked)
                     }
+                },
+                startAction = {
+                    MiuixRowIcon(isDark = isDark, icon = icon, iconTint = iconTint)
+                },
+                endActions = {
+                    if (badgeText != null) {
+                        Box(
+                            modifier = Modifier
+                                .padding(end = 6.dp)
+                                .clip(RoundedCornerShape(7.dp))
+                                .background(iconTint.copy(alpha = if (isDark) 0.18f else 0.12f))
+                                .padding(horizontal = 7.dp, vertical = 3.dp)
+                        ) {
+                            Text(
+                                text = badgeText,
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = iconTint
+                            )
+                        }
+                    }
+                    Switch(
+                        checked = checked,
+                        onCheckedChange = onCheckedChange
+                    )
                 }
-                Switch(
-                    checked = checked,
-                    onCheckedChange = onCheckedChange
-                )
-            }
-        )
+            )
+        }
     }
 }
 
 // ==================================================================
-// 7. 系统优化与维护入口卡 (Miuix ArrowPreference & SwitchPreference，无分割线纯净卡片)
+// 7. 系统优化与维护入口卡 (Miuix ArrowPreference & SwitchPreference，支持方案 B)
 // ==================================================================
 
 @Composable
@@ -1511,10 +1937,14 @@ private fun QuickActionsCard(
     onOpenBatteryInfoDialog: () -> Unit = {},
     actions: HomeActions
 ) {
+    var groupExpanded by remember { mutableStateOf(false) }
     Column {
-        SmallTitle(
+        GroupHeaderWithToggle(
             text = stringResource(R.string.home_card_quick_actions_title),
-            insideMargin = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+            isDark = isDark,
+            primaryColor = primaryColor,
+            expanded = groupExpanded,
+            onToggle = { groupExpanded = !groupExpanded }
         )
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -1528,6 +1958,7 @@ private fun QuickActionsCard(
                 title = "强制所有应用分屏/小窗",
                 subtitle = "解除窗口限制，让所有应用均支持分屏与多任务悬浮小窗",
                 checked = isForceResizableActive,
+                groupExpanded = groupExpanded,
                 onCheckedChange = actions.onToggleForceResizable
             )
             AdbActionRow(
@@ -1536,6 +1967,7 @@ private fun QuickActionsCard(
                 iconTint = if (isDark) Color(0xFF38BDF8) else Color(0xFF0284C7),
                 title = stringResource(R.string.home_action_night_guard_title),
                 subtitle = stringResource(R.string.home_action_night_guard_subtitle),
+                groupExpanded = groupExpanded,
                 onClick = actions.onNightWakeupGuardClick
             )
             AdbActionRow(
@@ -1544,6 +1976,7 @@ private fun QuickActionsCard(
                 iconTint = if (isDark) Color(0xFFA78BFA) else Color(0xFF7C3AED),
                 title = stringResource(R.string.home_action_geek_lab_title),
                 subtitle = stringResource(R.string.home_action_geek_lab_subtitle),
+                groupExpanded = groupExpanded,
                 onClick = actions.onOpenLaboratoryClick
             )
             AdbActionRow(
@@ -1552,6 +1985,7 @@ private fun QuickActionsCard(
                 iconTint = if (isDark) Color(0xFFF87171) else Color(0xFFF54A45),
                 title = stringResource(R.string.home_action_restore_defaults_title),
                 subtitle = stringResource(R.string.home_action_restore_defaults_subtitle),
+                groupExpanded = groupExpanded,
                 onClick = actions.onRestoreDefaultsClick
             )
             AdbActionRow(
@@ -1560,6 +1994,7 @@ private fun QuickActionsCard(
                 iconTint = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B),
                 title = stringResource(R.string.home_action_user_manual_title),
                 subtitle = stringResource(R.string.home_action_user_manual_subtitle),
+                groupExpanded = groupExpanded,
                 onClick = actions.onHelpClick
             )
         }
@@ -1567,11 +2002,11 @@ private fun QuickActionsCard(
 }
 
 // ==================================================================
-// Miuix 通用列表行组件（柔和粉彩圆角图标）
+// Miuix 通用列表行组件（柔和粉彩圆角图标 + 方案 B 长按单行展开副标题）
 // ==================================================================
 
 @Composable
-private fun MiuixRowIcon(
+fun MiuixRowIcon(
     isDark: Boolean,
     icon: Painter,
     iconTint: Color
@@ -1604,33 +2039,45 @@ private fun AdbActionRow(
     badgeText: String? = null,
     badgeColor: Color? = null,
     holdDownState: Boolean = false,
+    groupExpanded: Boolean = false,
     onClick: () -> Unit
 ) {
-    ArrowPreference(
-        title = title,
-        summary = subtitle,
-        holdDownState = holdDownState,
-        insideMargin = PaddingValues(horizontal = 14.dp, vertical = 11.dp),
-        onClick = onClick,
-        startAction = {
-            MiuixRowIcon(isDark = isDark, icon = icon, iconTint = iconTint)
-        },
-        endActions = {
-            if (badgeText != null) {
-                val accent = badgeColor ?: iconTint
-                Text(
-                    text = badgeText,
-                    fontSize = 10.5.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = accent,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(7.dp))
-                        .background(accent.copy(alpha = if (isDark) 0.18f else 0.12f))
-                        .padding(horizontal = 7.dp, vertical = 3.dp)
-                )
+    val haptic = LocalHapticFeedback.current
+    var rowToggled by remember(groupExpanded) { mutableStateOf(false) }
+    val showSubtitle = groupExpanded xor rowToggled
+    val effectiveSummary = if (showSubtitle && subtitle.isNotBlank()) subtitle else null
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .onLongPressToggle(haptic) { rowToggled = !rowToggled }
+    ) {
+        ArrowPreference(
+            title = title,
+            summary = effectiveSummary,
+            holdDownState = holdDownState,
+            insideMargin = PaddingValues(horizontal = 14.dp, vertical = 11.dp),
+            onClick = onClick,
+            startAction = {
+                MiuixRowIcon(isDark = isDark, icon = icon, iconTint = iconTint)
+            },
+            endActions = {
+                if (badgeText != null) {
+                    val accent = badgeColor ?: iconTint
+                    Text(
+                        text = badgeText,
+                        fontSize = 10.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = accent,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(7.dp))
+                            .background(accent.copy(alpha = if (isDark) 0.18f else 0.12f))
+                            .padding(horizontal = 7.dp, vertical = 3.dp)
+                    )
+                }
             }
-        }
-    )
+        )
+    }
 }
 
 @Composable
@@ -1674,7 +2121,7 @@ private fun Tile(
 }
 
 // ==================================================================
-// 8. Tab 2：Miuix 分应用刷新率规则组件
+// 8. Tab 2：Miuix 分应用刷新率规则组件（全面支持方案 B）
 // ==================================================================
 
 @Composable
@@ -1700,6 +2147,12 @@ private fun AppRulesTabContent(
     var targetMaxHz by remember { mutableIntStateOf(120) }
     var targetMinHz by remember { mutableIntStateOf(10) }
 
+    var headerGroupExpanded by remember { mutableStateOf(false) }
+    var presetsGroupExpanded by remember { mutableStateOf(false) }
+    var formGroupExpanded by remember { mutableStateOf(false) }
+    var listGroupExpanded by remember { mutableStateOf(false) }
+    var guideGroupExpanded by remember { mutableStateOf(false) }
+
     val requireAccessibility: () -> Unit = {
         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
         android.widget.Toast.makeText(context, R.string.rules_toast_accessibility_required, android.widget.Toast.LENGTH_SHORT).show()
@@ -1724,14 +2177,20 @@ private fun AppRulesTabContent(
                 title = stringResource(R.string.home_header_rules_title),
                 subtitle = stringResource(R.string.home_header_rules_subtitle),
                 isDark = isDark,
-                primaryColor = primaryColor
+                primaryColor = primaryColor,
+                expanded = headerGroupExpanded,
+                onToggle = { headerGroupExpanded = !headerGroupExpanded }
             )
         }
 
         // 前台无障碍感知与即时切换状态卡
         item(key = "card-accessibility-status") {
+            var cardToggled by remember(headerGroupExpanded) { mutableStateOf(false) }
+            val showSubtitle = headerGroupExpanded xor cardToggled
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onLongPressToggle(haptic) { cardToggled = !cardToggled },
                 cornerRadius = 20.dp,
                 colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
             ) {
@@ -1752,13 +2211,21 @@ private fun AppRulesTabContent(
                                 fontWeight = FontWeight.Bold,
                                 color = MiuixTheme.colorScheme.onSurface
                             )
-                            Spacer(Modifier.height(2.dp))
-                            Text(
-                                text = stringResource(R.string.rules_card_accessibility_subtitle),
-                                fontSize = 12.sp,
-                                lineHeight = 16.sp,
-                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                            )
+                            AnimatedVisibility(
+                                visible = showSubtitle,
+                                enter = expandVertically() + fadeIn(),
+                                exit = shrinkVertically() + fadeOut()
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.rules_card_accessibility_subtitle),
+                                    fontSize = 12.sp,
+                                    lineHeight = 16.sp,
+                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                    modifier = Modifier
+                                        .padding(top = 2.dp)
+                                        .clickable { cardToggled = !cardToggled }
+                                )
+                            }
                         }
                         Spacer(Modifier.width(8.dp))
                         val badgeBg = if (isInstantSwitchActive) {
@@ -1794,14 +2261,22 @@ private fun AppRulesTabContent(
                                 .padding(14.dp)
                         ) {
                             Column {
-                                Text(
-                                    text = stringResource(R.string.rules_warning_accessibility_locked),
-                                    fontSize = 12.sp,
-                                    lineHeight = 17.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = if (isDark) Color(0xFFFCA5A5) else Color(0xFFD9383A)
-                                )
-                                Spacer(Modifier.height(10.dp))
+                                AnimatedVisibility(
+                                    visible = showSubtitle,
+                                    enter = expandVertically() + fadeIn(),
+                                    exit = shrinkVertically() + fadeOut()
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.rules_warning_accessibility_locked),
+                                        fontSize = 12.sp,
+                                        lineHeight = 17.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = if (isDark) Color(0xFFFCA5A5) else Color(0xFFD9383A),
+                                        modifier = Modifier
+                                            .padding(bottom = 10.dp)
+                                            .clickable { cardToggled = !cardToggled }
+                                    )
+                                }
                                 TextButton(
                                     text = stringResource(R.string.rules_btn_enable_accessibility),
                                     onClick = actions.onOpenAccessibilityClick,
@@ -1815,15 +2290,22 @@ private fun AppRulesTabContent(
             }
         }
 
-        // 常用场景预设卡（2×2 宽敞点亮式冰蓝胶囊，文案 100% 完整展示）
+        // 常用场景预设卡（2×2 宽敞点亮式冰蓝胶囊，支持方案 B）
         item(key = "card-presets") {
+            var cardToggled by remember(presetsGroupExpanded) { mutableStateOf(false) }
+            val showSubtitle = presetsGroupExpanded xor cardToggled
             Column(modifier = if (!isInstantSwitchActive) Modifier.alpha(0.45f) else Modifier) {
-                SmallTitle(
+                GroupHeaderWithToggle(
                     text = stringResource(R.string.rules_card_presets_title),
-                    insideMargin = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                    isDark = isDark,
+                    primaryColor = primaryColor,
+                    expanded = showSubtitle,
+                    onToggle = { presetsGroupExpanded = !showSubtitle }
                 )
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onLongPressToggle(haptic) { cardToggled = !cardToggled },
                     cornerRadius = 20.dp,
                     colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
                 ) {
@@ -1889,96 +2371,150 @@ private fun AppRulesTabContent(
                                 }
                             }
                         }
+
+                        AnimatedVisibility(
+                            visible = showSubtitle,
+                            enter = expandVertically() + fadeIn(),
+                            exit = shrinkVertically() + fadeOut()
+                        ) {
+                            Text(
+                                text = "点击预设可快速填充下方刷新率上/下限与 LTPO 自适应开关，选择目标应用后点击「保存并立即生效」即可。",
+                                fontSize = 11.5.sp,
+                                lineHeight = 16.sp,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                modifier = Modifier
+                                    .padding(horizontal = 4.dp, vertical = 2.dp)
+                                    .clickable { cardToggled = !cardToggled }
+                            )
+                        }
                     }
                 }
             }
         }
 
-        // 目标应用与规则参数卡 (无分割线纯净 Miuix Card)
+        // 目标应用与规则参数卡 (无分割线纯净 Miuix Card，支持方案 B)
         item(key = "card-rule-form") {
+            var selectRowToggled by remember(formGroupExpanded) { mutableStateOf(false) }
+            var adaptiveRowToggled by remember(formGroupExpanded) { mutableStateOf(false) }
+            var maxHzRowToggled by remember(formGroupExpanded) { mutableStateOf(false) }
+            var minHzRowToggled by remember(formGroupExpanded) { mutableStateOf(false) }
+
             Column(modifier = if (!isInstantSwitchActive) Modifier.alpha(0.45f) else Modifier) {
-                SmallTitle(
+                GroupHeaderWithToggle(
                     text = stringResource(R.string.rules_card_config_title),
-                    insideMargin = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                    isDark = isDark,
+                    primaryColor = primaryColor,
+                    expanded = formGroupExpanded,
+                    onToggle = { formGroupExpanded = !formGroupExpanded }
                 )
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     cornerRadius = 20.dp,
                     colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
                 ) {
-                    ArrowPreference(
-                        title = targetLabel ?: stringResource(R.string.rules_select_app_hint),
-                        summary = targetPackage ?: "点击从已安装应用中选择目标应用",
-                        onClick = {
-                            if (!isInstantSwitchActive) {
-                                requireAccessibility()
-                                return@ArrowPreference
-                            }
-                            actions.onSelectAppForAppRule { pkg, label ->
-                                targetPackage = pkg
-                                targetLabel = label
-                                val existingRule = appRules.firstOrNull { it.packageName == pkg }
-                                if (existingRule != null) {
-                                    targetAdaptive = existingRule.adaptive
-                                    targetMaxHz = existingRule.maxHz
-                                    targetMinHz = existingRule.minHz
+                    val showSelectSub = formGroupExpanded xor selectRowToggled
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .onLongPressToggle(haptic) { selectRowToggled = !selectRowToggled }
+                    ) {
+                        ArrowPreference(
+                            title = targetLabel ?: stringResource(R.string.rules_select_app_hint),
+                            summary = if (showSelectSub) (targetPackage ?: "点击从已安装应用中选择目标应用") else null,
+                            onClick = {
+                                if (!isInstantSwitchActive) {
+                                    requireAccessibility()
+                                    return@ArrowPreference
                                 }
+                                actions.onSelectAppForAppRule { pkg, label ->
+                                    targetPackage = pkg
+                                    targetLabel = label
+                                    val existingRule = appRules.firstOrNull { it.packageName == pkg }
+                                    if (existingRule != null) {
+                                        targetAdaptive = existingRule.adaptive
+                                        targetMaxHz = existingRule.maxHz
+                                        targetMinHz = existingRule.minHz
+                                    }
+                                }
+                            },
+                            startAction = {
+                                MiuixRowIcon(
+                                    isDark = isDark,
+                                    icon = painterResource(R.drawable.ic_maxhz_apps_24),
+                                    iconTint = primaryColor
+                                )
                             }
-                        },
-                        startAction = {
-                            MiuixRowIcon(
-                                isDark = isDark,
-                                icon = painterResource(R.drawable.ic_maxhz_apps_24),
-                                iconTint = primaryColor
-                            )
-                        }
-                    )
+                        )
+                    }
 
-                    SwitchPreference(
-                        title = stringResource(R.string.rules_switch_adaptive),
-                        summary = if (targetAdaptive) stringResource(R.string.rules_switch_adaptive_summary_on)
-                        else stringResource(R.string.rules_switch_adaptive_summary_off),
-                        checked = targetAdaptive,
-                        onCheckedChange = {
-                            if (!isInstantSwitchActive) {
-                                requireAccessibility()
-                                return@SwitchPreference
+                    val showAdaptiveSub = formGroupExpanded xor adaptiveRowToggled
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .onLongPressToggle(haptic) { adaptiveRowToggled = !adaptiveRowToggled }
+                    ) {
+                        SwitchPreference(
+                            title = stringResource(R.string.rules_switch_adaptive),
+                            summary = if (showAdaptiveSub) {
+                                if (targetAdaptive) stringResource(R.string.rules_switch_adaptive_summary_on)
+                                else stringResource(R.string.rules_switch_adaptive_summary_off)
+                            } else null,
+                            checked = targetAdaptive,
+                            onCheckedChange = {
+                                if (!isInstantSwitchActive) {
+                                    requireAccessibility()
+                                    return@SwitchPreference
+                                }
+                                targetAdaptive = it
                             }
-                            targetAdaptive = it
-                        }
-                    )
+                        )
+                    }
 
                     val maxRates = listOf(120, 90, 60, 48)
                     val maxRateLabels = maxRates.map { "${it}Hz" }
                     val selectedMaxIndex = maxRates.indexOf(targetMaxHz).coerceAtLeast(0)
-                    WindowDropdownPreference(
-                        title = stringResource(R.string.rules_label_max_hz),
-                        summary = "应用在前台时允许达到的最高刷新率上限",
-                        items = maxRateLabels,
-                        selectedIndex = selectedMaxIndex,
-                        enabled = isInstantSwitchActive,
-                        onSelectedIndexChange = { idx ->
-                            val hz = maxRates.getOrElse(idx) { 120 }
-                            targetMaxHz = hz
-                            if (targetMinHz > hz) targetMinHz = hz
-                        }
-                    )
+                    val showMaxHzSub = formGroupExpanded xor maxHzRowToggled
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .onLongPressToggle(haptic) { maxHzRowToggled = !maxHzRowToggled }
+                    ) {
+                        WindowDropdownPreference(
+                            title = stringResource(R.string.rules_label_max_hz),
+                            summary = if (showMaxHzSub) "应用在前台时允许达到的最高刷新率上限" else null,
+                            items = maxRateLabels,
+                            selectedIndex = selectedMaxIndex,
+                            enabled = isInstantSwitchActive,
+                            onSelectedIndexChange = { idx ->
+                                val hz = maxRates.getOrElse(idx) { 120 }
+                                targetMaxHz = hz
+                                if (targetMinHz > hz) targetMinHz = hz
+                            }
+                        )
+                    }
 
                     if (targetAdaptive) {
                         val minRates = listOf(60, 48, 30, 24, 10).filter { it <= targetMaxHz }
                         val minRateLabels = minRates.map { "${it}Hz" }
                         val selectedMinIndex = minRates.indexOf(targetMinHz).coerceAtLeast(0)
-                        WindowDropdownPreference(
-                            title = stringResource(R.string.rules_label_min_hz),
-                            summary = "画面静止时允许 LTPO 降频到的最低刷新率下限",
-                            items = minRateLabels,
-                            selectedIndex = selectedMinIndex,
-                            enabled = isInstantSwitchActive,
-                            onSelectedIndexChange = { idx ->
-                                val hz = minRates.getOrElse(idx) { 10 }
-                                targetMinHz = hz
-                            }
-                        )
+                        val showMinHzSub = formGroupExpanded xor minHzRowToggled
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .onLongPressToggle(haptic) { minHzRowToggled = !minHzRowToggled }
+                        ) {
+                            WindowDropdownPreference(
+                                title = stringResource(R.string.rules_label_min_hz),
+                                summary = if (showMinHzSub) "画面静止时允许 LTPO 降频到的最低刷新率下限" else null,
+                                items = minRateLabels,
+                                selectedIndex = selectedMinIndex,
+                                enabled = isInstantSwitchActive,
+                                onSelectedIndexChange = { idx ->
+                                    val hz = minRates.getOrElse(idx) { 10 }
+                                    targetMinHz = hz
+                                }
+                            )
+                        }
                     }
 
                     Row(
@@ -2034,12 +2570,15 @@ private fun AppRulesTabContent(
             }
         }
 
-        // 已生效规则列表卡
+        // 已生效规则列表卡（支持方案 B：默认隐藏包名副标题，长按单行或点击「显示说明」展开）
         item(key = "card-rules-list") {
             Column {
-                SmallTitle(
+                GroupHeaderWithToggle(
                     text = stringResource(R.string.rules_card_list_title, appRules.size),
-                    insideMargin = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                    isDark = isDark,
+                    primaryColor = primaryColor,
+                    expanded = listGroupExpanded,
+                    onToggle = { listGroupExpanded = !listGroupExpanded }
                 )
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -2063,6 +2602,8 @@ private fun AppRulesTabContent(
                     } else {
                         Column {
                             appRules.forEach { rule ->
+                                var itemToggled by remember(rule.packageName, listGroupExpanded) { mutableStateOf(false) }
+                                val showPkg = listGroupExpanded xor itemToggled
                                 val label = remember(rule.packageName) {
                                     runCatching {
                                         pm.getApplicationInfo(rule.packageName, 0).loadLabel(pm).toString()
@@ -2070,58 +2611,64 @@ private fun AppRulesTabContent(
                                 }
                                 val baseTag = if (rule.adaptive) "${rule.minHz}~${rule.maxHz}Hz" else "${rule.maxHz}Hz"
                                 val ruleTag = if (isInstantSwitchActive) baseTag else "$baseTag · ${stringResource(R.string.rules_rule_status_paused)}"
-                                BasicComponent(
-                                    title = label,
-                                    summary = rule.packageName,
-                                    onClick = {
-                                        if (!isInstantSwitchActive) {
-                                            requireAccessibility()
-                                            return@BasicComponent
-                                        }
-                                        targetPackage = rule.packageName
-                                        targetLabel = label
-                                        targetAdaptive = rule.adaptive
-                                        targetMaxHz = rule.maxHz
-                                        targetMinHz = rule.minHz
-                                    },
-                                    startAction = {
-                                        MiuixRowIcon(
-                                            isDark = isDark,
-                                            icon = painterResource(R.drawable.ic_maxhz_apps_24),
-                                            iconTint = primaryColor
-                                        )
-                                    },
-                                    endActions = {
-                                        Text(
-                                            text = ruleTag,
-                                            fontSize = 11.5.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = if (isDark) Color(0xFF60A5FA) else primaryColor,
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(8.dp))
-                                                .background(if (isDark) Color(0xFF162946) else Color(0xFFEBF3FF))
-                                                .padding(horizontal = 8.dp, vertical = 3.5.dp)
-                                        )
-                                        Spacer(Modifier.width(8.dp))
-                                        Box(
-                                            modifier = Modifier
-                                                .size(28.dp)
-                                                .clip(RoundedCornerShape(8.dp))
-                                                .clickable {
-                                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                                    actions.onDeleteAppRule(rule.packageName)
-                                                },
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                text = "✕",
-                                                fontSize = 13.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = if (isDark) Color(0xFFF87171) else Color(0xFFF54A45)
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .onLongPressToggle(haptic) { itemToggled = !itemToggled }
+                                ) {
+                                    BasicComponent(
+                                        title = label,
+                                        summary = if (showPkg) rule.packageName else null,
+                                        onClick = {
+                                            if (!isInstantSwitchActive) {
+                                                requireAccessibility()
+                                                return@BasicComponent
+                                            }
+                                            targetPackage = rule.packageName
+                                            targetLabel = label
+                                            targetAdaptive = rule.adaptive
+                                            targetMaxHz = rule.maxHz
+                                            targetMinHz = rule.minHz
+                                        },
+                                        startAction = {
+                                            MiuixRowIcon(
+                                                isDark = isDark,
+                                                icon = painterResource(R.drawable.ic_maxhz_apps_24),
+                                                iconTint = primaryColor
                                             )
+                                        },
+                                        endActions = {
+                                            Text(
+                                                text = ruleTag,
+                                                fontSize = 11.5.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = if (isDark) Color(0xFF60A5FA) else primaryColor,
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(8.dp))
+                                                    .background(if (isDark) Color(0xFF162946) else Color(0xFFEBF3FF))
+                                                    .padding(horizontal = 8.dp, vertical = 3.5.dp)
+                                            )
+                                            Spacer(Modifier.width(8.dp))
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(28.dp)
+                                                    .clip(RoundedCornerShape(8.dp))
+                                                    .clickable {
+                                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                        actions.onDeleteAppRule(rule.packageName)
+                                                    },
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = "✕",
+                                                    fontSize = 13.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = if (isDark) Color(0xFFF87171) else Color(0xFFF54A45)
+                                                )
+                                            }
                                         }
-                                    }
-                                )
+                                    )
+                                }
                             }
 
                             Box(
@@ -2142,15 +2689,22 @@ private fun AppRulesTabContent(
             }
         }
 
-        // 流媒体高刷兼容策略指南卡 & LTPO 校准双卡（统一分组标题，避免卡片内外标题重复）
+        // 流媒体高刷兼容策略指南卡 & LTPO 校准双卡（统一分组标题 + 方案 B）
         item(key = "card-stream-compat-guide") {
+            var compatToggled by remember(guideGroupExpanded) { mutableStateOf(false) }
+            val showCompatSub = guideGroupExpanded xor compatToggled
             Column {
-                SmallTitle(
+                GroupHeaderWithToggle(
                     text = "高刷进阶与功耗校准",
-                    insideMargin = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                    isDark = isDark,
+                    primaryColor = primaryColor,
+                    expanded = guideGroupExpanded,
+                    onToggle = { guideGroupExpanded = !guideGroupExpanded }
                 )
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onLongPressToggle(haptic) { compatToggled = !compatToggled },
                     cornerRadius = 20.dp,
                     colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
                 ) {
@@ -2161,13 +2715,21 @@ private fun AppRulesTabContent(
                             fontWeight = FontWeight.Bold,
                             color = MiuixTheme.colorScheme.onSurface
                         )
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            text = stringResource(R.string.rules_compat_policy_tip_desc),
-                            fontSize = 12.5.sp,
-                            lineHeight = 18.sp,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                        )
+                        AnimatedVisibility(
+                            visible = showCompatSub,
+                            enter = expandVertically() + fadeIn(),
+                            exit = shrinkVertically() + fadeOut()
+                        ) {
+                            Text(
+                                text = stringResource(R.string.rules_compat_policy_tip_desc),
+                                fontSize = 12.5.sp,
+                                lineHeight = 18.sp,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                modifier = Modifier
+                                    .padding(top = 6.dp)
+                                    .clickable { compatToggled = !compatToggled }
+                            )
+                        }
                         Spacer(Modifier.height(12.dp))
                         TextButton(
                             text = stringResource(R.string.rules_btn_open_dev_options),
@@ -2182,8 +2744,12 @@ private fun AppRulesTabContent(
 
         // 屏幕自适应降频与功耗校准卡
         item(key = "card-calibrate-ltpo-power") {
+            var ltpoToggled by remember(guideGroupExpanded) { mutableStateOf(false) }
+            val showLtpoSub = guideGroupExpanded xor ltpoToggled
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onLongPressToggle(haptic) { ltpoToggled = !ltpoToggled },
                 cornerRadius = 20.dp,
                 colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
             ) {
@@ -2194,13 +2760,21 @@ private fun AppRulesTabContent(
                         fontWeight = FontWeight.Bold,
                         color = MiuixTheme.colorScheme.onSurface
                     )
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        text = stringResource(R.string.rules_calibrate_ltpo_desc),
-                        fontSize = 12.5.sp,
-                        lineHeight = 18.sp,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                    )
+                    AnimatedVisibility(
+                        visible = showLtpoSub,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
+                        Text(
+                            text = stringResource(R.string.rules_calibrate_ltpo_desc),
+                            fontSize = 12.5.sp,
+                            lineHeight = 18.sp,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            modifier = Modifier
+                                .padding(top = 6.dp)
+                                .clickable { ltpoToggled = !ltpoToggled }
+                        )
+                    }
                     Spacer(Modifier.height(12.dp))
                     TextButton(
                         text = stringResource(R.string.rules_btn_calibrate_ltpo),

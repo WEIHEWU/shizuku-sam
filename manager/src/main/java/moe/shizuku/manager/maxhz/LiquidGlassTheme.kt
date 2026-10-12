@@ -668,23 +668,20 @@ half4 main(float2 coord) {
     // ==================================================================
 
     /**
-     * 页面背景统一纯净底色（亮色 0xFFF7F9FC，深色 0xFF111418，纯黑 0x000000）。
-     * 与 Compose 页面完全对齐，彻底消除不同界面之间的色差与割裂。
+     * 页面背景统一 Miuix 纯净底色（亮色 0xFFF5F6F9，深色 0xFF0D0F12，纯黑 0x000000）。
+     * 与 Miuix Compose 页面完全对齐，彻底消除不同界面之间的色差与割裂。
      */
     @JvmStatic
     fun createPageBackgroundDrawable(isDark: Boolean, isBlack: Boolean): Drawable {
         if (isBlack) {
             return ColorDrawable(Color.BLACK)
         }
-        val color = if (isDark) 0xFF111418.toInt() else 0xFFF7F9FC.toInt()
+        val color = if (isDark) 0xFF0D0F12.toInt() else 0xFFF5F6F9.toInt()
         return ColorDrawable(color)
     }
 
     /**
-     * 卡片玻璃底板。
-     *
-     * @param host 宿主 View。玻璃需要它在窗口中的位置去采样背景快照；
-     *             传 null 时退化为不采样背景的静态玻璃。
+     * 卡片 Miuix 底板（无描边纯色大圆角卡片，对齐 Miuix Card）。
      */
     @JvmStatic
     fun createCardDrawable(
@@ -694,10 +691,8 @@ half4 main(float2 coord) {
         hasAccentTop: Boolean = false
     ): Drawable = GradientDrawable().apply {
         cornerRadius = cornerRadiusPx
-        val cardBgColor = if (isDark) 0xFF1E222A.toInt() else 0xFFFFFFFF.toInt()
-        val cardBorderColor = if (isDark) 0x18FFFFFF.toInt() else 0x0C000000.toInt()
+        val cardBgColor = if (isDark) 0xFF181A20.toInt() else 0xFFFFFFFF.toInt()
         setColor(cardBgColor)
-        setStroke(maxOf(1, (1f * density).toInt()), cardBorderColor)
     }
 
     /**
@@ -717,7 +712,7 @@ half4 main(float2 coord) {
     )
 
     /**
-     * 应用玻璃材质（MaterialCardView 版）：统一 20dp 圆角、0dp 海拔、无阴影、对齐 Compose GlassCard。
+     * 应用玻璃材质（MaterialCardView 版）：统一 20dp 圆角、0dp 海拔、无阴影、对齐 Compose Miuix Card。
      */
     @JvmStatic
     fun applyGlassMaterial(card: MaterialCardView, radiusPx: Float, isDark: Boolean) {
@@ -755,12 +750,12 @@ half4 main(float2 coord) {
         }
     }
 
-    /** iOS 风格开关，亮色下轨道同步加深以保证在浅色玻璃上清晰 */
+    /** Miuix 风格开关：开启态采用 Miuix 标志性蓝，关闭态采用 Miuix 柔和浅灰/深灰轨道 */
     @JvmStatic
     fun styleIosSwitch(switch: View, isDark: Boolean) {
         if (switch !is MaterialSwitch) return
-        val checkedTrackColor = if (isDark) 0xFF34C759.toInt() else 0xFF2DBF52.toInt()
-        val uncheckedTrackColor = if (isDark) 0x4D787880.toInt() else 0x4D5B6470.toInt()
+        val checkedTrackColor = if (isDark) 0xFF277AF7.toInt() else 0xFF3482FF.toInt()
+        val uncheckedTrackColor = if (isDark) 0xFF2E323D.toInt() else 0xFFE2E6EE.toInt()
 
         switch.trackTintList = ColorStateList(
             arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
@@ -1295,8 +1290,7 @@ half4 main(float2 coord) {
     }
 
     /**
-     * 胶囊按钮。亮色由「浅灰实心」升级为「半透白玻璃 + 顶部高光 +
-     * 底部蓝灰内阴影」，与卡片玻璃保持同一套语言。
+     * Miuix 按钮底板：无描边、圆润色块，与 Miuix TextButton 保持同一套语言。
      */
     class LiquidGlassButtonDrawable(
         private val cornerRadiusPx: Float,
@@ -1304,21 +1298,11 @@ half4 main(float2 coord) {
         private val isPrimary: Boolean,
         private val isDanger: Boolean,
         private val isPressed: Boolean,
-        /**
-         * 中性强调：只把玻璃做"实"一点（填充更厚、描边更清），
-         * 不掺任何强调色。用于底部导航这类不该被主题色染色的地方 ——
-         * 原先选中态走 isPrimary，结果整个底栏变成一块蓝。
-         */
         private val isEmphasis: Boolean = false
     ) : Drawable() {
 
         private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-        private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            strokeWidth = 1.5f
-        }
         private val rectF = RectF()
-        private val strokeRectF = RectF()
 
         override fun onBoundsChange(bounds: Rect) {
             super.onBoundsChange(bounds)
@@ -1327,63 +1311,33 @@ half4 main(float2 coord) {
             if (w <= 0 || h <= 0) return
 
             rectF.set(bounds)
-            strokeRectF.set(
-                bounds.left + 0.75f,
-                bounds.top + 0.75f,
-                bounds.right - 0.75f,
-                bounds.bottom - 0.75f
-            )
-
-            if (isPrimary) {
-                // 用注入的主题色，而不是写死的 0xFF007AFF。
-                // 按压态 / 渐变末端由 shade() 派生，不再维护第二组色值。
-                //
-                // fillForWhite 保证白字在这块填充上够 4.5:1：强调色是动态取色，
-                // 用户选到浅蓝时白字会掉到 4:1 以下，这里按需把填充压暗一档。
-                val base = FillContrast.fillForWhite(accent)
-                val c1 = if (isPressed) shade(base, 0.30f) else base
-                val c2 = if (isPressed) shade(base, 0.48f) else shade(base, 0.22f)
-                fillPaint.shader = LinearGradient(0f, 0f, 0f, h, c1, c2, Shader.TileMode.CLAMP)
-                strokePaint.shader = LinearGradient(
-                    0f, 0f, w, h,
-                    intArrayOf(0xCCFFFFFF.toInt(), shade(base, 0.35f)),
-                    null,
-                    Shader.TileMode.CLAMP
-                )
-            } else if (isDanger) {
-                // 警示/危险操作（清空、删除等）：采用柔和半透明红玻璃，彻底抛弃厚重刺眼的实心红大块，
-                // 与全 App 的液态玻璃质感完全统一。文字配柔和玫瑰红/深红，通透且警示语义明确。
-                val fillAlpha1 = if (isPressed) 0x48 else 0x24
-                val fillAlpha2 = if (isPressed) 0x34 else 0x14
-                val redRgb = if (isDark) 0xF87171 else 0xEF4444
-                fillPaint.shader = LinearGradient(
-                    0f, 0f, 0f, h,
-                    (fillAlpha1 shl 24) or redRgb,
-                    (fillAlpha2 shl 24) or redRgb,
-                    Shader.TileMode.CLAMP
-                )
-                val strokeAlpha1 = if (isDark) 0x66 else 0x4D
-                val strokeAlpha2 = if (isDark) 0x33 else 0x22
-                strokePaint.shader = LinearGradient(
-                    0f, 0f, w, h,
-                    intArrayOf((strokeAlpha1 shl 24) or redRgb, (strokeAlpha2 shl 24) or redRgb),
-                    null,
-                    Shader.TileMode.CLAMP
-                )
-            } else if (!isDark) {
-                val baseColor = if (isPressed) 0xFFE2E8F0.toInt() else if (isEmphasis) 0xFFE8EEF6.toInt() else 0xFFF0F3F8.toInt()
-                fillPaint.shader = null
-                fillPaint.color = baseColor
-                strokePaint.shader = null
-                strokePaint.strokeWidth = maxOf(1f, 1f * density)
-                strokePaint.color = 0x14000000.toInt()
-            } else {
-                val baseColor = if (isPressed) 0xFF374151.toInt() else if (isEmphasis) 0xFF333B47.toInt() else 0xFF2C323D.toInt()
-                fillPaint.shader = null
-                fillPaint.color = baseColor
-                strokePaint.shader = null
-                strokePaint.strokeWidth = maxOf(1f, 1f * density)
-                strokePaint.color = 0x24FFFFFF.toInt()
+            fillPaint.shader = null
+            fillPaint.color = when {
+                isPrimary -> {
+                    val base = if (isDark) 0xFF277AF7.toInt() else 0xFF3482FF.toInt()
+                    if (isPressed) shade(base, 0.16f) else base
+                }
+                isDanger -> {
+                    if (isDark) {
+                        if (isPressed) 0x44F87171 else 0x2EF87171
+                    } else {
+                        if (isPressed) 0xFFFAD8D2.toInt() else 0xFFFFECE8.toInt()
+                    }
+                }
+                !isDark -> {
+                    when {
+                        isPressed -> 0xFFE2E6EE.toInt()
+                        isEmphasis -> 0xFFE8EBF2.toInt()
+                        else -> 0xFFF0F2F6.toInt()
+                    }
+                }
+                else -> {
+                    when {
+                        isPressed -> 0xFF2E323D.toInt()
+                        isEmphasis -> 0xFF272B35.toInt()
+                        else -> 0xFF21242C.toInt()
+                    }
+                }
             }
         }
 
@@ -1391,18 +1345,15 @@ half4 main(float2 coord) {
             if (rectF.isEmpty) return
             val r = cornerRadiusPx.coerceAtMost(minOf(rectF.width(), rectF.height()) / 2f)
             canvas.drawRoundRect(rectF, r, r, fillPaint)
-            canvas.drawRoundRect(strokeRectF, r, r, strokePaint)
         }
 
         override fun setAlpha(alpha: Int) {
             fillPaint.alpha = alpha
-            strokePaint.alpha = alpha
             invalidateSelf()
         }
 
         override fun setColorFilter(colorFilter: ColorFilter?) {
             fillPaint.colorFilter = colorFilter
-            strokePaint.colorFilter = colorFilter
             invalidateSelf()
         }
 

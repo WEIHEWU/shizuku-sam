@@ -1434,6 +1434,103 @@ open class MaxHzActivity : AppBarActivity() {
             .start()
     }
 
+    protected val detailSubtitles = mutableListOf<View>()
+    protected val detailTogglePills = mutableListOf<TextView>()
+    protected var detailSubtitlesExpanded = false
+
+    protected fun bindOptionBSubtitle(touchTarget: View, vararg subtitleViews: View) {
+        subtitleViews.forEach { sub ->
+            if (!detailSubtitles.contains(sub)) {
+                detailSubtitles.add(sub)
+            }
+            sub.visibility = if (detailSubtitlesExpanded) View.VISIBLE else View.GONE
+            sub.isClickable = true
+            sub.setOnClickListener {
+                it.visibility = View.GONE
+            }
+        }
+        touchTarget.isLongClickable = true
+        touchTarget.setOnLongClickListener { v ->
+            v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+            val anyVisible = subtitleViews.any { it.visibility == View.VISIBLE }
+            val next = if (anyVisible) View.GONE else View.VISIBLE
+            subtitleViews.forEach { it.visibility = next }
+            true
+        }
+    }
+
+    protected fun styleOptionBTogglePill(pill: TextView, expanded: Boolean) {
+        val isDark = isDarkMode()
+        pill.text = if (expanded) "隐藏说明" else "显示说明"
+        pill.textSize = 11.5f
+        pill.includeFontPadding = false
+        pill.setTypeface(pill.typeface, android.graphics.Typeface.BOLD)
+        pill.setTextColor(
+            if (expanded) {
+                if (isDark) 0xFF277AF7.toInt() else 0xFF3482FF.toInt()
+            } else {
+                themeColors.onSurfaceVariant
+            }
+        )
+        pill.setPadding(dp(10), dp(4), dp(10), dp(4))
+        pill.background = GradientDrawable().apply {
+            cornerRadius = dp(999).toFloat()
+            setColor(
+                if (expanded) {
+                    if (isDark) 0xFF162946.toInt() else 0xFFEBF3FF.toInt()
+                } else {
+                    if (isDark) 0xFF21242C.toInt() else 0xFFF0F2F6.toInt()
+                }
+            )
+        }
+    }
+
+    protected fun createOptionBTogglePill(groupSubtitlesProvider: (() -> List<View>)? = null): TextView {
+        return TextView(this).apply {
+            isClickable = true
+            isFocusable = true
+            if (groupSubtitlesProvider == null) {
+                styleOptionBTogglePill(this, detailSubtitlesExpanded)
+                detailTogglePills.add(this)
+                setOnClickListener { v ->
+                    v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                    detailSubtitlesExpanded = !detailSubtitlesExpanded
+                    val vis = if (detailSubtitlesExpanded) View.VISIBLE else View.GONE
+                    detailSubtitles.forEach { it.visibility = vis }
+                    detailTogglePills.forEach { styleOptionBTogglePill(it, detailSubtitlesExpanded) }
+                }
+            } else {
+                var groupExpanded = false
+                styleOptionBTogglePill(this, groupExpanded)
+                setOnClickListener { v ->
+                    v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                    val targets = groupSubtitlesProvider()
+                    val anyVisible = targets.any { it.visibility == View.VISIBLE }
+                    groupExpanded = !anyVisible
+                    val vis = if (groupExpanded) View.VISIBLE else View.GONE
+                    targets.forEach { it.visibility = vis }
+                    styleOptionBTogglePill(this, groupExpanded)
+                }
+            }
+        }
+    }
+
+    protected fun createDetailOptionBHeader(title: String): View {
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(6), dp(2), dp(6), dp(10))
+            addView(TextView(this@MaxHzActivity).apply {
+                text = title
+                textSize = 13f
+                setTextColor(themeColors.primary)
+                setTypeface(typeface, android.graphics.Typeface.BOLD)
+                includeFontPadding = false
+            }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            addView(createOptionBTogglePill())
+        }
+    }
+
     private fun renderDetail(restoreScrollY: Int? = null) {
         val screen = detailStack.lastOrNull() ?: return
         // 详情页仍是 View 渲染：隐藏 Compose 页、恢复 ScrollView
@@ -1448,7 +1545,11 @@ open class MaxHzActivity : AppBarActivity() {
             glassDockOverlay.visibility = View.GONE
         }
         updateSystemBarPadding()
+        detailSubtitles.clear()
+        detailTogglePills.clear()
+        detailSubtitlesExpanded = false
         pageContent.removeAllViews()
+        pageContent.addView(createDetailOptionBHeader(screen.title))
         runCatching { screen.builder() }
             .onSuccess { pageContent.addView(it) }
             .onFailure { error ->
@@ -1472,40 +1573,39 @@ open class MaxHzActivity : AppBarActivity() {
     protected fun entryGroupCard(groupLabel: String, items: List<EntryItem>): View {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            val isDark = isDarkMode()
-            addView(TextView(this@MaxHzActivity).apply {
-                text = groupLabel
-                textSize = 12.5f
-                setTextColor(themeColors.primary)
-                setTypeface(typeface, android.graphics.Typeface.BOLD)
-                setPadding(dp(18), dp(14), dp(18), dp(6))
-                includeFontPadding = false
+            val groupSubs = mutableListOf<View>()
+            addView(LinearLayout(this@MaxHzActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(18), dp(14), dp(14), dp(6))
+                addView(TextView(this@MaxHzActivity).apply {
+                    text = groupLabel
+                    textSize = 13f
+                    setTextColor(themeColors.primary)
+                    setTypeface(typeface, android.graphics.Typeface.BOLD)
+                    includeFontPadding = false
+                }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                addView(createOptionBTogglePill { groupSubs })
             })
             addView(MaterialCardView(this@MaxHzActivity).apply {
                 applyLiquidGlassCardStyle(this, CARD_RADIUS_DP)
                 addView(LinearLayout(this@MaxHzActivity).apply {
                     orientation = LinearLayout.VERTICAL
-                    items.forEachIndexed { index, item ->
-                        if (index > 0) {
-                            addView(View(this@MaxHzActivity).apply {
-                                setBackgroundColor(if (isDark) 0x1AFFFFFF.toInt() else 0x0D000000.toInt())
-                            }, LinearLayout.LayoutParams(
-                                LinearLayout.LayoutParams.MATCH_PARENT, dp(1)
-                            ).apply { leftMargin = dp(68); rightMargin = dp(16) })
-                        }
-                        addView(entryRow(item))
+                    setPadding(0, dp(4), 0, dp(4))
+                    items.forEach { item ->
+                        addView(entryRow(item, groupSubs))
                     }
                 })
             })
         }
     }
 
-    private fun entryRow(item: EntryItem): View {
+    private fun entryRow(item: EntryItem, groupSubs: MutableList<View>? = null): View {
         val isDark = isDarkMode()
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(16), dp(11), dp(16), dp(11))
+            setPadding(dp(16), dp(12), dp(16), dp(12))
             val icon = featureIconContainer(item.title)
             addView(icon, LinearLayout.LayoutParams(dp(36), dp(36)).apply {
                 rightMargin = dp(14)
@@ -1535,6 +1635,8 @@ open class MaxHzActivity : AppBarActivity() {
                 }
                 addView(subTextView)
             }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            groupSubs?.add(subTextView)
+            bindOptionBSubtitle(this, subTextView)
             val row = this
             if (item.toggle != null) {
                 var programmaticChange = false
@@ -1559,8 +1661,6 @@ open class MaxHzActivity : AppBarActivity() {
                 addView(switch, LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
                 ).apply { leftMargin = dp(8) })
-                // 带开关的条目：点行身进入详情页（如「游戏模式切换」里的「添加游戏」），
-                // 开关本身仍只负责翻转。原写法整行都 performClick 开关，导致详情页永远进不去。
                 setOnClickListener {
                     playClickFeedback(this, pressed = true)
                     item.onClick()
@@ -1568,10 +1668,10 @@ open class MaxHzActivity : AppBarActivity() {
             } else {
                 addView(TextView(this@MaxHzActivity).apply {
                     text = "›"
-                    textSize = 22f
+                    textSize = 20f
                     includeFontPadding = false
-                    // 亮色卡上用深灰箭头，深色卡上用白色箭头，保证两种模式都清晰
-                    setTextColor(if (isDark) 0xE6FFFFFF.toInt() else 0xFF475569.toInt())
+                    setTypeface(typeface, android.graphics.Typeface.BOLD)
+                    setTextColor(if (isDark) 0xFF707A8F.toInt() else 0xFF94A3B8.toInt())
                     setPadding(dp(8), 0, 0, 0)
                 })
                 setOnClickListener {
@@ -2765,6 +2865,13 @@ open class MaxHzActivity : AppBarActivity() {
             orientation = LinearLayout.VERTICAL
 
             // 主开关卡片（仿 Galaxy MaxHz 顶部"关/开"大开关）
+            val topDescView = TextView(this@MaxHzActivity).apply {
+                text = "熄屏时快速进入 doze 模式，以改善待机耗电。\n设备解锁时 doze 模式自动停用。"
+                textSize = 13f
+                setTextColor(themeColors.onSurfaceVariant)
+                setPadding(dp(16), dp(10), dp(16), dp(4))
+                setLineSpacing(0f, 1.35f)
+            }
             addView(MaterialCardView(this@MaxHzActivity).apply {
                 applyLiquidGlassCardStyle(this, CARD_RADIUS_DP)
                 addView(LinearLayout(this@MaxHzActivity).apply {
@@ -2810,33 +2917,28 @@ open class MaxHzActivity : AppBarActivity() {
                                             suppressMasterSwitch = false
                                             masterStateText.text = "开"
                                         }
-	                                    }
-	                                ) {
-	                                    MaxHzController.restoreQuickDoze().also {
-	                                        if (it.code == 0) {
-	                                            MaxHzPrefs.setQuickDozeEnabled(this@MaxHzActivity, false)
-	                                            updateMaxHzServiceState()
-	                                        }
-	                                    }
-	                                }
-	                            }
-	                        }
+                                    }
+                                ) {
+                                    MaxHzController.restoreQuickDoze().also {
+                                        if (it.code == 0) {
+                                            MaxHzPrefs.setQuickDozeEnabled(this@MaxHzActivity, false)
+                                            updateMaxHzServiceState()
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                     addView(masterSwitch)
                 })
+                bindOptionBSubtitle(this, topDescView)
             })
 
-            // 功能说明（仿 Galaxy MaxHz 卡片下方说明文字）
-            addView(TextView(this@MaxHzActivity).apply {
-                text = "熄屏时快速进入 doze 模式，以改善待机耗电。\n设备解锁时 doze 模式自动停用。"
-                textSize = 13f
-                setTextColor(themeColors.onSurfaceVariant)
-                setPadding(dp(16), dp(10), dp(16), dp(10))
-                setLineSpacing(0f, 1.35f)
-            })
+            // 功能说明（默认隐藏，长按主开关卡片或点顶部“显示说明”展开）
+            addView(topDescView)
 
             // 维护设置卡片：无需维护开关 + 初始维护窗口间隔
-            addView(MaterialCardView(this@MaxHzActivity).apply {
+            addSpacedView(MaterialCardView(this@MaxHzActivity).apply {
                 applyLiquidGlassCardStyle(this, CARD_RADIUS_DP)
                 addView(LinearLayout(this@MaxHzActivity).apply {
                     orientation = LinearLayout.VERTICAL
@@ -2846,6 +2948,12 @@ open class MaxHzActivity : AppBarActivity() {
                         orientation = LinearLayout.HORIZONTAL
                         gravity = Gravity.CENTER_VERTICAL
                         setPadding(0, dp(8), 0, dp(8))
+                        val noMaintSub = TextView(this@MaxHzActivity).apply {
+                            text = "节省最多的电池"
+                            textSize = 12.5f
+                            setTextColor(themeColors.onSurfaceVariant)
+                            setPadding(0, dp(2), 0, 0)
+                        }
                         addView(LinearLayout(this@MaxHzActivity).apply {
                             orientation = LinearLayout.VERTICAL
                             addView(TextView(this@MaxHzActivity).apply {
@@ -2853,12 +2961,7 @@ open class MaxHzActivity : AppBarActivity() {
                                 textSize = 15.5f
                                 setTextColor(themeColors.onSurface)
                             })
-                            addView(TextView(this@MaxHzActivity).apply {
-                                text = "节省最多的电池"
-                                textSize = 12.5f
-                                setTextColor(themeColors.onSurfaceVariant)
-                                setPadding(0, dp(2), 0, 0)
-                            })
+                            addView(noMaintSub)
                         }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
                         var suppressNoMaintenance = false
                         noMaintenanceSwitch = MaterialSwitch(this@MaxHzActivity).apply {
@@ -2881,6 +2984,7 @@ open class MaxHzActivity : AppBarActivity() {
                             }
                         }
                         addView(noMaintenanceSwitch)
+                        bindOptionBSubtitle(this, noMaintSub)
                     })
                     // 分隔线
                     addView(View(this@MaxHzActivity).apply {
@@ -2906,12 +3010,13 @@ open class MaxHzActivity : AppBarActivity() {
                             }
                             addView(intervalValueView)
                         })
-                        addView(TextView(this@MaxHzActivity).apply {
+                        val intervalSub = TextView(this@MaxHzActivity).apply {
                             text = "间隔越长，电池消耗越少"
                             textSize = 12.5f
                             setTextColor(themeColors.onSurfaceVariant)
                             setPadding(0, dp(2), 0, 0)
-                        })
+                        }
+                        addView(intervalSub)
                         intervalSeekBar = SeekBar(this@MaxHzActivity).apply {
                             max = 11
                             progress = (MaxHzPrefs.quickDozeMaintenanceMinutes(this@MaxHzActivity) / 10).coerceIn(1, 12) - 1
@@ -2968,20 +3073,24 @@ open class MaxHzActivity : AppBarActivity() {
                                 Toast.makeText(this@MaxHzActivity, "已开启“无需维护”，无需设置间隔。", Toast.LENGTH_SHORT).show()
                             }
                         }
+                        bindOptionBSubtitle(this, intervalSub)
                     })
                 })
-            }, LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ))
+            }, gap)
 
             // 管理电池使用卡片（后台保护名单 + 最近的待机记录 + 系统电池优化入口）
-            addView(TextView(this@MaxHzActivity).apply {
-                text = "管理电池使用"
-                textSize = 12.5f
-                setTextColor(themeColors.primary)
-                setTypeface(typeface, android.graphics.Typeface.BOLD)
+            val batteryMgmtSubtitles = mutableListOf<View>()
+            addView(LinearLayout(this@MaxHzActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
                 setPadding(dp(16), dp(12), dp(16), dp(6))
+                addView(TextView(this@MaxHzActivity).apply {
+                    text = "管理电池使用"
+                    textSize = 12.5f
+                    setTextColor(themeColors.primary)
+                    setTypeface(typeface, android.graphics.Typeface.BOLD)
+                }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                addView(createOptionBTogglePill { batteryMgmtSubtitles })
             })
             addView(MaterialCardView(this@MaxHzActivity).apply {
                 applyLiquidGlassCardStyle(this, CARD_RADIUS_DP)
@@ -2997,12 +3106,15 @@ open class MaxHzActivity : AppBarActivity() {
                             textSize = 15.5f
                             setTextColor(themeColors.onSurface)
                         })
-                        addView(TextView(this@MaxHzActivity).apply {
+                        val sub = TextView(this@MaxHzActivity).apply {
                             text = "确认参数已配置，或手机当前是否已经进入待机省电。"
                             textSize = 12.5f
                             setTextColor(themeColors.onSurfaceVariant)
                             setPadding(0, dp(2), 0, 0)
-                        })
+                        }
+                        addView(sub)
+                        batteryMgmtSubtitles.add(sub)
+                        bindOptionBSubtitle(this, sub)
                         setOnClickListener {
                             playClickFeedback(this)
                             runCommand(
@@ -3027,12 +3139,15 @@ open class MaxHzActivity : AppBarActivity() {
                             setTextColor(themeColors.onSurface)
                             setTypeface(typeface, android.graphics.Typeface.BOLD)
                         })
-                        addView(TextView(this@MaxHzActivity).apply {
+                        val sub = TextView(this@MaxHzActivity).apply {
                             text = "多维诊断后台频繁唤醒与异常持锁应用，一键压制。"
                             textSize = 12.5f
                             setTextColor(themeColors.onSurfaceVariant)
                             setPadding(0, dp(2), 0, 0)
-                        })
+                        }
+                        addView(sub)
+                        batteryMgmtSubtitles.add(sub)
+                        bindOptionBSubtitle(this, sub)
                         setOnClickListener {
                             playClickFeedback(this)
                             pushDetail("待机异常唤醒排查") { nightWakeupGuardSection() }
@@ -3051,12 +3166,15 @@ open class MaxHzActivity : AppBarActivity() {
                             textSize = 15.5f
                             setTextColor(themeColors.onSurface)
                         })
-                        addView(TextView(this@MaxHzActivity).apply {
+                        val sub = TextView(this@MaxHzActivity).apply {
                             text = "控制哪些应用不被系统严格限制后台。"
                             textSize = 12.5f
                             setTextColor(themeColors.onSurfaceVariant)
                             setPadding(0, dp(2), 0, 0)
-                        })
+                        }
+                        addView(sub)
+                        batteryMgmtSubtitles.add(sub)
+                        bindOptionBSubtitle(this, sub)
                         setOnClickListener {
                             playClickFeedback(this)
                             pushDetail("后台保护名单") { dozeWhitelistSection() }
@@ -3075,12 +3193,15 @@ open class MaxHzActivity : AppBarActivity() {
                             textSize = 15.5f
                             setTextColor(themeColors.onSurface)
                         })
-                        addView(TextView(this@MaxHzActivity).apply {
+                        val sub = TextView(this@MaxHzActivity).apply {
                             text = "查看手机最近是否进入待机省电状态。"
                             textSize = 12.5f
                             setTextColor(themeColors.onSurfaceVariant)
                             setPadding(0, dp(2), 0, 0)
-                        })
+                        }
+                        addView(sub)
+                        batteryMgmtSubtitles.add(sub)
+                        bindOptionBSubtitle(this, sub)
                         setOnClickListener {
                             playClickFeedback(this)
                             pushDetail("最近待机记录") { dozeHistorySection() }
@@ -3099,12 +3220,15 @@ open class MaxHzActivity : AppBarActivity() {
                             textSize = 15.5f
                             setTextColor(themeColors.onSurface)
                         })
-                        addView(TextView(this@MaxHzActivity).apply {
+                        val sub = TextView(this@MaxHzActivity).apply {
                             text = "打开系统电池优化页面，查看或调整应用电池用量。"
                             textSize = 12.5f
                             setTextColor(themeColors.onSurfaceVariant)
                             setPadding(0, dp(2), 0, 0)
-                        })
+                        }
+                        addView(sub)
+                        batteryMgmtSubtitles.add(sub)
+                        bindOptionBSubtitle(this, sub)
                         setOnClickListener {
                             playClickFeedback(this)
                             openBatteryUsageSettings()
@@ -3249,13 +3373,15 @@ open class MaxHzActivity : AppBarActivity() {
 
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            addView(TextView(this@MaxHzActivity).apply {
+            val topTipView = TextView(this@MaxHzActivity).apply {
                 text = "关闭后，系统更容易限制该应用后台活动。通讯、电话、推送、健康类谨慎关闭。"
                 textSize = 13f
                 setTextColor(themeColors.onSurfaceVariant)
                 setPadding(dp(16), dp(2), dp(16), dp(12))
                 setLineSpacing(0f, 1.25f)
-            })
+            }
+            addView(topTipView)
+            bindOptionBSubtitle(topTipView, topTipView)
             addView(EditText(this@MaxHzActivity).apply {
                 hint = "搜索应用"
                 textSize = 14f
@@ -3346,13 +3472,15 @@ open class MaxHzActivity : AppBarActivity() {
 
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            addView(TextView(this@MaxHzActivity).apply {
+            val topTipView = TextView(this@MaxHzActivity).apply {
                 text = "这里显示手机最近是否进入待机省电。普通状态表示仍在正常运行；浅度或深度待机表示系统正在省电。"
                 textSize = 13f
                 setTextColor(themeColors.onSurfaceVariant)
                 setPadding(dp(16), dp(2), dp(16), dp(12))
                 setLineSpacing(0f, 1.25f)
-            })
+            }
+            addView(topTipView)
+            bindOptionBSubtitle(topTipView, topTipView)
             addSpacedView(horizontalActions(
                 button("刷新日志") {
                     runCommand(
@@ -3438,7 +3566,7 @@ open class MaxHzActivity : AppBarActivity() {
                 suggestionContainer.visibility = View.VISIBLE
             } else {
                 suggestionFoldHeaderView?.visibility = View.VISIBLE
-                suggestionHeader.text = if (suggestionsExpanded) "扫描建议 ▾" else "扫描建议 ▸"
+                suggestionHeader.text = if (suggestionsExpanded) "扫描建议 ($count) ▾" else "扫描建议 ($count) ▸"
                 suggestionCountView.text = if (suggestionsExpanded) {
                     "共发现 $count 个异常候选应用，可一键批量或按项选择加入护栏"
                 } else {
@@ -3621,6 +3749,13 @@ open class MaxHzActivity : AppBarActivity() {
 
             // 卡片 1：待机异常唤醒排查总控（规范 Hero Card，与游戏模式 1:1 对齐）
             addView(card {
+                val heroSub = TextView(this@MaxHzActivity).apply {
+                    text = "智能排查待机异常唤醒，抑制后台唤醒锁与过度闹钟"
+                    textSize = 12.5f
+                    setTextColor(themeColors.onSurfaceVariant)
+                    includeFontPadding = false
+                    setPadding(0, dp(3), 0, 0)
+                }
                 addView(LinearLayout(this@MaxHzActivity).apply {
                     orientation = LinearLayout.HORIZONTAL
                     gravity = Gravity.CENTER_VERTICAL
@@ -3637,13 +3772,7 @@ open class MaxHzActivity : AppBarActivity() {
                             setTypeface(typeface, android.graphics.Typeface.BOLD)
                             includeFontPadding = false
                         })
-                        addView(TextView(this@MaxHzActivity).apply {
-                            text = "智能排查待机异常唤醒，抑制后台唤醒锁与过度闹钟"
-                            textSize = 12.5f
-                            setTextColor(themeColors.onSurfaceVariant)
-                            includeFontPadding = false
-                            setPadding(0, dp(3), 0, 0)
-                        })
+                        addView(heroSub)
                     }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
                     addView(headerBadges(stateView, resultBadge(resultKey)))
                 })
@@ -3781,6 +3910,7 @@ open class MaxHzActivity : AppBarActivity() {
                 addSpacedView(switchView, dp(12))
 
                 addSpacedView(summaryTextView, dp(10))
+                bindOptionBSubtitle(this, heroSub, summaryTextView)
             })
 
             // 卡片 2：异常唤醒扫描与分析
@@ -3792,13 +3922,15 @@ open class MaxHzActivity : AppBarActivity() {
                     setTypeface(typeface, android.graphics.Typeface.BOLD)
                     includeFontPadding = false
                 })
-                addView(TextView(this@MaxHzActivity).apply {
+                val scanSub = TextView(this@MaxHzActivity).apply {
                     text = "读取前台耗电与唤醒锁，排查不必要的后台闹钟与高频唤醒"
                     textSize = 12.5f
                     setTextColor(themeColors.onSurfaceVariant)
                     includeFontPadding = false
                     setPadding(0, dp(3), 0, 0)
-                })
+                }
+                addView(scanSub)
+                bindOptionBSubtitle(this, scanSub)
 
                 addSpacedView(horizontalActions(
                     button("开始扫描") {
@@ -3860,6 +3992,7 @@ open class MaxHzActivity : AppBarActivity() {
                     }
                     addView(suggestionHeader)
                     addView(suggestionCountView)
+                    bindOptionBSubtitle(this, suggestionCountView)
                     setOnClickListener {
                         playClickFeedback(this)
                         suggestionsExpanded = !suggestionsExpanded
@@ -3886,6 +4019,7 @@ open class MaxHzActivity : AppBarActivity() {
                         includeFontPadding = false
                     }
                     addView(packageHeaderTitle, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                    addView(createOptionBTogglePill())
                 })
 
                 val actionButtons = mutableListOf<View>()
@@ -3940,21 +4074,28 @@ open class MaxHzActivity : AppBarActivity() {
 
             // 卡片 4：运行机制与保护机制（与游戏模式卡片 4 结构对齐）
             addSpacedView(card {
-                addView(TextView(this@MaxHzActivity).apply {
-                    text = "运行机制与保护机制"
-                    textSize = 15f
-                    setTextColor(themeColors.onSurface)
-                    setTypeface(typeface, android.graphics.Typeface.BOLD)
-                    includeFontPadding = false
-                })
-                addSpacedView(TextView(this@MaxHzActivity).apply {
+                val mechSub = TextView(this@MaxHzActivity).apply {
                     text = "• 精准针对：仅对您手动加入护栏名单的 App 生效，名单为空时不压制任何应用。\n• 完整还原：关闭开关或删除应用时，自动完整还原唤醒锁与待机状态，不留残留。\n• 安全白名单：重要通讯、电话及系统核心服务内置智能白名单保护，防止漏接重要消息。"
                     textSize = 12.5f
                     setTextColor(themeColors.onSurfaceVariant)
                     setLineSpacing(0f, 1.35f)
                     includeFontPadding = false
-                }, dp(8))
+                }
+                addView(LinearLayout(this@MaxHzActivity).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    addView(TextView(this@MaxHzActivity).apply {
+                        text = "运行机制与保护机制"
+                        textSize = 15f
+                        setTextColor(themeColors.onSurface)
+                        setTypeface(typeface, android.graphics.Typeface.BOLD)
+                        includeFontPadding = false
+                    }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                    addView(createOptionBTogglePill { listOf(mechSub) })
+                })
+                addSpacedView(mechSub, dp(8))
                 addSpacedView(resultView, dp(6))
+                bindOptionBSubtitle(this, mechSub)
             }, gap)
 
             // 底部避让占位，保证穿透毛玻璃 Dock 时内容完全可向上滑出
@@ -4956,6 +5097,9 @@ open class MaxHzActivity : AppBarActivity() {
                 }
             }
 
+            var showDialogSubtitles = false
+            val expandedRowPkgs = mutableSetOf<String>()
+
             val listView = ListView(this@MaxHzActivity).apply {
                 dividerHeight = 0
                 listAdapter = object : ArrayAdapter<UserAppChoice>(
@@ -4966,10 +5110,11 @@ open class MaxHzActivity : AppBarActivity() {
                     override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
                         val app = getItem(position) ?: visibleApps[position]
                         val isChecked = selectedPackages.contains(app.packageName)
+                        val showSub = showDialogSubtitles || expandedRowPkgs.contains(app.packageName)
                         return LinearLayout(this@MaxHzActivity).apply {
                             orientation = LinearLayout.HORIZONTAL
                             gravity = Gravity.CENTER_VERTICAL
-                            minimumHeight = dp(52)
+                            minimumHeight = dp(48)
                             setPadding(dp(12), dp(6), dp(12), dp(6))
                             layoutParams = AbsListView.LayoutParams(
                                 AbsListView.LayoutParams.MATCH_PARENT,
@@ -4986,15 +5131,17 @@ open class MaxHzActivity : AppBarActivity() {
                                     maxLines = 1
                                     ellipsize = TextUtils.TruncateAt.END
                                 })
-                                addView(TextView(this@MaxHzActivity).apply {
-                                    text = "${app.packageName} · ${if (app.systemApp) "系统" else "用户"}"
-                                    textSize = 11.5f
-                                    setTextColor(themeColors.onSurfaceVariant)
-                                    includeFontPadding = false
-                                    setPadding(0, dp(2), 0, 0)
-                                    maxLines = 1
-                                    ellipsize = TextUtils.TruncateAt.END
-                                })
+                                if (showSub) {
+                                    addView(TextView(this@MaxHzActivity).apply {
+                                        text = "${app.packageName} · ${if (app.systemApp) "系统" else "用户"}"
+                                        textSize = 11.5f
+                                        setTextColor(themeColors.onSurfaceVariant)
+                                        includeFontPadding = false
+                                        setPadding(0, dp(2), 0, 0)
+                                        maxLines = 1
+                                        ellipsize = TextUtils.TruncateAt.END
+                                    })
+                                }
                             }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
                             addView(CheckBox(this@MaxHzActivity).apply {
                                 this.isChecked = isChecked
@@ -5016,6 +5163,15 @@ open class MaxHzActivity : AppBarActivity() {
                     listAdapter.notifyDataSetChanged()
                     updateSelectionSummary()
                 }
+                setOnItemLongClickListener { _, view, which, _ ->
+                    val app = visibleApps.getOrNull(which) ?: return@setOnItemLongClickListener false
+                    view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                    if (!expandedRowPkgs.remove(app.packageName)) {
+                        expandedRowPkgs.add(app.packageName)
+                    }
+                    listAdapter.notifyDataSetChanged()
+                    true
+                }
             }
 
             val rootView = LinearLayout(this@MaxHzActivity).apply {
@@ -5033,6 +5189,7 @@ open class MaxHzActivity : AppBarActivity() {
                     setTextColor(themeColors.onSurfaceVariant)
                     setLineSpacing(0f, 1.2f)
                     setPadding(dp(2), 0, dp(2), dp(8))
+                    visibility = View.GONE
                 }
                 addView(modeDescView)
 
@@ -5079,11 +5236,22 @@ open class MaxHzActivity : AppBarActivity() {
                     }
                     addView(selectionCountView, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
                     addView(TextView(this@MaxHzActivity).apply {
-                        text = "全选当前"
+                        styleOptionBTogglePill(this, showDialogSubtitles)
+                        setOnClickListener { v ->
+                            v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                            showDialogSubtitles = !showDialogSubtitles
+                            expandedRowPkgs.clear()
+                            modeDescView.visibility = if (showDialogSubtitles) View.VISIBLE else View.GONE
+                            styleOptionBTogglePill(this, showDialogSubtitles)
+                            listAdapter.notifyDataSetChanged()
+                        }
+                    })
+                    addView(TextView(this@MaxHzActivity).apply {
+                        text = "全选"
                         textSize = 12f
                         setTextColor(themeColors.primary)
                         setTypeface(typeface, android.graphics.Typeface.BOLD)
-                        setPadding(dp(10), dp(4), dp(10), dp(4))
+                        setPadding(dp(10), dp(4), dp(6), dp(4))
                         setOnClickListener {
                             visibleApps.forEach { selectedPackages.add(it.packageName) }
                             listAdapter.notifyDataSetChanged()
@@ -5094,7 +5262,7 @@ open class MaxHzActivity : AppBarActivity() {
                         text = "清空"
                         textSize = 12f
                         setTextColor(themeColors.onSurfaceVariant)
-                        setPadding(dp(10), dp(4), dp(4), dp(4))
+                        setPadding(dp(6), dp(4), dp(4), dp(4))
                         setOnClickListener {
                             selectedPackages.clear()
                             listAdapter.notifyDataSetChanged()
@@ -5531,12 +5699,10 @@ open class MaxHzActivity : AppBarActivity() {
         card.preventCornerOverlap = false
         card.strokeWidth = 0
         card.setCardBackgroundColor(Color.TRANSPARENT)
-        val cardBgColor = if (isDark) 0xFF1E222A.toInt() else 0xFFFFFFFF.toInt()
-        val cardBorderColor = if (isDark) 0x18FFFFFF.toInt() else 0x0C000000.toInt()
+        val cardBgColor = if (isDark) 0xFF181A20.toInt() else 0xFFFFFFFF.toInt()
         card.background = GradientDrawable().apply {
             cornerRadius = radiusPx
             setColor(cardBgColor)
-            setStroke(dp(1), cardBorderColor)
         }
     }
 
@@ -5605,7 +5771,7 @@ open class MaxHzActivity : AppBarActivity() {
                     playClickFeedback(this)
                     collapseVisibleResultInside(this)
                 }
-                addView(LinearLayout(this@MaxHzActivity).apply {
+                val headerContainer = LinearLayout(this@MaxHzActivity).apply {
                     orientation = LinearLayout.VERTICAL
                     addView(LinearLayout(this@MaxHzActivity).apply {
                         orientation = LinearLayout.HORIZONTAL
@@ -5634,16 +5800,18 @@ open class MaxHzActivity : AppBarActivity() {
                             LinearLayout.LayoutParams.WRAP_CONTENT
                         ).apply { topMargin = dp(10) })
                     }
-                })
-                addView(TextView(this@MaxHzActivity).apply {
+                }
+                addView(headerContainer)
+                val subTextView = TextView(this@MaxHzActivity).apply {
                     text = subtitle
                     textSize = 13.5f
                     setTextColor(themeColors.onSurfaceVariant)
                     includeFontPadding = false
                     setPadding(0, dp(6), 0, dp(10))
-                    maxLines = 2
-                    ellipsize = TextUtils.TruncateAt.END
-                })
+                }
+                addView(subTextView)
+                bindOptionBSubtitle(this, subTextView)
+                bindOptionBSubtitle(headerContainer, subTextView)
                 content()
             })
         }
@@ -5700,6 +5868,7 @@ open class MaxHzActivity : AppBarActivity() {
                     rightMargin = dp(16)
                 })
 
+                lateinit var subTextView: TextView
                 addView(LinearLayout(this@MaxHzActivity).apply {
                     orientation = LinearLayout.VERTICAL
                     addView(TextView(this@MaxHzActivity).apply {
@@ -5711,7 +5880,7 @@ open class MaxHzActivity : AppBarActivity() {
                         maxLines = 1
                         ellipsize = TextUtils.TruncateAt.END
                     })
-                    addView(TextView(this@MaxHzActivity).apply {
+                    subTextView = TextView(this@MaxHzActivity).apply {
                         text = displaySubtitle
                         textSize = 13f
                         setTextColor(if (isBlocked) themeColors.error else themeColors.onSurfaceVariant)
@@ -5719,10 +5888,12 @@ open class MaxHzActivity : AppBarActivity() {
                         setPadding(0, dp(4), 0, 0)
                         maxLines = 3
                         ellipsize = TextUtils.TruncateAt.END
-                    })
+                    }
+                    addView(subTextView)
                 }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
                     rightMargin = dp(8)
                 })
+                bindOptionBSubtitle(this, subTextView)
 
                 var suppress = false
                 val toggle = MaterialSwitch(this@MaxHzActivity).apply {
@@ -6263,10 +6434,21 @@ open class MaxHzActivity : AppBarActivity() {
     }
 
     private fun featureIconContainer(title: String, color: Int = featureIconTintColor()): FrameLayout {
-        val icon = featureIconView(title, Color.WHITE)
+        val (c1, _) = LiquidGlassTheme.categoryColorsFor(title)
+        val isDark = isDarkMode()
+        val icon = featureIconView(title, c1)
+        val pastelBg = Color.argb(
+            if (isDark) 0x38 else 0x24,
+            Color.red(c1),
+            Color.green(c1),
+            Color.blue(c1)
+        )
         return FrameLayout(this).apply {
-            background = LiquidGlassTheme.createIosIconDrawable(title, dp(9).toFloat())
-            addView(icon, FrameLayout.LayoutParams(dp(22), dp(22), Gravity.CENTER))
+            background = GradientDrawable().apply {
+                cornerRadius = dp(11).toFloat()
+                setColor(pastelBg)
+            }
+            addView(icon, FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER))
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }
     }
@@ -6760,11 +6942,11 @@ open class MaxHzActivity : AppBarActivity() {
             .toList()
     }
 
-    private fun appPickerRowView(app: UserAppChoice): View {
+    private fun appPickerRowView(app: UserAppChoice, showSubtitle: Boolean = false): View {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_VERTICAL
-            minimumHeight = dp(52)
+            minimumHeight = dp(46)
             setPadding(dp(16), dp(7), dp(16), dp(7))
             layoutParams = AbsListView.LayoutParams(
                 AbsListView.LayoutParams.MATCH_PARENT,
@@ -6778,15 +6960,17 @@ open class MaxHzActivity : AppBarActivity() {
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
             })
-            addView(TextView(this@MaxHzActivity).apply {
-                text = appKindShort(app.trustClass)
-                textSize = 11.5f
-                setTextColor(themeColors.onSurfaceVariant)
-                includeFontPadding = false
-                setPadding(0, dp(3), 0, 0)
-                maxLines = 1
-                ellipsize = TextUtils.TruncateAt.END
-            })
+            if (showSubtitle) {
+                addView(TextView(this@MaxHzActivity).apply {
+                    text = "${appKindShort(app.trustClass)} · ${app.packageName}"
+                    textSize = 11.5f
+                    setTextColor(themeColors.onSurfaceVariant)
+                    includeFontPadding = false
+                    setPadding(0, dp(3), 0, 0)
+                    maxLines = 1
+                    ellipsize = TextUtils.TruncateAt.END
+                })
+            }
         }
     }
 
@@ -6798,8 +6982,11 @@ open class MaxHzActivity : AppBarActivity() {
         val visibleApps = mutableListOf<UserAppChoice>()
         var selectedFilter = if (apps.any { !it.systemApp }) AppListFilter.USER else AppListFilter.ALL
         var searchQuery = ""
+        var showDialogSubtitles = false
+        val expandedRowPkgs = mutableSetOf<String>()
         lateinit var filterContainer: LinearLayout
         lateinit var listAdapter: ArrayAdapter<UserAppChoice>
+        var descView: TextView? = null
         var redrawFilters: () -> Unit = {}
 
         fun filteredApps(): List<UserAppChoice> {
@@ -6867,26 +7054,59 @@ open class MaxHzActivity : AppBarActivity() {
             dividerHeight = 0
             listAdapter = object : ArrayAdapter<UserAppChoice>(this@MaxHzActivity, android.R.layout.simple_list_item_1, visibleApps) {
                 override fun getView(position: Int, convertView: View?, parent: android.view.ViewGroup): View {
-                    return appPickerRowView(getItem(position) ?: visibleApps[position])
+                    val app = getItem(position) ?: visibleApps[position]
+                    return appPickerRowView(app, showDialogSubtitles || expandedRowPkgs.contains(app.packageName))
                 }
             }
             adapter = listAdapter
             setOnItemClickListener { _, _, which, _ ->
                 visibleApps.getOrNull(which)?.let(onSelected)
             }
+            setOnItemLongClickListener { _, view, which, _ ->
+                val app = visibleApps.getOrNull(which) ?: return@setOnItemLongClickListener false
+                view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                if (!expandedRowPkgs.remove(app.packageName)) {
+                    expandedRowPkgs.add(app.packageName)
+                }
+                listAdapter.notifyDataSetChanged()
+                true
+            }
         }
 
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(18), 0, dp(18), 0)
-            description?.takeIf { it.isNotBlank() }?.let {
+            addView(LinearLayout(this@MaxHzActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(0, 0, 0, dp(8))
                 addView(TextView(this@MaxHzActivity).apply {
+                    text = "应用列表（长按单行可查看包名）"
+                    textSize = 11.5f
+                    setTextColor(themeColors.onSurfaceVariant)
+                }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                addView(TextView(this@MaxHzActivity).apply {
+                    styleOptionBTogglePill(this, showDialogSubtitles)
+                    setOnClickListener { v ->
+                        v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                        showDialogSubtitles = !showDialogSubtitles
+                        expandedRowPkgs.clear()
+                        descView?.visibility = if (showDialogSubtitles) View.VISIBLE else View.GONE
+                        styleOptionBTogglePill(this, showDialogSubtitles)
+                        listAdapter.notifyDataSetChanged()
+                    }
+                })
+            })
+            description?.takeIf { it.isNotBlank() }?.let {
+                descView = TextView(this@MaxHzActivity).apply {
                     text = it
                     textSize = 13f
                     setTextColor(themeColors.onSurfaceVariant)
                     setLineSpacing(0f, 1.25f)
                     setPadding(0, 0, 0, dp(12))
-                })
+                    visibility = View.GONE
+                }
+                addView(descView)
             }
             addView(EditText(this@MaxHzActivity).apply {
                 hint = "搜索应用"
@@ -7230,7 +7450,6 @@ open class MaxHzActivity : AppBarActivity() {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
                 val indicator = View(this@MaxHzActivity).apply {
-                    val isDark = isDarkMode()
                     val indicatorColor = themeColors.primary
                     background = rounded(indicatorColor, dp(2).toFloat())
                 }
@@ -7246,13 +7465,16 @@ open class MaxHzActivity : AppBarActivity() {
                 })
             }
             addView(headerRow)
-            addView(TextView(this@MaxHzActivity).apply {
+            val subView = TextView(this@MaxHzActivity).apply {
                 text = subtitle
                 textSize = 12f
                 setTextColor(themeColors.onSurfaceVariant)
                 includeFontPadding = false
                 setPadding(dp(12), dp(3), 0, 0)
-            })
+            }
+            addView(subView)
+            bindOptionBSubtitle(this, subView)
+            bindOptionBSubtitle(headerRow, subView)
         }
     }
 
@@ -7274,8 +7496,8 @@ open class MaxHzActivity : AppBarActivity() {
             minimumWidth = 0
             insetTop = 0
             insetBottom = 0
-            val radiusPx = dp(BUTTON_HEIGHT_DP / 2).toFloat()
-            cornerRadius = dp(BUTTON_HEIGHT_DP / 2)
+            val radiusPx = dp(14).toFloat()
+            cornerRadius = dp(14)
             setPadding(dp(18), dp(6), dp(18), dp(6))
             maxLines = 2
             ellipsize = TextUtils.TruncateAt.END
@@ -7286,22 +7508,16 @@ open class MaxHzActivity : AppBarActivity() {
             if (isSelected) {
                 val selectedBg = when {
                     text.contains("省电") -> 0xFF10B981.toInt()
-                    text.contains("性能") || text.contains("满血") || text.contains("游戏") -> 0xFF3B82F6.toInt()
-                    else -> if (isDark) 0xFF333B4A.toInt() else 0xFFFFFFFF.toInt()
-                }
-                val selectedStroke = when {
-                    text.contains("省电") -> 0xFF10B981.toInt()
-                    text.contains("性能") || text.contains("满血") || text.contains("游戏") -> 0xFF3B82F6.toInt()
-                    else -> if (isDark) 0x24FFFFFF.toInt() else 0x1A000000.toInt()
+                    text.contains("性能") || text.contains("满血") || text.contains("游戏") -> if (isDark) 0xFF277AF7.toInt() else 0xFF3482FF.toInt()
+                    else -> if (isDark) 0xFF162946.toInt() else 0xFFEBF3FF.toInt()
                 }
                 val textColor = when {
                     text.contains("省电") || text.contains("性能") || text.contains("满血") || text.contains("游戏") -> 0xFFFFFFFF.toInt()
-                    else -> if (isDark) 0xFFFFFFFF.toInt() else 0xFF0F172A.toInt()
+                    else -> if (isDark) 0xFF277AF7.toInt() else 0xFF3482FF.toInt()
                 }
                 background = GradientDrawable().apply {
                     cornerRadius = radiusPx
                     setColor(selectedBg)
-                    setStroke(dp(1), selectedStroke)
                 }
                 setTextColor(textColor)
             } else {
@@ -7314,7 +7530,7 @@ open class MaxHzActivity : AppBarActivity() {
                 val textColor = when {
                     isDanger -> if (isDark) 0xFFFCA5A5.toInt() else 0xFFDC2626.toInt()
                     isPrimary -> 0xFFFFFFFF.toInt()
-                    else -> if (isDark) 0xFFE6EAF5.toInt() else 0xFF1E293B.toInt()
+                    else -> if (isDark) 0xFFECEFF4.toInt() else 0xFF1A1C1E.toInt()
                 }
                 setTextColor(textColor)
             }
@@ -7374,11 +7590,10 @@ open class MaxHzActivity : AppBarActivity() {
 
     private fun divider(): View {
         return View(this).apply {
-            setBackgroundColor(themeColors.outline)
-            alpha = 0.4f
+            setBackgroundColor(Color.TRANSPARENT)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(1)
+                dp(4)
             )
         }
     }
@@ -7396,24 +7611,42 @@ open class MaxHzActivity : AppBarActivity() {
     private fun twoLineListRow(title: String, summary: String): View {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(0, dp(13), 0, dp(13))
-            addView(TextView(this@MaxHzActivity).apply {
-                text = title
-                textSize = 16f
-                setTextColor(themeColors.onSurface)
-                setTypeface(typeface, android.graphics.Typeface.BOLD)
-                includeFontPadding = false
-                maxLines = 2
-                ellipsize = TextUtils.TruncateAt.END
+            setPadding(0, dp(11), 0, dp(11))
+            val shortRight = summary.lineSequence().firstOrNull()?.substringBefore('(')?.substringBefore('（')?.trim().orEmpty()
+            addView(LinearLayout(this@MaxHzActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                addView(TextView(this@MaxHzActivity).apply {
+                    text = title
+                    textSize = 15f
+                    setTextColor(themeColors.onSurface)
+                    setTypeface(typeface, android.graphics.Typeface.BOLD)
+                    includeFontPadding = false
+                    maxLines = 1
+                    ellipsize = TextUtils.TruncateAt.END
+                }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                if (shortRight.isNotEmpty()) {
+                    addView(TextView(this@MaxHzActivity).apply {
+                        text = shortRight.take(18)
+                        textSize = 13f
+                        setTextColor(themeColors.primary)
+                        setTypeface(typeface, android.graphics.Typeface.BOLD)
+                        includeFontPadding = false
+                        maxLines = 1
+                        setPadding(dp(8), 0, 0, 0)
+                    })
+                }
             })
-            addView(TextView(this@MaxHzActivity).apply {
+            val subView = TextView(this@MaxHzActivity).apply {
                 text = summary
-                textSize = 13.5f
+                textSize = 13f
                 setTextColor(themeColors.onSurfaceVariant)
                 includeFontPadding = false
                 setPadding(0, dp(3), 0, 0)
                 setLineSpacing(0f, 1.2f)
-            })
+            }
+            addView(subView)
+            bindOptionBSubtitle(this, subView)
         }
     }
 
@@ -7429,29 +7662,34 @@ open class MaxHzActivity : AppBarActivity() {
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, dp(13), 0, dp(13))
+            setPadding(0, dp(11), 0, dp(11))
             installClickFeedback(this)
             addView(LinearLayout(this@MaxHzActivity).apply {
                 orientation = LinearLayout.VERTICAL
                 addView(TextView(this@MaxHzActivity).apply {
                     text = title
-                    textSize = 16f
+                    textSize = 15.5f
                     setTextColor(themeColors.onSurface)
                     setTypeface(typeface, android.graphics.Typeface.BOLD)
                     includeFontPadding = false
-                    maxLines = 2
+                    maxLines = 1
                     ellipsize = TextUtils.TruncateAt.END
                 })
                 summaryView = TextView(this@MaxHzActivity).apply {
                     text = summary
-                    textSize = 13.5f
+                    textSize = 13f
                     setTextColor(themeColors.onSurfaceVariant)
                     includeFontPadding = false
                     setPadding(0, dp(3), 0, 0)
                     setLineSpacing(0f, 1.2f)
-                }.apply { visibility = if (summary.isBlank()) View.GONE else View.VISIBLE }
+                }
                 addView(summaryView)
             }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            if (summary.isNotBlank()) {
+                bindOptionBSubtitle(this, summaryView)
+            } else {
+                summaryView.visibility = View.GONE
+            }
             toggle = MaterialSwitch(this@MaxHzActivity).apply {
                 showText = false
                 isChecked = checked
@@ -7540,6 +7778,7 @@ open class MaxHzActivity : AppBarActivity() {
     }
 
     private fun filterChip(text: String, selected: Boolean, onClick: () -> Unit): TextView {
+        val isDark = isDarkMode()
         return MaterialButton(this).apply {
             this.text = text
             gravity = Gravity.CENTER
@@ -7551,18 +7790,26 @@ open class MaxHzActivity : AppBarActivity() {
             minimumWidth = 0
             insetTop = 0
             insetBottom = 0
-            cornerRadius = dp(18)
-            setPadding(dp(10), dp(6), dp(10), dp(6))
+            cornerRadius = dp(12)
+            setPadding(dp(12), dp(6), dp(12), dp(6))
             maxLines = 2
             ellipsize = TextUtils.TruncateAt.END
-            setTextColor(if (selected) themeColors.onPrimary else themeColors.onSurfaceVariant)
-            backgroundTintList = ColorStateList.valueOf(if (selected) {
-                themeColors.primary
-            } else {
-                themeColors.surface
-            })
-            strokeWidth = if (selected) 0 else dp(1)
-            strokeColor = ColorStateList.valueOf(themeColors.outline)
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            setTextColor(
+                if (selected) {
+                    0xFFFFFFFF.toInt()
+                } else {
+                    themeColors.onSurfaceVariant
+                }
+            )
+            backgroundTintList = ColorStateList.valueOf(
+                if (selected) {
+                    if (isDark) 0xFF277AF7.toInt() else 0xFF3482FF.toInt()
+                } else {
+                    themeColors.surfaceContainerHigh
+                }
+            )
+            strokeWidth = 0
             isClickable = true
             isFocusable = true
             setOnClickListener {
@@ -7864,19 +8111,34 @@ open class MaxHzActivity : AppBarActivity() {
                 background = rounded(rowBackground, dp(CARD_RADIUS_DP).toFloat())
                 installClickFeedback(this, foregroundRipple = false)
                 setPadding(dp(12), dp(8), dp(12), dp(8))
-                addView(TextView(this@MaxHzActivity).apply {
-                    text = appName
-                    textSize = 14f
-                    setTypeface(typeface, android.graphics.Typeface.BOLD)
-                    setTextColor(primaryText)
-                    maxLines = 2
+                addView(LinearLayout(this@MaxHzActivity).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    addView(TextView(this@MaxHzActivity).apply {
+                        text = appName
+                        textSize = 14f
+                        setTypeface(typeface, android.graphics.Typeface.BOLD)
+                        setTextColor(primaryText)
+                        maxLines = 1
+                        ellipsize = TextUtils.TruncateAt.END
+                    }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                    addView(TextView(this@MaxHzActivity).apply {
+                        text = modeText
+                        textSize = 12f
+                        setTypeface(typeface, android.graphics.Typeface.BOLD)
+                        setTextColor(themeColors.primary)
+                        setPadding(dp(8), 0, 0, 0)
+                    })
                 })
-                addView(TextView(this@MaxHzActivity).apply {
+                val sub = TextView(this@MaxHzActivity).apply {
                     text = "${appKindDescriptionForPackage(rule.packageName)}  ·  $modeText  ·  点击删除"
                     textSize = 12f
                     setTextColor(secondaryText)
                     maxLines = 1
-                })
+                    setPadding(0, dp(2), 0, 0)
+                }
+                addView(sub)
+                bindOptionBSubtitle(this, sub)
                 setOnClickListener {
                     playClickFeedback(this)
                     showDeleteAppRefreshRuleDialog(rule, appName, modeText) {
@@ -7938,6 +8200,15 @@ open class MaxHzActivity : AppBarActivity() {
                 guardApplied -> "待应用"
                 else -> "未激活"
             }
+            val subView = TextView(this@MaxHzActivity).apply {
+                text = "${packageName} · ${appKindDescriptionForPackage(packageName)} · $applyState"
+                textSize = 11.5f
+                setTextColor(themeColors.onSurfaceVariant)
+                includeFontPadding = false
+                maxLines = 1
+                ellipsize = TextUtils.TruncateAt.END
+                setPadding(0, dp(3), 0, 0)
+            }
             row.addView(LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 addView(TextView(this@MaxHzActivity).apply {
@@ -7949,16 +8220,9 @@ open class MaxHzActivity : AppBarActivity() {
                     maxLines = 1
                     ellipsize = TextUtils.TruncateAt.END
                 })
-                addView(TextView(this@MaxHzActivity).apply {
-                    text = "${packageName} · ${appKindDescriptionForPackage(packageName)} · $applyState"
-                    textSize = 11.5f
-                    setTextColor(themeColors.onSurfaceVariant)
-                    includeFontPadding = false
-                    maxLines = 1
-                    ellipsize = TextUtils.TruncateAt.END
-                    setPadding(0, dp(3), 0, 0)
-                })
+                addView(subView)
             }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            bindOptionBSubtitle(row, subView)
 
             row.addView(button("删除") {
                 MaxHzPrefs.removeNightWakeupGuardPackage(this@MaxHzActivity, packageName)
@@ -8741,10 +9005,12 @@ open class MaxHzActivity : AppBarActivity() {
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 ).apply { leftMargin = dp(10) })
 
+                bindOptionBSubtitle(this, summaryView)
                 setOnClickListener {
                     expanded = !expanded
                     expandIndicator.text = if (expanded) " ▾" else " ▸"
                     expandedDetailView.visibility = if (expanded) View.VISIBLE else View.GONE
+                    summaryView.visibility = if (expanded || detailSubtitlesExpanded) View.VISIBLE else View.GONE
                     summaryView.maxLines = if (expanded) 3 else 1
                     playClickFeedback(this)
                 }
@@ -9754,6 +10020,13 @@ open class MaxHzActivity : AppBarActivity() {
 
             // 卡片 1：游戏模式总控
             addView(card {
+                val heroSub = TextView(this@MaxHzActivity).apply {
+                    text = "识别前台游戏自动生效极致性能，离开即刻还原"
+                    textSize = 12.5f
+                    setTextColor(themeColors.onSurfaceVariant)
+                    includeFontPadding = false
+                    setPadding(0, dp(3), 0, 0)
+                }
                 addView(LinearLayout(this@MaxHzActivity).apply {
                     orientation = LinearLayout.HORIZONTAL
                     gravity = Gravity.CENTER_VERTICAL
@@ -9770,13 +10043,7 @@ open class MaxHzActivity : AppBarActivity() {
                             setTypeface(typeface, android.graphics.Typeface.BOLD)
                             includeFontPadding = false
                         })
-                        addView(TextView(this@MaxHzActivity).apply {
-                            text = "识别前台游戏自动生效极致性能，离开即刻还原"
-                            textSize = 12.5f
-                            setTextColor(themeColors.onSurfaceVariant)
-                            includeFontPadding = false
-                            setPadding(0, dp(3), 0, 0)
-                        })
+                        addView(heroSub)
                     }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
                     addView(statusBadge(gameAutoPerformanceState()))
                 })
@@ -9822,7 +10089,7 @@ open class MaxHzActivity : AppBarActivity() {
                     }, dp(10))
                 }
 
-                addSpacedView(TextView(this@MaxHzActivity).apply {
+                val strategySummarySub = TextView(this@MaxHzActivity).apply {
                     val customCount = packages.count {
                         MaxHzPrefs.gamePackageCustomProfile(this@MaxHzActivity, it) != null
                     }
@@ -9831,7 +10098,9 @@ open class MaxHzActivity : AppBarActivity() {
                     textSize = 12.5f
                     setTextColor(themeColors.onSurfaceVariant)
                     includeFontPadding = false
-                }, dp(10))
+                }
+                addSpacedView(strategySummarySub, dp(10))
+                bindOptionBSubtitle(this, heroSub, strategySummarySub)
             })
 
             // 卡片 2：目标模式与温控策略
@@ -9843,13 +10112,15 @@ open class MaxHzActivity : AppBarActivity() {
                     setTypeface(typeface, android.graphics.Typeface.BOLD)
                     includeFontPadding = false
                 })
-                addSpacedView(TextView(this@MaxHzActivity).apply {
+                val targetDescSub = TextView(this@MaxHzActivity).apply {
                     text = "作为未单独指定游戏的默认档位；下方游戏名单支持为每款游戏分别指定「系统默认」或「性能模式」。"
                     textSize = 12f
                     setTextColor(themeColors.onSurfaceVariant)
                     includeFontPadding = false
                     setLineSpacing(0f, 1.25f)
-                }, dp(4))
+                }
+                addSpacedView(targetDescSub, dp(4))
+                bindOptionBSubtitle(this, targetDescSub)
                 addSpacedView(horizontalActions(
                     button(if (currentTarget == MaxHzPrefs.GAME_PROFILE_DEFAULT) "系统默认 ✓" else "系统默认") {
                         if (!MaxHzShell.isReady()) {
@@ -9918,6 +10189,7 @@ open class MaxHzActivity : AppBarActivity() {
                         setTypeface(typeface, android.graphics.Typeface.BOLD)
                         includeFontPadding = false
                     }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                    addView(createOptionBTogglePill())
                 })
 
                 val actionButtons = mutableListOf<View>()
@@ -9965,22 +10237,29 @@ open class MaxHzActivity : AppBarActivity() {
 
             // 卡片 4：运行机制与特性说明
             addSpacedView(card {
-                addView(TextView(this@MaxHzActivity).apply {
-                    text = "运行机制与节能优势"
-                    textSize = 15f
-                    setTextColor(themeColors.onSurface)
-                    setTypeface(typeface, android.graphics.Typeface.BOLD)
-                    includeFontPadding = false
-                })
-                addSpacedView(TextView(this@MaxHzActivity).apply {
+                val mechSub = TextView(this@MaxHzActivity).apply {
                     text = "• 零后台轮询：仅在前台应用切换事件到达时瞬间触发，平时完全休眠，不耗待机电量。\n• 按游戏独立分档：日常开「省电自适应」时，可将轻度游戏设为「系统默认」（仅解除省电限制不发热），重度游戏设为「性能模式」。\n• 状态完整还原：退出游戏或超过保持时间后，100% 恢复到进游戏前的日常模式与设置，不留耗电尾巴。"
                     textSize = 12.5f
                     setTextColor(themeColors.onSurfaceVariant)
                     setLineSpacing(0f, 1.35f)
                     includeFontPadding = false
-                }, dp(8))
+                }
+                addView(LinearLayout(this@MaxHzActivity).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    addView(TextView(this@MaxHzActivity).apply {
+                        text = "运行机制与节能优势"
+                        textSize = 15f
+                        setTextColor(themeColors.onSurface)
+                        setTypeface(typeface, android.graphics.Typeface.BOLD)
+                        includeFontPadding = false
+                    }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                    addView(createOptionBTogglePill { listOf(mechSub) })
+                })
+                addSpacedView(mechSub, dp(8))
                 val runtimeResultView = resultText(GAME_AUTO_RUNTIME_RESULT_KEY)
                 addSpacedView(runtimeResultView, dp(6))
+                bindOptionBSubtitle(this, mechSub)
             }, gap)
 
             // 底部避让占位，保证穿透毛玻璃 Dock 时内容完全可向上滑出
@@ -10024,14 +10303,16 @@ open class MaxHzActivity : AppBarActivity() {
                     setLineSpacing(0f, 1.3f)
                 })
             } else {
-                addView(TextView(this@MaxHzActivity).apply {
+                val tipSub = TextView(this@MaxHzActivity).apply {
                     text = "💡 点击每款游戏右侧的模式胶囊，可单独指定该游戏进前台时切「系统默认」或「性能模式」。"
                     textSize = 12f
                     setTextColor(themeColors.onSurfaceVariant)
                     includeFontPadding = false
                     setLineSpacing(0f, 1.25f)
                     setPadding(0, 0, 0, dp(6))
-                })
+                }
+                addView(tipSub)
+                bindOptionBSubtitle(tipSub, tipSub)
                 packages.forEachIndexed { index, packageName ->
                     val info = loadAppDisplayInfo(packageName)
                     val customProfile = MaxHzPrefs.gamePackageCustomProfile(this@MaxHzActivity, packageName)
@@ -10058,7 +10339,16 @@ open class MaxHzActivity : AppBarActivity() {
                         else setImageResource(R.drawable.ic_maxhz_apps_24)
                     }
                     row.addView(iconView, LinearLayout.LayoutParams(dp(36), dp(36)).apply { rightMargin = dp(12) })
-                    row.addView(LinearLayout(this@MaxHzActivity).apply {
+                    val pkgSubView = TextView(this@MaxHzActivity).apply {
+                        text = "$subtitlePrefix · $packageName"
+                        textSize = 11.5f
+                        setTextColor(themeColors.onSurfaceVariant)
+                        includeFontPadding = false
+                        maxLines = 1
+                        ellipsize = TextUtils.TruncateAt.END
+                        setPadding(0, dp(3), 0, 0)
+                    }
+                    val textCol = LinearLayout(this@MaxHzActivity).apply {
                         orientation = LinearLayout.VERTICAL
                         setOnClickListener {
                             showGamePackageProfileDialog(packageName, info.label)
@@ -10072,16 +10362,10 @@ open class MaxHzActivity : AppBarActivity() {
                             maxLines = 1
                             ellipsize = TextUtils.TruncateAt.END
                         })
-                        addView(TextView(this@MaxHzActivity).apply {
-                            text = "$subtitlePrefix · $packageName"
-                            textSize = 11.5f
-                            setTextColor(themeColors.onSurfaceVariant)
-                            includeFontPadding = false
-                            maxLines = 1
-                            ellipsize = TextUtils.TruncateAt.END
-                            setPadding(0, dp(3), 0, 0)
-                        })
-                    }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                        addView(pkgSubView)
+                    }
+                    row.addView(textCol, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                    bindOptionBSubtitle(textCol, pkgSubView)
                     val modePill = TextView(this@MaxHzActivity).apply {
                         text = modePillText
                         textSize = 12f
@@ -10577,60 +10861,58 @@ open class MaxHzActivity : AppBarActivity() {
 
     private fun loadThemeColors(): ThemeColors {
         val blackTheme = isShizukuBlackTheme()
-        val shizukuPrimaryLight = ContextCompat.getColor(this, R.color.app_color_light)
-        val shizukuPrimaryDark = ContextCompat.getColor(this, R.color.app_color_dark)
         if (isDarkMode()) {
-            val pageColor = if (blackTheme) 0xFF000000.toInt() else 0xFF111418.toInt()
-            val shizukuCardColor = if (blackTheme) 0xFF121624.toInt() else 0xFF1E222A.toInt()
-            val shizukuPrimaryContainer = 0xff344f8e.toInt()
-            val maxSurfaceHigh = if (blackTheme) 0xff121624.toInt() else 0xFF2C323D.toInt()
+            val pageColor = if (blackTheme) 0xFF000000.toInt() else 0xFF0D0F12.toInt()
+            val shizukuCardColor = 0xFF181A20.toInt()
+            val shizukuPrimaryContainer = 0xFF162946.toInt()
+            val maxSurfaceHigh = 0xFF21242C.toInt()
             return ThemeColors(
                 page = pageColor,
                 surface = shizukuCardColor,
                 surfaceContainer = shizukuCardColor,
                 surfaceContainerHigh = maxSurfaceHigh,
-                outline = if (blackTheme) 0xff1c2333.toInt() else 0x18FFFFFF.toInt(),
-                onSurface = resolveColor(com.google.android.material.R.attr.colorOnSurface, 0xffe6e1e5.toInt()),
-                onSurfaceVariant = resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant, 0xffcac4d0.toInt()),
-                primary = resolveColor(com.google.android.material.R.attr.colorPrimary, shizukuPrimaryDark),
-                onPrimary = resolveColor(com.google.android.material.R.attr.colorOnPrimary, 0xffffffff.toInt()),
+                outline = 0x1AFFFFFF,
+                onSurface = 0xFFECEFF4.toInt(),
+                onSurfaceVariant = 0xFF949BA8.toInt(),
+                primary = 0xFF277AF7.toInt(),
+                onPrimary = 0xFFFFFFFF.toInt(),
                 primaryContainer = shizukuPrimaryContainer,
-                onPrimaryContainer = 0xffffffff.toInt(),
+                onPrimaryContainer = 0xFF277AF7.toInt(),
                 secondaryContainer = shizukuCardColor,
-                onSecondaryContainer = resolveColor(com.google.android.material.R.attr.colorOnSurface, 0xffe6e1e5.toInt()),
+                onSecondaryContainer = 0xFFECEFF4.toInt(),
                 tertiaryContainer = shizukuCardColor,
-                onTertiaryContainer = resolveColor(com.google.android.material.R.attr.colorOnSurface, 0xffe6e1e5.toInt()),
-                errorContainer = 0xff5d2226.toInt(),
-                onErrorContainer = 0xffffdad6.toInt(),
-                warningContainer = 0xFF2C323D.toInt(),
-                onWarningContainer = resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant, 0xffcac4d0.toInt()),
-                error = 0xffffb4ab.toInt()
+                onTertiaryContainer = 0xFFECEFF4.toInt(),
+                errorContainer = 0xFF5D2226.toInt(),
+                onErrorContainer = 0xFFFFDAD6.toInt(),
+                warningContainer = 0xFF21242C.toInt(),
+                onWarningContainer = 0xFF949BA8.toInt(),
+                error = 0xFFFFB4AB.toInt()
             )
         }
-        val pageColor = 0xFFF7F9FC.toInt()
+        val pageColor = 0xFFF5F6F9.toInt()
         val shizukuCardColor = 0xFFFFFFFF.toInt()
-        val shizukuPrimaryContainer = 0xffe1e6ff.toInt()
+        val shizukuPrimaryContainer = 0xFFEBF3FF.toInt()
         return ThemeColors(
             page = pageColor,
             surface = shizukuCardColor,
             surfaceContainer = shizukuCardColor,
-            surfaceContainerHigh = 0xFFF0F3F8.toInt(),
-            outline = 0x0C000000.toInt(),
-            onSurface = resolveColor(com.google.android.material.R.attr.colorOnSurface, 0xff1f2937.toInt()),
-            onSurfaceVariant = resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant, 0xff475569.toInt()),
-            primary = resolveColor(com.google.android.material.R.attr.colorPrimary, shizukuPrimaryLight),
-            onPrimary = resolveColor(com.google.android.material.R.attr.colorOnPrimary, 0xffffffff.toInt()),
+            surfaceContainerHigh = 0xFFF0F2F6.toInt(),
+            outline = 0x0C000000,
+            onSurface = 0xFF1A1C1E.toInt(),
+            onSurfaceVariant = 0xFF6B7280.toInt(),
+            primary = 0xFF3482FF.toInt(),
+            onPrimary = 0xFFFFFFFF.toInt(),
             primaryContainer = shizukuPrimaryContainer,
-            onPrimaryContainer = shizukuPrimaryLight,
+            onPrimaryContainer = 0xFF3482FF.toInt(),
             secondaryContainer = shizukuCardColor,
-            onSecondaryContainer = resolveColor(com.google.android.material.R.attr.colorOnSurface, 0xff1f2937.toInt()),
+            onSecondaryContainer = 0xFF1A1C1E.toInt(),
             tertiaryContainer = shizukuCardColor,
-            onTertiaryContainer = resolveColor(com.google.android.material.R.attr.colorOnSurface, 0xff1f2937.toInt()),
-            errorContainer = 0xffffe1df.toInt(),
-            onErrorContainer = 0xff9a2d2d.toInt(),
-            warningContainer = 0xFFF1F5F9.toInt(),
-            onWarningContainer = resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant, 0xff475569.toInt()),
-            error = 0xffa12a2a.toInt()
+            onTertiaryContainer = 0xFF1A1C1E.toInt(),
+            errorContainer = 0xFFFFECE8.toInt(),
+            onErrorContainer = 0xFF9A2D2D.toInt(),
+            warningContainer = 0xFFF0F2F6.toInt(),
+            onWarningContainer = 0xFF6B7280.toInt(),
+            error = 0xFFA12A2A.toInt()
         )
     }
 

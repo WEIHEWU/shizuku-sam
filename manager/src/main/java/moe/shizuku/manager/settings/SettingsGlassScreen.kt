@@ -1,28 +1,23 @@
 package moe.shizuku.manager.settings
 
 import android.content.ComponentName
-import android.content.Context
 import android.os.Build
 import androidx.appcompat.app.AppCompatDelegate
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.*
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -33,36 +28,44 @@ import androidx.compose.ui.unit.sp
 import moe.shizuku.manager.R
 import moe.shizuku.manager.ShizukuSettings
 import moe.shizuku.manager.app.ThemeHelper
+import moe.shizuku.manager.home.GroupHeaderWithToggle
+import moe.shizuku.manager.home.MiuixRowIcon
+import moe.shizuku.manager.home.MiuixSubPageTopBar
+import moe.shizuku.manager.home.onLongPressToggle
 import moe.shizuku.manager.ktx.isComponentEnabled
 import moe.shizuku.manager.ktx.setComponentEnabled
-import moe.shizuku.manager.maxhz.GlassCard
 import moe.shizuku.manager.receiver.BootCompleteReceiver
-import moe.shizuku.manager.utils.Contrast
 import moe.shizuku.manager.utils.CustomTabsHelper
 import moe.shizuku.manager.utils.RootBootScriptHelper
 import rikka.material.app.LocaleDelegate
-import rikka.shizuku.manager.ShizukuLocales
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CardDefaults
+import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.basic.TextField
+import top.yukonga.miuix.kmp.preference.ArrowPreference
+import top.yukonga.miuix.kmp.preference.SwitchPreference
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.utils.overScrollVertical
+import top.yukonga.miuix.kmp.window.WindowDialog
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsGlassScreen(
     isDark: Boolean,
     isBlackNightTheme: Boolean,
-    primaryColor: Color = if (isDark) Color(0xFF90CAF9) else Color(0xFF1976D2),
+    primaryColor: Color = if (isDark) Color(0xFF277AF7) else Color(0xFF3482FF),
     onBackClick: () -> Unit,
     onRecreate: () -> Unit
 ) {
     val context = LocalContext.current
-    val density = LocalDensity.current
     val haptic = LocalHapticFeedback.current
 
     val bgColor = if (isBlackNightTheme) {
         Color.Black
-    } else if (isDark) {
-        Color(0xFF111418)
     } else {
-        Color(0xFFF7F9FC)
+        MiuixTheme.colorScheme.surface
     }
 
     val bootComponent = remember { ComponentName(context.packageName, BootCompleteReceiver::class.java.name) }
@@ -78,74 +81,62 @@ fun SettingsGlassScreen(
     var showNightModeDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
 
-    Box(
-        Modifier
-            .fillMaxSize()
-            .background(bgColor)
+    var startupExpanded by remember { mutableStateOf(false) }
+    var appearanceExpanded by remember { mutableStateOf(false) }
+    var languageExpanded by remember { mutableStateOf(false) }
+    var aboutExpanded by remember { mutableStateOf(false) }
+
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        containerColor = bgColor,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) {
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .overScrollVertical(),
             contentPadding = PaddingValues(
-                top = 56.dp,
-                start = 16.dp,
-                end = 16.dp,
+                top = 54.dp,
+                start = 14.dp,
+                end = 14.dp,
                 bottom = 48.dp
             ),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // 顶栏标头
+            // Miuix 顶栏标头（支持长按展开说明）
             item(key = "header-top") {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 4.dp, top = 4.dp, bottom = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(38.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(if (isDark) Color(0xFF222733) else Color(0xFFEFF3F8))
-                            .border(1.dp, if (isDark) Color(0x1FFFFFFF) else Color(0x0C000000), RoundedCornerShape(12.dp))
-                            .clickable {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onBackClick()
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "‹",
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Light,
-                            color = if (isDark) Color.White else Color(0xFF1E293B)
-                        )
-                    }
-                    Spacer(Modifier.width(14.dp))
-                    Column {
-                        Text(
-                            text = stringResource(R.string.settings_title),
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isDark) Color.White else Color(0xFF1E293B)
-                        )
-                    }
-                }
+                MiuixSubPageTopBar(
+                    title = stringResource(R.string.settings_title),
+                    subtitle = "管理开机自启、服务进程守护、界面深浅色外观与多语言偏好",
+                    isDark = isDark,
+                    primaryColor = primaryColor,
+                    onBackClick = onBackClick
+                )
             }
 
             // 1. 启动与常驻
             item(key = "section-startup") {
-                SettingsSectionTitle(stringResource(R.string.settings_section_startup), isDark, primaryColor)
-            }
-            item(key = "card-startup") {
-                GlassCard(isDark = isDark) {
-                    Column {
-                        SettingsSwitchRow(
+                Column {
+                    GroupHeaderWithToggle(
+                        text = stringResource(R.string.settings_section_startup),
+                        isDark = isDark,
+                        primaryColor = primaryColor,
+                        expanded = startupExpanded,
+                        onToggle = { startupExpanded = !startupExpanded }
+                    )
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        cornerRadius = 20.dp,
+                        colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+                    ) {
+                        SettingsMiuixSwitchRow(
                             isDark = isDark,
                             icon = painterResource(R.drawable.ic_root_24dp),
                             iconTint = if (isDark) Color(0xFFF87171) else Color(0xFFDC2626),
                             title = stringResource(R.string.settings_start_on_boot),
                             subtitle = stringResource(R.string.settings_start_on_boot_summary),
                             checked = startOnBoot,
+                            groupExpanded = startupExpanded,
                             onCheckedChange = { checked ->
                                 context.packageManager.setComponentEnabled(bootComponent, checked)
                                 startOnBoot = context.packageManager.isComponentEnabled(bootComponent)
@@ -158,39 +149,40 @@ fun SettingsGlassScreen(
                                 }
                             }
                         )
-                        SettingsDivider(isDark)
-                        SettingsSwitchRow(
+                        SettingsMiuixSwitchRow(
                             isDark = isDark,
                             icon = painterResource(R.drawable.ic_maxhz_shield_24),
-                            iconTint = if (isDark) Color(0xFF34D399) else Color(0xFF059669),
+                            iconTint = if (isDark) Color(0xFF34D399) else Color(0xFF10B981),
                             title = stringResource(R.string.settings_watchdog),
                             subtitle = stringResource(R.string.settings_watchdog_summary),
                             checked = watchdog,
+                            groupExpanded = startupExpanded,
                             onCheckedChange = { checked ->
                                 ShizukuSettings.setWatchdog(context, checked)
                                 watchdog = ShizukuSettings.getWatchdog()
                             }
                         )
-                        SettingsDivider(isDark)
-                        SettingsSwitchRow(
+                        SettingsMiuixSwitchRow(
                             isDark = isDark,
                             icon = painterResource(R.drawable.ic_wadb_24),
                             iconTint = if (isDark) Color(0xFF60A5FA) else Color(0xFF2563EB),
                             title = stringResource(R.string.settings_tcp_mode),
                             subtitle = stringResource(R.string.settings_tcp_mode_summary),
                             checked = tcpMode,
+                            groupExpanded = startupExpanded,
                             onCheckedChange = { checked ->
                                 ShizukuSettings.setTcpMode(checked)
                                 tcpMode = ShizukuSettings.getTcpMode()
                             }
                         )
-                        SettingsDivider(isDark)
-                        SettingsActionRow(
+                        SettingsMiuixActionRow(
                             isDark = isDark,
                             icon = painterResource(R.drawable.ic_terminal_24),
                             iconTint = if (isDark) Color(0xFFFBBF24) else Color(0xFFD97706),
                             title = stringResource(R.string.settings_tcp_port),
-                            subtitle = "$tcpPort",
+                            subtitle = "设置在启用 TCP 端口监听时使用的固定本地端口号（默认 5555）",
+                            valueText = "$tcpPort",
+                            groupExpanded = startupExpanded,
                             onClick = { showPortDialog = true }
                         )
                     }
@@ -199,33 +191,43 @@ fun SettingsGlassScreen(
 
             // 2. 界面外观与主题
             item(key = "section-appearance") {
-                SettingsSectionTitle(stringResource(R.string.settings_section_appearance), isDark, primaryColor)
-            }
-            item(key = "card-appearance") {
-                GlassCard(isDark = isDark) {
-                    Column {
+                Column {
+                    GroupHeaderWithToggle(
+                        text = stringResource(R.string.settings_section_appearance),
+                        isDark = isDark,
+                        primaryColor = primaryColor,
+                        expanded = appearanceExpanded,
+                        onToggle = { appearanceExpanded = !appearanceExpanded }
+                    )
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        cornerRadius = 20.dp,
+                        colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+                    ) {
                         val nightModeSummary = when (nightMode) {
                             AppCompatDelegate.MODE_NIGHT_NO -> stringResource(R.string.settings_night_mode_off)
                             AppCompatDelegate.MODE_NIGHT_YES -> stringResource(R.string.settings_night_mode_on)
                             else -> stringResource(R.string.settings_night_mode_follow_system)
                         }
-                        SettingsActionRow(
+                        SettingsMiuixActionRow(
                             isDark = isDark,
                             icon = painterResource(R.drawable.ic_outline_dark_mode_24),
                             iconTint = if (isDark) Color(0xFFA78BFA) else Color(0xFF7C3AED),
                             title = stringResource(R.string.dark_theme),
-                            subtitle = nightModeSummary,
+                            subtitle = "切换应用界面的浅色、深色或跟随系统深色模式策略",
+                            valueText = nightModeSummary,
+                            groupExpanded = appearanceExpanded,
                             onClick = { showNightModeDialog = true }
                         )
                         if (nightMode != AppCompatDelegate.MODE_NIGHT_NO) {
-                            SettingsDivider(isDark)
-                            SettingsSwitchRow(
+                            SettingsMiuixSwitchRow(
                                 isDark = isDark,
                                 icon = painterResource(R.drawable.ic_maxhz_sun_24),
                                 iconTint = if (isDark) Color(0xFF818CF8) else Color(0xFF4F46E5),
                                 title = stringResource(R.string.settings_black_night_theme),
                                 subtitle = stringResource(R.string.settings_black_night_theme_summary),
                                 checked = blackNightTheme,
+                                groupExpanded = appearanceExpanded,
                                 onCheckedChange = { checked ->
                                     ShizukuSettings.getPreferences().edit().putBoolean(ThemeHelper.KEY_BLACK_NIGHT_THEME, checked).apply()
                                     blackNightTheme = checked
@@ -234,15 +236,14 @@ fun SettingsGlassScreen(
                             )
                         }
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                            SettingsDivider(isDark)
-                            SettingsSwitchRow(
+                            SettingsMiuixSwitchRow(
                                 isDark = isDark,
                                 icon = painterResource(R.drawable.ic_system_icon),
                                 iconTint = primaryColor,
                                 title = stringResource(R.string.settings_use_system_color),
-                                subtitle = stringResource(R.string.settings_use_system_color),
+                                subtitle = "提取系统壁纸主色调（Material You）作为界面动态强调色",
                                 checked = useSystemColor,
-                                activeColor = primaryColor,
+                                groupExpanded = appearanceExpanded,
                                 onCheckedChange = { checked ->
                                     ShizukuSettings.getPreferences().edit().putBoolean(ThemeHelper.KEY_USE_SYSTEM_COLOR, checked).apply()
                                     useSystemColor = checked
@@ -256,48 +257,69 @@ fun SettingsGlassScreen(
 
             // 3. 语言与国际化
             item(key = "section-language") {
-                SettingsSectionTitle(stringResource(R.string.settings_section_language), isDark, primaryColor)
-            }
-            item(key = "card-language") {
-                GlassCard(isDark = isDark) {
-                    val currentConfiguredLang = ShizukuSettings.getPreferences().getString(ShizukuSettings.LANGUAGE, "SYSTEM") ?: "SYSTEM"
-                    val currentLangName = if (currentConfiguredLang == "SYSTEM" || currentConfiguredLang.isEmpty()) {
-                        stringResource(R.string.follow_system)
-                    } else {
-                        when (currentConfiguredLang) {
-                            "zh-CN" -> "简体中文"
-                            "zh-TW" -> "繁體中文"
-                            "en" -> "English"
-                            else -> {
-                                val currentLocale = ShizukuSettings.getLocale()
-                                currentLocale?.getDisplayName(currentLocale)?.replaceFirstChar { it.uppercase() } ?: stringResource(R.string.follow_system)
+                Column {
+                    GroupHeaderWithToggle(
+                        text = stringResource(R.string.settings_section_language),
+                        isDark = isDark,
+                        primaryColor = primaryColor,
+                        expanded = languageExpanded,
+                        onToggle = { languageExpanded = !languageExpanded }
+                    )
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        cornerRadius = 20.dp,
+                        colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+                    ) {
+                        val currentConfiguredLang = ShizukuSettings.getPreferences().getString(ShizukuSettings.LANGUAGE, "SYSTEM") ?: "SYSTEM"
+                        val currentLangName = if (currentConfiguredLang == "SYSTEM" || currentConfiguredLang.isEmpty()) {
+                            stringResource(R.string.follow_system)
+                        } else {
+                            when (currentConfiguredLang) {
+                                "zh-CN" -> "简体中文"
+                                "zh-TW" -> "繁體中文"
+                                "en" -> "English"
+                                else -> {
+                                    val currentLocale = ShizukuSettings.getLocale()
+                                    currentLocale?.getDisplayName(currentLocale)?.replaceFirstChar { it.uppercase() } ?: stringResource(R.string.follow_system)
+                                }
                             }
                         }
+                        SettingsMiuixActionRow(
+                            isDark = isDark,
+                            icon = painterResource(R.drawable.ic_outline_translate_24),
+                            iconTint = if (isDark) Color(0xFF38BDF8) else Color(0xFF0284C7),
+                            title = stringResource(R.string.settings_language),
+                            subtitle = "单独指定本应用界面的显示语言，无需更改系统全局语言",
+                            valueText = currentLangName,
+                            groupExpanded = languageExpanded,
+                            onClick = { showLanguageDialog = true }
+                        )
                     }
-                    SettingsActionRow(
-                        isDark = isDark,
-                        icon = painterResource(R.drawable.ic_outline_translate_24),
-                        iconTint = if (isDark) Color(0xFF38BDF8) else Color(0xFF0284C7),
-                        title = stringResource(R.string.settings_language),
-                        subtitle = currentLangName,
-                        onClick = { showLanguageDialog = true }
-                    )
                 }
             }
 
             // 4. 关于与翻译
             item(key = "section-about") {
-                SettingsSectionTitle(stringResource(R.string.settings_section_about), isDark, primaryColor)
-            }
-            item(key = "card-about") {
-                GlassCard(isDark = isDark) {
-                    Column {
-                        SettingsActionRow(
+                Column {
+                    GroupHeaderWithToggle(
+                        text = stringResource(R.string.settings_section_about),
+                        isDark = isDark,
+                        primaryColor = primaryColor,
+                        expanded = aboutExpanded,
+                        onToggle = { aboutExpanded = !aboutExpanded }
+                    )
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        cornerRadius = 20.dp,
+                        colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+                    ) {
+                        SettingsMiuixActionRow(
                             isDark = isDark,
                             icon = painterResource(R.drawable.ic_baseline_link_24),
                             iconTint = if (isDark) Color(0xFF60A5FA) else Color(0xFF2563EB),
                             title = stringResource(R.string.settings_translation),
                             subtitle = stringResource(R.string.settings_translation_summary, stringResource(R.string.app_name)),
+                            groupExpanded = aboutExpanded,
                             onClick = {
                                 CustomTabsHelper.launchUrlOrCopy(context, context.getString(R.string.translation_url))
                             }
@@ -315,301 +337,294 @@ fun SettingsGlassScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "Shizuku v13.7.0",
+                        text = "Shizuku Sam v13.8.4",
                         fontSize = 11.5.sp,
-                        color = if (isDark) Color(0xFF64748B) else Color(0xFF94A3B8)
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                     )
                 }
             }
         }
     }
 
-    // 端口修改弹窗
-    if (showPortDialog) {
-        var inputPort by remember { mutableStateOf(tcpPort.toString()) }
-        AlertDialog(
-            onDismissRequest = { showPortDialog = false },
-            title = { Text(stringResource(R.string.settings_port_dialog_title), fontWeight = FontWeight.Bold) },
-            text = {
-                OutlinedTextField(
-                    value = inputPort,
-                    onValueChange = { inputPort = it.filter { ch -> ch.isDigit() }.take(5) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
-                    label = { Text("1 - 65535") }
+    // Miuix 窗口级弹窗：端口修改
+    var inputPort by remember(showPortDialog, tcpPort) { mutableStateOf(tcpPort.toString()) }
+    var portDialogShowDesc by remember(showPortDialog) { mutableStateOf(false) }
+    WindowDialog(
+        show = showPortDialog,
+        title = stringResource(R.string.settings_port_dialog_title),
+        summary = if (portDialogShowDesc) "请输入 1 ~ 65535 之间的合法本地 TCP 端口号（建议保持默认 5555）。" else null,
+        onDismissRequest = { showPortDialog = false }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .onLongPressToggle(haptic) { portDialogShowDesc = !portDialogShowDesc },
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            TextField(
+                value = inputPort,
+                onValueChange = { inputPort = it.filter { ch -> ch.isDigit() }.take(5) },
+                label = "端口号 (1 - 65535)",
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth()
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                TextButton(
+                    text = stringResource(android.R.string.cancel),
+                    onClick = { showPortDialog = false },
+                    modifier = Modifier.weight(1f)
                 )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    val port = inputPort.toIntOrNull()
-                    if (port != null && port in 1..65535) {
-                        ShizukuSettings.setTcpPort(port)
-                        tcpPort = port
-                    }
-                    showPortDialog = false
-                }) {
-                    Text(stringResource(android.R.string.ok))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showPortDialog = false }) {
-                    Text(stringResource(android.R.string.cancel))
-                }
-            }
-        )
-    }
-
-    // 深色模式选择弹窗
-    if (showNightModeDialog) {
-        val options = listOf(
-            AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM to stringResource(R.string.settings_night_mode_follow_system),
-            AppCompatDelegate.MODE_NIGHT_YES to stringResource(R.string.settings_night_mode_on),
-            AppCompatDelegate.MODE_NIGHT_NO to stringResource(R.string.settings_night_mode_off)
-        )
-        AlertDialog(
-            onDismissRequest = { showNightModeDialog = false },
-            title = { Text(stringResource(R.string.settings_night_mode_title), fontWeight = FontWeight.Bold) },
-            text = {
-                Column {
-                    options.forEach { (mode, label) ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    if (nightMode != mode) {
-                                        ShizukuSettings.getPreferences().edit().putInt(ShizukuSettings.NIGHT_MODE, mode).apply()
-                                        AppCompatDelegate.setDefaultNightMode(mode)
-                                        nightMode = mode
-                                        showNightModeDialog = false
-                                        onRecreate()
-                                    } else {
-                                        showNightModeDialog = false
-                                    }
-                                }
-                                .padding(vertical = 12.dp, horizontal = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(
-                                selected = (nightMode == mode),
-                                onClick = null
-                            )
-                            Spacer(Modifier.width(12.dp))
-                            Text(text = label, fontSize = 15.sp)
+                TextButton(
+                    text = stringResource(android.R.string.ok),
+                    colors = ButtonDefaults.textButtonColorsPrimary(),
+                    onClick = {
+                        val port = inputPort.toIntOrNull()
+                        if (port != null && port in 1..65535) {
+                            ShizukuSettings.setTcpPort(port)
+                            tcpPort = port
                         }
-                    }
-                }
-            },
-            confirmButton = {}
-        )
-    }
-
-    // 语言选择弹窗
-    if (showLanguageDialog) {
-        val locales = listOf(
-            "SYSTEM" to stringResource(R.string.follow_system),
-            "zh-CN" to "简体中文",
-            "zh-TW" to "繁體中文",
-            "en" to "English"
-        )
-        val prefTag = ShizukuSettings.getPreferences().getString(ShizukuSettings.LANGUAGE, "SYSTEM")
-        val currentConfiguredLang = if (prefTag.isNullOrEmpty()) "SYSTEM" else prefTag
-        var selectedTag by remember { mutableStateOf(currentConfiguredLang) }
-
-        val onSelectLang: (String) -> Unit = { tag ->
-            selectedTag = tag
-            val locale = if ("SYSTEM" == tag) {
-                LocaleDelegate.systemLocale
-            } else {
-                Locale.forLanguageTag(tag)
+                        showPortDialog = false
+                    },
+                    modifier = Modifier.weight(1f)
+                )
             }
-            LocaleDelegate.defaultLocale = locale
-            ShizukuSettings.getPreferences().edit().putString(ShizukuSettings.LANGUAGE, tag).apply()
-            showLanguageDialog = false
-            onRecreate()
         }
+    }
 
-        AlertDialog(
-            onDismissRequest = { showLanguageDialog = false },
-            title = { Text(stringResource(R.string.settings_section_language), fontWeight = FontWeight.Bold) },
-            text = {
-                Column {
-                    locales.forEach { (tag, label) ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable { onSelectLang(tag) }
-                                .padding(vertical = 12.dp, horizontal = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(
-                                selected = (selectedTag == tag),
-                                onClick = { onSelectLang(tag) }
-                            )
-                            Spacer(Modifier.width(12.dp))
-                            Text(text = label, fontSize = 15.sp)
+    // Miuix 窗口级弹窗：深色模式选择
+    val nightOptions = listOf(
+        AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM to stringResource(R.string.settings_night_mode_follow_system),
+        AppCompatDelegate.MODE_NIGHT_YES to stringResource(R.string.settings_night_mode_on),
+        AppCompatDelegate.MODE_NIGHT_NO to stringResource(R.string.settings_night_mode_off)
+    )
+    WindowDialog(
+        show = showNightModeDialog,
+        title = stringResource(R.string.settings_night_mode_title),
+        onDismissRequest = { showNightModeDialog = false }
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            nightOptions.forEach { (mode, label) ->
+                val selected = nightMode == mode
+                val itemBg = when {
+                    selected && isDark -> Color(0xFF162946)
+                    selected && !isDark -> Color(0xFFEBF3FF)
+                    isDark -> Color(0xFF28282D)
+                    else -> Color(0xFFF0F2F6)
+                }
+                val itemFg = if (selected) {
+                    if (isDark) Color(0xFF60A5FA) else primaryColor
+                } else {
+                    MiuixTheme.colorScheme.onSurface
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(itemBg)
+                        .clickable {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            if (nightMode != mode) {
+                                ShizukuSettings.getPreferences().edit().putInt(ShizukuSettings.NIGHT_MODE, mode).apply()
+                                AppCompatDelegate.setDefaultNightMode(mode)
+                                nightMode = mode
+                                showNightModeDialog = false
+                                onRecreate()
+                            } else {
+                                showNightModeDialog = false
+                            }
                         }
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = label,
+                        fontSize = 15.sp,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                        color = itemFg
+                    )
+                    if (selected) {
+                        Text(
+                            text = "✓",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = itemFg
+                        )
                     }
                 }
-            },
-            confirmButton = {}
-        )
+            }
+            Spacer(Modifier.height(4.dp))
+            TextButton(
+                text = stringResource(android.R.string.cancel),
+                onClick = { showNightModeDialog = false },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+
+    // Miuix 窗口级弹窗：语言选择
+    val locales = listOf(
+        "SYSTEM" to stringResource(R.string.follow_system),
+        "zh-CN" to "简体中文",
+        "zh-TW" to "繁體中文",
+        "en" to "English"
+    )
+    val prefTag = ShizukuSettings.getPreferences().getString(ShizukuSettings.LANGUAGE, "SYSTEM")
+    val currentConfiguredLang = if (prefTag.isNullOrEmpty()) "SYSTEM" else prefTag
+
+    WindowDialog(
+        show = showLanguageDialog,
+        title = stringResource(R.string.settings_section_language),
+        onDismissRequest = { showLanguageDialog = false }
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            locales.forEach { (tag, label) ->
+                val selected = currentConfiguredLang == tag
+                val itemBg = when {
+                    selected && isDark -> Color(0xFF162946)
+                    selected && !isDark -> Color(0xFFEBF3FF)
+                    isDark -> Color(0xFF28282D)
+                    else -> Color(0xFFF0F2F6)
+                }
+                val itemFg = if (selected) {
+                    if (isDark) Color(0xFF60A5FA) else primaryColor
+                } else {
+                    MiuixTheme.colorScheme.onSurface
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(itemBg)
+                        .clickable {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            val locale = if ("SYSTEM" == tag) {
+                                LocaleDelegate.systemLocale
+                            } else {
+                                Locale.forLanguageTag(tag)
+                            }
+                            LocaleDelegate.defaultLocale = locale
+                            ShizukuSettings.getPreferences().edit().putString(ShizukuSettings.LANGUAGE, tag).apply()
+                            showLanguageDialog = false
+                            onRecreate()
+                        }
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = label,
+                        fontSize = 15.sp,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                        color = itemFg
+                    )
+                    if (selected) {
+                        Text(
+                            text = "✓",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = itemFg
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+            TextButton(
+                text = stringResource(android.R.string.cancel),
+                onClick = { showLanguageDialog = false },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
     }
 }
 
 @Composable
-private fun SettingsSectionTitle(
-    title: String,
-    isDark: Boolean,
-    primaryColor: Color
-) {
-    Text(
-        text = title,
-        fontSize = 12.5.sp,
-        fontWeight = FontWeight.Bold,
-        color = Contrast.ensure(primaryColor, Contrast.glassSurface(isDark)),
-        modifier = Modifier.padding(start = 18.dp, top = 2.dp, bottom = 4.dp)
-    )
-}
-
-@Composable
-private fun SettingsSwitchRow(
+private fun SettingsMiuixSwitchRow(
     isDark: Boolean,
     icon: Painter,
     iconTint: Color,
     title: String,
     subtitle: String,
     checked: Boolean,
-    activeColor: Color? = null,
+    groupExpanded: Boolean = false,
     onCheckedChange: (Boolean) -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
-    val switchActiveColor = activeColor ?: (if (isDark) Color(0xFF10B981) else Color(0xFF059669))
-    Row(
-        Modifier
+    var rowToggled by remember(groupExpanded) { mutableStateOf(false) }
+    val showSubtitle = groupExpanded xor rowToggled
+
+    Box(
+        modifier = Modifier
             .fillMaxWidth()
-            .clickable {
-                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                onCheckedChange(!checked)
-            }
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .onLongPressToggle(haptic) { rowToggled = !rowToggled }
     ) {
-        Box(
-            modifier = Modifier
-                .size(36.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(if (isDark) Color(0xFF222733) else Color(0xFFEFF3F8))
-                .border(1.dp, if (isDark) Color(0x1FFFFFFF) else Color(0x0C000000), RoundedCornerShape(10.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            Image(
-                painter = icon,
-                contentDescription = null,
-                colorFilter = ColorFilter.tint(iconTint),
-                modifier = Modifier.size(20.dp)
-            )
-        }
-        Spacer(Modifier.width(14.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                text = title,
-                fontSize = 14.5.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = if (isDark) Color(0xFFF1F5F9) else Color(0xFF1E293B)
-            )
-            Spacer(Modifier.height(2.dp))
-            Text(
-                text = subtitle,
-                fontSize = 11.5.sp,
-                lineHeight = 15.sp,
-                color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B)
-            )
-        }
-        Spacer(Modifier.width(8.dp))
-        Switch(
+        SwitchPreference(
+            title = title,
+            summary = if (showSubtitle && subtitle.isNotBlank()) subtitle else null,
             checked = checked,
+            insideMargin = PaddingValues(horizontal = 14.dp, vertical = 11.dp),
             onCheckedChange = {
                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onCheckedChange(it)
             },
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = Color.White,
-                checkedTrackColor = switchActiveColor,
-                uncheckedThumbColor = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B),
-                uncheckedTrackColor = if (isDark) Color(0xFF333B4A) else Color(0xFFE2E8F0)
-            )
+            startAction = {
+                MiuixRowIcon(isDark = isDark, icon = icon, iconTint = iconTint)
+            }
         )
     }
 }
 
 @Composable
-private fun SettingsActionRow(
+private fun SettingsMiuixActionRow(
     isDark: Boolean,
     icon: Painter,
     iconTint: Color,
     title: String,
     subtitle: String,
+    valueText: String? = null,
+    groupExpanded: Boolean = false,
     onClick: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
-    Row(
-        Modifier
+    var rowToggled by remember(groupExpanded) { mutableStateOf(false) }
+    val showSubtitle = groupExpanded xor rowToggled
+
+    Box(
+        modifier = Modifier
             .fillMaxWidth()
-            .clickable {
+            .onLongPressToggle(haptic) { rowToggled = !rowToggled }
+    ) {
+        ArrowPreference(
+            title = title,
+            summary = if (showSubtitle && subtitle.isNotBlank()) subtitle else null,
+            insideMargin = PaddingValues(horizontal = 14.dp, vertical = 11.dp),
+            onClick = {
                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onClick()
+            },
+            startAction = {
+                MiuixRowIcon(isDark = isDark, icon = icon, iconTint = iconTint)
+            },
+            endActions = {
+                if (!valueText.isNullOrBlank()) {
+                    Text(
+                        text = valueText,
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantActions
+                    )
+                }
             }
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(36.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(if (isDark) Color(0xFF222733) else Color(0xFFEFF3F8))
-                .border(1.dp, if (isDark) Color(0x1FFFFFFF) else Color(0x0C000000), RoundedCornerShape(10.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            Image(
-                painter = icon,
-                contentDescription = null,
-                colorFilter = ColorFilter.tint(iconTint),
-                modifier = Modifier.size(20.dp)
-            )
-        }
-        Spacer(Modifier.width(14.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                text = title,
-                fontSize = 14.5.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = if (isDark) Color(0xFFF1F5F9) else Color(0xFF1E293B)
-            )
-            Spacer(Modifier.height(2.dp))
-            Text(
-                text = subtitle,
-                fontSize = 11.5.sp,
-                lineHeight = 15.sp,
-                color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B)
-            )
-        }
-        Spacer(Modifier.width(4.dp))
-        Text(
-            text = "›",
-            fontSize = 17.sp,
-            color = if (isDark) Color(0xFF64748B) else Color(0xFF94A3B8)
         )
     }
-}
-
-@Composable
-private fun SettingsDivider(isDark: Boolean) {
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .height(0.6.dp)
-            .background(if (isDark) Color(0x18FFFFFF) else Color(0x0E000000))
-    )
 }

@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <a href="./README.md">简体中文</a> | <a href="./README.en.md">English</a> | <a href="https://github.com/WEIHEWU/shizuku-sam/releases/latest"><b>⬇️ Download Latest Release (v13.8.2)</b></a>
+  <a href="./README.md">简体中文</a> | <a href="./README.en.md">English</a> | <a href="https://github.com/WEIHEWU/shizuku-sam/releases/latest"><b>⬇️ Download Latest Release (v13.8.4)</b></a>
 </p>
 
 ---
@@ -15,7 +15,7 @@
 
 **Shizuku Sam** integrates the **Shizuku privileged service** with a purpose-built **Samsung Galaxy (One UI) system scheduler & hardware enhancer, background & deep sleep controller, and per-app refresh rate rule manager** in a single cohesive application.
 
-The entire app is built around a **3-tab Liquid Glass floating dock (`Shizuku` · `Hardware` · `App Rules`)** and **Miuix cards and top-level `WindowDialog` modals**. Every section, card title, switch, and secondary screen listed below corresponds 1:1 with the actual `v13.8.2` app UI.
+The entire app (Level 1, Level 2, Level 3 screens, and all dialogs) is unified under the **Miuix (`top.yukonga.miuix.kmp`) UI system**, a **3-tab Liquid Glass floating dock (`Shizuku` · `Hardware` · `App Rules`)**, and **on-demand subtitle toggles (clean single-line titles by default + long-press any row/card to toggle its explanation in place + a `显示说明 / 隐藏说明` pill button on every section/page header)**. Every section, card title, switch, and secondary screen listed below corresponds 1:1 with the actual `v13.8.4` app UI.
 
 ---
 
@@ -133,7 +133,7 @@ The entire app is built around a **3-tab Liquid Glass floating dock (`Shizuku` �
 
 ### Prebuilt APK
 Download the latest signed release APK from **[GitHub Releases](https://github.com/WEIHEWU/shizuku-sam/releases/latest)**:
-- Latest Release: **[`Shizuku-Sam-v13.8.2.apk`](https://github.com/WEIHEWU/shizuku-sam/releases/download/v13.8.2/Shizuku-Sam-v13.8.2.apk)** (also archived under [`releases/`](./releases/))
+- Latest Release: **[`Shizuku-Sam-v13.8.4.apk`](https://github.com/WEIHEWU/shizuku-sam/releases/download/v13.8.4/Shizuku-Sam-v13.8.4.apk)** (also archived under [`releases/`](./releases/))
 
 ### Build from Source
 - **JDK**: Java 21

@@ -4,6 +4,9 @@ import android.net.Uri
 import android.view.View
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -26,8 +30,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -155,6 +164,26 @@ fun MaxHzPageScreen(
     }
 }
 
+@Composable
+private fun Modifier.onLongPressTogglePage(onLongPress: () -> Unit): Modifier {
+    return this.pointerInput(onLongPress) {
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false)
+            val longPress = awaitLongPressOrCancellation(down.id)
+            if (longPress != null) {
+                longPress.consume()
+                onLongPress()
+                var event = awaitPointerEvent(PointerEventPass.Initial)
+                while (event.changes.any { it.pressed }) {
+                    event.changes.forEach { it.consume() }
+                    event = awaitPointerEvent(PointerEventPass.Initial)
+                }
+                event.changes.forEach { it.consume() }
+            }
+        }
+    }
+}
+
 /**
  * 带按钮的卡片
  */
@@ -164,8 +193,15 @@ private fun ActionGlassCard(
     primaryColor: Color,
     card: MaxHzActionCard
 ) {
+    val haptic = LocalHapticFeedback.current
+    var showSubtitle by remember { mutableStateOf(false) }
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .onLongPressTogglePage {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                showSubtitle = !showSubtitle
+            },
         cornerRadius = 16.dp,
         colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
     ) {
@@ -188,12 +224,14 @@ private fun ActionGlassCard(
                         color = MiuixTheme.colorScheme.onSurface,
                         maxLines = 1
                     )
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        text = card.subtitle,
-                        fontSize = 12.sp,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                    )
+                    if (showSubtitle) {
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = card.subtitle,
+                            fontSize = 12.sp,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                        )
+                    }
                 }
             }
             Spacer(Modifier.height(12.dp))
@@ -219,10 +257,15 @@ private fun GroupGlassCard(
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit
 ) {
+    val haptic = LocalHapticFeedback.current
+    var showGroupSubtitles by remember(pageKey, group.label) { mutableStateOf(false) }
+    val rowExpandedMap = remember(pageKey, group.label) { mutableStateMapOf<String, Boolean>() }
+
     Column {
         Row(
             Modifier
                 .fillMaxWidth()
+                .padding(end = 12.dp)
                 .then(
                     if (group.collapsedByDefault) {
                         Modifier.clickable { onExpandedChange(!expanded) }
@@ -230,16 +273,50 @@ private fun GroupGlassCard(
                         Modifier
                     }
                 ),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            SmallTitle(
-                text = if (group.collapsedByDefault) {
-                    "${group.label} ${if (expanded) "▾" else "▸"}"
-                } else {
-                    group.label
-                },
-                insideMargin = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-            )
+            Box(Modifier.weight(1f)) {
+                SmallTitle(
+                    text = if (group.collapsedByDefault) {
+                        "${group.label} ${if (expanded) "▾" else "▸"}"
+                    } else {
+                        group.label
+                    },
+                    insideMargin = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                )
+            }
+            if (expanded) {
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(
+                            if (showGroupSubtitles) {
+                                MiuixTheme.colorScheme.primary.copy(alpha = 0.14f)
+                            } else {
+                                MiuixTheme.colorScheme.onSurface.copy(alpha = 0.06f)
+                            }
+                        )
+                        .clickable {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            val next = !showGroupSubtitles
+                            showGroupSubtitles = next
+                            rowExpandedMap.clear()
+                        }
+                        .padding(horizontal = 10.dp, vertical = 3.dp)
+                ) {
+                    Text(
+                        text = if (showGroupSubtitles) "隐藏说明" else "显示说明",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = if (showGroupSubtitles) {
+                            MiuixTheme.colorScheme.primary
+                        } else {
+                            MiuixTheme.colorScheme.onSurfaceVariantActions
+                        }
+                    )
+                }
+            }
         }
         if (expanded) {
             Card(
@@ -250,7 +327,19 @@ private fun GroupGlassCard(
                 Column {
                     group.entries.forEach { entry ->
                         key("$pageKey/${entry.title}") {
-                            EntryRow(entry, isDark, primaryColor, refreshTick, pageKey)
+                            val showSub = rowExpandedMap[entry.title] ?: showGroupSubtitles
+                            EntryRow(
+                                entry = entry,
+                                isDark = isDark,
+                                primaryColor = primaryColor,
+                                refreshTick = refreshTick,
+                                pageKey = pageKey,
+                                showSubtitle = showSub,
+                                onToggleSubtitle = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    rowExpandedMap[entry.title] = !showSub
+                                }
+                            )
                         }
                     }
                 }
@@ -265,7 +354,9 @@ private fun EntryRow(
     isDark: Boolean,
     primaryColor: Color,
     refreshTick: Int,
-    pageKey: Int
+    pageKey: Int,
+    showSubtitle: Boolean,
+    onToggleSubtitle: () -> Unit
 ) {
     val cacheKey = "$pageKey/${entry.title}/$refreshTick"
 
@@ -283,63 +374,65 @@ private fun EntryRow(
 
     val colors = LiquidGlassTheme.categoryColorsFor(entry.title)
 
-    if (entry.toggle != null) {
-        val enabled = remember(cacheKey) { entry.toggle.isEnabled() }
-        SwitchPreference(
-            title = entry.title,
-            summary = entry.subtitle,
-            checked = isOn,
-            enabled = enabled,
-            insideMargin = PaddingValues(horizontal = 14.dp, vertical = 11.dp),
-            onCheckedChange = { want ->
-                if (busy) return@SwitchPreference
-                busy = true
-                optimistic = want
-                entry.toggle.onToggle(want) { ok ->
-                    busy = false
-                    if (!ok) optimistic = null
-                    MaxHzComposeRefreshBus.bump()
+    Box(Modifier.onLongPressTogglePage(onToggleSubtitle)) {
+        if (entry.toggle != null) {
+            val enabled = remember(cacheKey) { entry.toggle.isEnabled() }
+            SwitchPreference(
+                title = entry.title,
+                summary = if (showSubtitle) entry.subtitle else null,
+                checked = isOn,
+                enabled = enabled,
+                insideMargin = PaddingValues(horizontal = 14.dp, vertical = 11.dp),
+                onCheckedChange = { want ->
+                    if (busy) return@SwitchPreference
+                    busy = true
+                    optimistic = want
+                    entry.toggle.onToggle(want) { ok ->
+                        busy = false
+                        if (!ok) optimistic = null
+                        MaxHzComposeRefreshBus.bump()
+                    }
+                },
+                startAction = {
+                    Box(Modifier.padding(end = 12.dp)) {
+                        IconBadge(
+                            painter = painterResource(featureIconRes(entry.title)),
+                            colors = Pair(colors.first.toLong(), colors.second.toLong())
+                        )
+                    }
                 }
-            },
-            startAction = {
-                Box(Modifier.padding(end = 12.dp)) {
-                    IconBadge(
-                        painter = painterResource(featureIconRes(entry.title)),
-                        colors = Pair(colors.first.toLong(), colors.second.toLong())
-                    )
-                }
-            }
-        )
-    } else {
-        val isShortStatus = !statusText.isNullOrBlank() && statusText.length <= 8
-        val displaySummary = if (!statusText.isNullOrBlank() && !isShortStatus) {
-            "${entry.subtitle}\n当前状态：$statusText"
+            )
         } else {
-            entry.subtitle
-        }
-        ArrowPreference(
-            title = entry.title,
-            summary = displaySummary,
-            insideMargin = PaddingValues(horizontal = 14.dp, vertical = 11.dp),
-            onClick = entry.onClick,
-            startAction = {
-                Box(Modifier.padding(end = 12.dp)) {
-                    IconBadge(
-                        painter = painterResource(featureIconRes(entry.title)),
-                        colors = Pair(colors.first.toLong(), colors.second.toLong())
-                    )
-                }
-            },
-            endActions = {
-                if (isShortStatus && statusText != null) {
-                    Text(
-                        text = statusText,
-                        fontSize = 12.sp,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantActions
-                    )
-                }
+            val isShortStatus = !statusText.isNullOrBlank() && statusText.length <= 8
+            val displaySummary = if (!statusText.isNullOrBlank() && !isShortStatus) {
+                "${entry.subtitle}\n当前状态：$statusText"
+            } else {
+                entry.subtitle
             }
-        )
+            ArrowPreference(
+                title = entry.title,
+                summary = if (showSubtitle) displaySummary else null,
+                insideMargin = PaddingValues(horizontal = 14.dp, vertical = 11.dp),
+                onClick = entry.onClick,
+                startAction = {
+                    Box(Modifier.padding(end = 12.dp)) {
+                        IconBadge(
+                            painter = painterResource(featureIconRes(entry.title)),
+                            colors = Pair(colors.first.toLong(), colors.second.toLong())
+                        )
+                    }
+                },
+                endActions = {
+                    if (isShortStatus && statusText != null) {
+                        Text(
+                            text = statusText,
+                            fontSize = 12.sp,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantActions
+                        )
+                    }
+                }
+            )
+        }
     }
 }
 
