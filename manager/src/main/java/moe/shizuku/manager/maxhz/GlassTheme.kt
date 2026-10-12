@@ -123,6 +123,25 @@ fun GlassAppTheme(
         }
     }
 
+    val miuixTextStyles = remember {
+        top.yukonga.miuix.kmp.theme.defaultTextStyles(
+            main = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Normal),
+            paragraph = TextStyle(fontSize = 13.sp, lineHeight = 17.5.sp),
+            body1 = TextStyle(fontSize = 13.sp, lineHeight = 17.5.sp),
+            body2 = TextStyle(fontSize = 11.5.sp, lineHeight = 15.5.sp),
+            button = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Medium),
+            footnote1 = TextStyle(fontSize = 11.sp),
+            footnote2 = TextStyle(fontSize = 10.5.sp),
+            headline1 = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Medium),
+            headline2 = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Medium),
+            subtitle = TextStyle(fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold),
+            title1 = TextStyle(fontSize = 19.sp, fontWeight = FontWeight.Bold),
+            title2 = TextStyle(fontSize = 16.5.sp, fontWeight = FontWeight.Bold),
+            title3 = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Bold),
+            title4 = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+        )
+    }
+
     val existingNavOwner = androidx.navigationevent.compose.LocalNavigationEventDispatcherOwner.current
     val fallbackNavOwner = remember {
         object : androidx.navigationevent.NavigationEventDispatcherOwner {
@@ -140,6 +159,7 @@ fun GlassAppTheme(
         ) {
             top.yukonga.miuix.kmp.theme.MiuixTheme(
                 colors = miuixColors,
+                textStyles = miuixTextStyles,
                 content = content
             )
         }

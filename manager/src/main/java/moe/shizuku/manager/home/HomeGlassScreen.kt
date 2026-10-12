@@ -706,19 +706,19 @@ private fun SectionHeader(
     isDark: Boolean,
     primaryColor: Color
 ) {
-    Column(Modifier.padding(start = 6.dp, end = 6.dp, top = 12.dp, bottom = 4.dp)) {
+    Column(Modifier.padding(start = 6.dp, end = 6.dp, top = 4.dp, bottom = 2.dp)) {
         Text(
             text = title,
-            fontSize = 27.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = (-0.5).sp,
+            fontSize = 15.5.sp,
+            fontWeight = FontWeight.SemiBold,
             color = MiuixTheme.colorScheme.onSurface
         )
         if (subtitle != null) {
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(2.dp))
             Text(
                 text = subtitle,
-                fontSize = 12.5.sp,
+                fontSize = 11.5.sp,
+                lineHeight = 15.5.sp,
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary
             )
         }
@@ -749,7 +749,7 @@ private fun HeroCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        cornerRadius = 22.dp,
+        cornerRadius = 20.dp,
         colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
     ) {
         Box(
@@ -757,19 +757,19 @@ private fun HeroCard(
                 .fillMaxWidth()
                 .clipToBounds()
         ) {
-            // 右下/右上角半裁切几何圆环水印（保持 Shizuku Sam 专属科技感，同时赋予大厂主控台呼吸感）
+            // 右上角半裁切几何圆环水印
             val watermarkColor = if (ok) {
-                primaryColor.copy(alpha = if (isDark) 0.24f else 0.16f)
+                primaryColor.copy(alpha = if (isDark) 0.22f else 0.14f)
             } else {
-                (if (isDark) Color(0xFF64748B) else Color(0xFF94A3B8)).copy(alpha = 0.18f)
+                (if (isDark) Color(0xFF64748B) else Color(0xFF94A3B8)).copy(alpha = 0.16f)
             }
             Canvas(
                 modifier = Modifier
-                    .size(124.dp)
+                    .size(108.dp)
                     .align(Alignment.TopEnd)
-                    .offset(x = 26.dp, y = 12.dp)
+                    .offset(x = 22.dp, y = 10.dp)
             ) {
-                val strokeWidth = 10.dp.toPx()
+                val strokeWidth = 8.5.dp.toPx()
                 val radius = (size.minDimension - strokeWidth) / 2f
                 drawCircle(
                     color = watermarkColor,
@@ -808,15 +808,15 @@ private fun HeroCard(
                 }
             }
 
-            Column(Modifier.padding(20.dp)) {
-                // 顶部：超大粗体状态标题 + 柔和浅蓝/浅珊瑚胶囊标签
+            Column(Modifier.padding(16.dp)) {
+                // 顶部：精致状态标题 + 柔和浅蓝/浅珊瑚胶囊标签
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
                         text = if (ok) "运行中" else "未运行",
-                        fontSize = 24.sp,
+                        fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         color = MiuixTheme.colorScheme.onSurface
                     )
@@ -836,19 +836,19 @@ private fun HeroCard(
                         modifier = Modifier
                             .clip(RoundedCornerShape(50))
                             .background(pillBg)
-                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                            .padding(horizontal = 9.dp, vertical = 3.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(5.dp)
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(6.dp)
+                                .size(5.5.dp)
                                 .clip(RoundedCornerShape(50))
                                 .background(pillFg)
                         )
                         Text(
                             text = if (ok) "$runningModeName · v$apiVersion.$patchVersion" else "待激活",
-                            fontSize = 11.5.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = pillFg
                         )
@@ -859,31 +859,31 @@ private fun HeroCard(
                         val doFg = if (isDark) Color(0xFF38BDF8) else Color(0xFF0284C7)
                         Text(
                             text = stringResource(R.string.dhizuku_device_owner_badge),
-                            fontSize = 11.sp,
+                            fontSize = 10.5.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = doFg,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(50))
                                 .background(doBg)
-                                .padding(horizontal = 9.dp, vertical = 4.dp)
+                                .padding(horizontal = 8.dp, vertical = 3.dp)
                         )
                     }
                 }
 
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(6.dp))
 
                 Text(
                     text = if (ok) stringResource(R.string.home_status_activated_summary, runningModeName, apiVersion, patchVersion, "")
                     else if (activePort > 0) stringResource(R.string.home_status_hint_port_found, activePort)
                     else if (!isWifiConnected) stringResource(R.string.home_status_hint_no_wifi)
                     else stringResource(R.string.home_status_hint_ready),
-                    fontSize = 13.sp,
-                    lineHeight = 18.sp,
+                    fontSize = 12.sp,
+                    lineHeight = 16.5.sp,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    modifier = Modifier.padding(end = 56.dp)
+                    modifier = Modifier.padding(end = 48.dp)
                 )
 
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(14.dp))
 
                 if (ok) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1437,12 +1437,14 @@ private fun SwitchItemRow(
     holdDownState: Boolean = false,
     onRowClick: (() -> Unit)? = null
 ) {
+    val rowPadding = PaddingValues(horizontal = 14.dp, vertical = 11.dp)
     if (onRowClick == null && badgeText == null) {
         SwitchPreference(
             title = title,
             summary = subtitle,
             checked = checked,
             holdDownState = holdDownState,
+            insideMargin = rowPadding,
             onCheckedChange = onCheckedChange,
             startAction = {
                 MiuixRowIcon(isDark = isDark, icon = icon, iconTint = iconTint)
@@ -1453,6 +1455,7 @@ private fun SwitchItemRow(
             title = title,
             summary = subtitle,
             holdDownState = holdDownState,
+            insideMargin = rowPadding,
             onClick = {
                 if (onRowClick != null) {
                     onRowClick()
@@ -1467,14 +1470,14 @@ private fun SwitchItemRow(
                 if (badgeText != null) {
                     Box(
                         modifier = Modifier
-                            .padding(end = 8.dp)
-                            .clip(RoundedCornerShape(8.dp))
+                            .padding(end = 6.dp)
+                            .clip(RoundedCornerShape(7.dp))
                             .background(iconTint.copy(alpha = if (isDark) 0.18f else 0.12f))
-                            .padding(horizontal = 8.dp, vertical = 3.5.dp)
+                            .padding(horizontal = 7.dp, vertical = 3.dp)
                     ) {
                         Text(
                             text = badgeText,
-                            fontSize = 11.sp,
+                            fontSize = 10.5.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = iconTint
                         )
@@ -1570,9 +1573,9 @@ private fun MiuixRowIcon(
 ) {
     Box(
         modifier = Modifier
-            .padding(end = 14.dp)
-            .size(38.dp)
-            .clip(RoundedCornerShape(11.dp))
+            .padding(end = 12.dp)
+            .size(34.dp)
+            .clip(RoundedCornerShape(10.dp))
             .background(iconTint.copy(alpha = if (isDark) 0.18f else 0.12f)),
         contentAlignment = Alignment.Center
     ) {
@@ -1580,7 +1583,7 @@ private fun MiuixRowIcon(
             painter = icon,
             contentDescription = null,
             colorFilter = ColorFilter.tint(iconTint),
-            modifier = Modifier.size(20.dp),
+            modifier = Modifier.size(18.dp),
             contentScale = ContentScale.Fit
         )
     }
@@ -1602,6 +1605,7 @@ private fun AdbActionRow(
         title = title,
         summary = subtitle,
         holdDownState = holdDownState,
+        insideMargin = PaddingValues(horizontal = 14.dp, vertical = 11.dp),
         onClick = onClick,
         startAction = {
             MiuixRowIcon(isDark = isDark, icon = icon, iconTint = iconTint)
@@ -1611,13 +1615,13 @@ private fun AdbActionRow(
                 val accent = badgeColor ?: iconTint
                 Text(
                     text = badgeText,
-                    fontSize = 11.5.sp,
+                    fontSize = 10.5.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = accent,
                     modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(RoundedCornerShape(7.dp))
                         .background(accent.copy(alpha = if (isDark) 0.18f else 0.12f))
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                        .padding(horizontal = 7.dp, vertical = 3.dp)
                 )
             }
         }
@@ -1645,19 +1649,19 @@ private fun Tile(
 
     Column(
         modifier
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(12.dp))
             .background(tileBgColor)
-            .padding(horizontal = 12.dp, vertical = 10.dp)
+            .padding(horizontal = 10.dp, vertical = 9.dp)
     ) {
         Text(
             text = label,
-            fontSize = 11.sp,
+            fontSize = 10.5.sp,
             color = MiuixTheme.colorScheme.onSurfaceVariantSummary
         )
-        Spacer(Modifier.height(3.dp))
+        Spacer(Modifier.height(2.dp))
         Text(
             text = value,
-            fontSize = 14.sp,
+            fontSize = 13.sp,
             fontWeight = FontWeight.Bold,
             color = valueColor
         )

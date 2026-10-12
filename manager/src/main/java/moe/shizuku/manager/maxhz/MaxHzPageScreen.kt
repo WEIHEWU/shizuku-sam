@@ -290,6 +290,7 @@ private fun EntryRow(
             summary = entry.subtitle,
             checked = isOn,
             enabled = enabled,
+            insideMargin = PaddingValues(horizontal = 14.dp, vertical = 11.dp),
             onCheckedChange = { want ->
                 if (busy) return@SwitchPreference
                 busy = true
@@ -319,6 +320,7 @@ private fun EntryRow(
         ArrowPreference(
             title = entry.title,
             summary = displaySummary,
+            insideMargin = PaddingValues(horizontal = 14.dp, vertical = 11.dp),
             onClick = entry.onClick,
             startAction = {
                 Box(Modifier.padding(end = 12.dp)) {
@@ -332,7 +334,7 @@ private fun EntryRow(
                 if (isShortStatus && statusText != null) {
                     Text(
                         text = statusText,
-                        fontSize = 12.5.sp,
+                        fontSize = 12.sp,
                         color = MiuixTheme.colorScheme.onSurfaceVariantActions
                     )
                 }

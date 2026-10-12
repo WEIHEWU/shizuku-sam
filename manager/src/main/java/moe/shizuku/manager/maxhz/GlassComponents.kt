@@ -105,7 +105,7 @@ fun GlassCard(
 fun IconBadge(
     painter: Painter,
     colors: Pair<Long, Long>,
-    sizeDp: Int = 38
+    sizeDp: Int = 34
 ) {
     val accent = Color(colors.first)
     Box(
