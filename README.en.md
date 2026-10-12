@@ -1,10 +1,10 @@
 # Shizuku Sam
 
-[中文说明](README.md) · **[📥 Direct Download Latest APK (Shizuku-Sam-v13.8.0.apk · 3.4 MB)](https://github.com/WEIHEWU/shizuku-sam/raw/main/releases/Shizuku-Sam-v13.8.0.apk)** · [Releases](https://github.com/WEIHEWU/shizuku-sam/releases)
+[中文说明](README.md) · **[📥 Direct Download Latest APK (Shizuku-Sam-v13.8.1.apk · 3.4 MB)](https://github.com/WEIHEWU/shizuku-sam/raw/main/releases/Shizuku-Sam-v13.8.1.apk)** · [Releases](https://github.com/WEIHEWU/shizuku-sam/releases)
 
 An enhanced edition of **Shizuku (`moe.shizuku.privileged.api`)** tailored for Samsung One UI 8.5 / Galaxy flagships, built with **Miuix (`top.yukonga.miuix.kmp`)** UI, featuring **Wi-Fi-free Boot Auto-Start (Loopback ADB TLS port scanner)**, a **3-Channel Execution Engine (Root / Shizuku / Device Owner)**, and a **100% genuine, zero-placebo hardware & system tuning suite**.
 
-Current version: `13.8.0` (`versionCode 130800`).
+Current version: `13.8.1` (`versionCode 130801`).
 
 > Tested and verified on Samsung Galaxy S24 Ultra (One UI 8.5 / Android 16), while remaining 100% compatible with the standard Shizuku API ecosystem.
 
@@ -28,7 +28,7 @@ Current version: `13.8.0` (`versionCode 130800`).
 - **Per-Cluster CPU Governor & Frequency Locking**: Adjusts `scaling_governor`, `scaling_min_freq`, and `scaling_max_freq` per CPU cluster (Root required).
 - **Samsung Performance Profile**: Directly toggles `sem_enhanced_cpu_responsiveness` and `low_power`.
 - **Background Process Limit (`ActivityManager.setProcessLimit`) & Samsung RAM Plus (`ram_expand_size`)**.
-- **App DEX Compilation (`cmd package compile -m speed-profile / everything`)**, system-wide cache trimming (`pm trim-caches`), kernel pagecache reclamation (`drop_caches`), and `fstrim`.
+- **App DEX Compilation (Per-app custom selection with `-m speed` full AOT / `-m speed-profile`, core apps, or all apps)**, system-wide cache trimming (`pm trim-caches`), kernel pagecache reclamation (`drop_caches`), and `fstrim`.
 
 ### 4. Battery Health, Charging & Network Privacy
 - **Samsung Battery Protection (`protect_battery` / `battery_protection_threshold`) & Fast Charging Controls**: Miuix modal dialog for charging threshold & direct toggles for `adaptive_fast_charging`, `super_fast_charging`, `wireless_fast_charging`, and bypass power (`pass_through`).
@@ -44,7 +44,7 @@ Requires JDK 21 and Android SDK (`compileSdk 37` / `NDK 29.0.13113456`).
 ./gradlew :manager:assembleRelease
 ```
 
-Output APK: `manager/build/outputs/apk/release/shizuku-v13.8.0-release.apk`.
+Output APK: `manager/build/outputs/apk/release/shizuku-v13.8.1-release.apk`。
 - If `signing.properties` is present in the project root, the release keystore is used.
 - Otherwise, the build script automatically falls back to the Android Debug Keystore so cloned repositories build out of the box.
 

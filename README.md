@@ -1,10 +1,10 @@
 # Shizuku Sam
 
-[English](README.en.md) · **[📥 点击直接下载最新安装包 (Shizuku-Sam-v13.8.0.apk · 3.4 MB)](https://github.com/WEIHEWU/shizuku-sam/raw/main/releases/Shizuku-Sam-v13.8.0.apk)** · [Releases 历史版本页面](https://github.com/WEIHEWU/shizuku-sam/releases)
+[English](README.en.md) · **[📥 点击直接下载最新安装包 (Shizuku-Sam-v13.8.1.apk · 3.4 MB)](https://github.com/WEIHEWU/shizuku-sam/raw/main/releases/Shizuku-Sam-v13.8.1.apk)** · [Releases 历史版本页面](https://github.com/WEIHEWU/shizuku-sam/releases)
 
 基于官方 **Shizuku (`moe.shizuku.privileged.api`)** 深度定制的三星 One UI 8.5 / Galaxy 旗舰增强版，采用 **Miuix (HyperOS / MIUIX KMP)** 原生阻尼与 Bento 卡片交互体系，集成 **无 Wi-Fi 重启自启（Loopback 端口扫描直连）**、**三通道权限引擎（Root / Shizuku / Device Owner）** 以及 **100% 真实生效的系统硬件与显示深度调校套件**。
 
-当前版本：`13.8.0`（`versionCode 130800`）。
+当前版本：`13.8.1`（`versionCode 130801`）。
 
 > 针对三星 Galaxy S24 Ultra（One UI 8.5 / Android 16）深度适配与实机验证，同时完全兼容标准 Shizuku API 生态。
 
@@ -28,7 +28,7 @@
 - **SoC 硬件频率与州长（Governor）锁定**：支持按 CPU Cluster 独立调节 `scaling_governor` 与 `scaling_min_freq` / `scaling_max_freq`（需 Root）。
 - **三星性能模式直控**：直接读写 `sem_enhanced_cpu_responsiveness` 与 `low_power` 系统状态。
 - **后台进程上限 (`ActivityManager.setProcessLimit`) 与三星 RAM Plus (`ram_expand_size`) 调节**。
-- **应用 DEX 编译加速 (`cmd package compile -m speed-profile / everything`)** 与全量应用缓存回收（`pm trim-caches`）。
+- **应用 DEX 编译加速（支持自选指定应用 `-m speed` 极速全编译 / `-m speed-profile` 热点编译 / 全量与核心应用预编译）** 与全量应用缓存回收（`pm trim-caches`）。
 - **内核级内存回收 (`drop_caches`) 与 `fstrim` 闪存碎片整理**。
 
 ### 4. 电池健康、充电控制与网络净化
@@ -45,7 +45,7 @@
 ./gradlew :manager:assembleRelease
 ```
 
-构建产物位于 `manager/build/outputs/apk/release/shizuku-v13.8.0-release.apk`。
+构建产物位于 `manager/build/outputs/apk/release/shizuku-v13.8.1-release.apk`。
 - 若根目录存在 `signing.properties`（配置 `KEYSTORE_FILE`、`KEYSTORE_PASSWORD`、`KEYSTORE_ALIAS`、`KEYSTORE_ALIAS_PASSWORD`），将使用正式签名密钥构建；
 - 若未提供 `signing.properties`，构建脚本会自动回退至 Android Debug Keystore，克隆仓库后即可直接编译运行。
 
