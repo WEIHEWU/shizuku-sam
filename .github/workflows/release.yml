@@ -83,8 +83,39 @@ jobs:
           files: |
             releases/Shizuku-Sam-v13.8.7.apk
 
+      - name: Publish Release v13.8.8 (One UI 9 & Android 17 Full Adaptation, Fix Authorized App Disappearance)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v13.8.8
+          name: "Shizuku Sam v13.8.8 — One UI 9 / 安卓 17 深度适配 & 彻底修复已授权应用消失与列表空白"
+          body: |
+            ### Shizuku Sam v13.8.8
+
+            #### 🎯 针对 One UI 9 (Android 17) 与上游 Shizuku 核心 100% 深度适配与修复
+            - **彻底修复已授权应用消失与弹窗允许后不显示问题 (`AuthorizationManager.kt` / `ShizukuService.java` / `ShizukuConfigManager.java`)**：
+              - **本地 PMS 智能容灾兜底**：适配 Android 17 / One UI 9 底层重构后的 `IPackageManager` 与 Binder 传输机制。针对多应用安装设备，在底层反射兼容层异常返回空时，无缝激活管理端本地 PMS 兜底扫描，通过管理端自身的 `QUERY_ALL_PACKAGES` 权限与 API 37 机制完整补全应用列表，杜绝已授权应用列表显示空白；
+              - **权限双向实时校验与自愈**：在管理端 `granted()`、`grant()`、`revoke()` 中实施 Shizuku UID 内存标志与系统标准运行时权限 `moe.shizuku.manager.permission.API_V23` 的双向同步，即使服务端重启或配置临时重置，已授权应用的权限记录也永不丢失；
+              - **服务端配置自动补全与自愈**：在权限确认广播和配置持久化加载时，自动校验并补齐包名列表，杜绝空包名导致过滤失败或误删配置。
+            - **已授权应用管理页面全生命周期感知 (`ApplicationManagementActivity.kt`)**：
+              - 页面切回前台（`onResume`）自动静默刷新已授权应用列表，在第三方应用请求权限并返回后即刻高亮展示；
+              - 优化加载失败处理逻辑，遇到瞬时异常优雅保留列表与重试，不再闪退关闭页面。
+
+            #### 🔄 核心协议与接口 100% 对齐上游原生 Shizuku
+            - 严格遵循上游 Shizuku 核心架构、AIDL 事务号、Token 校验与权限掩码设计，不擅自增删协议字段，确保对所有调用 Shizuku API 的第三方软件 100% 完美透明兼容。
+
+            #### 🛡️ 系统级防杀与常驻保活体系（Anti-Kill Keepalive）
+            - **Watchdog 守护服务**：精准声明 Android 14+ / 17 严格强制要求的 `specialUse` 前台服务类型与系统属性；
+            - **AOT 预编译后台服务 (`AotCompileService.kt`)**：采用 `dataSync` 前台服务结合 CPU `PARTIAL_WAKE_LOCK`，锁屏或退至后台持续保活运行；
+            - **ADB 自动提权与白名单注入**：自动配置 `dumpsys deviceidle whitelist` 电池不优化白名单与应用活跃桶（`active`）。
+
+            #### ⚡ 16KB ELF 页面对齐与 API 37 编译构建
+            - **JNI CMake 全架构 16KB 页表支持**：全架构编译注入 `-Wl,-z,max-page-size=16384`，完美适配 Galaxy S24 / S25 / S26 等 One UI 9 设备的 16KB 页表内核；
+            - **SDK 全面升级**：`compileSdk = 37`，`targetSdk = 37`，Java 21 现代工具链。
+          files: |
+            releases/Shizuku-Sam-v13.8.8.apk
+
       - name: Publish Future Version Tag Release
-        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2' && github.ref_name != 'v13.8.3' && github.ref_name != 'v13.8.4' && github.ref_name != 'v13.8.5' && github.ref_name != 'v13.8.6' && github.ref_name != 'v13.8.7'
+        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2' && github.ref_name != 'v13.8.3' && github.ref_name != 'v13.8.4' && github.ref_name != 'v13.8.5' && github.ref_name != 'v13.8.6' && github.ref_name != 'v13.8.7' && github.ref_name != 'v13.8.8'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
