@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <a href="./README.md">简体中文</a> | <a href="./README.en.md">English</a> | <a href="https://github.com/WEIHEWU/shizuku-sam/releases/latest"><b>⬇️ Download Latest Release (v13.8.6)</b></a>
+  <a href="./README.md">简体中文</a> | <a href="./README.en.md">English</a> | <a href="https://github.com/WEIHEWU/shizuku-sam/releases/latest"><b>⬇️ Download Latest Release (v13.8.7)</b></a>
 </p>
 
 ---
@@ -15,7 +15,7 @@
 
 **Shizuku Sam** integrates the **Shizuku privileged service** with a purpose-built **Samsung Galaxy (One UI) system scheduler & hardware enhancer, background & deep sleep controller, and per-app refresh rate rule manager** in a single cohesive application.
 
-The entire app (Level 1, Level 2, Level 3 screens, and all dialogs) is unified under the **Miuix (`top.yukonga.miuix.kmp`) UI system**, a **3-tab Liquid Glass floating dock (`Shizuku` · `Hardware` · `App Rules`)**, and **on-demand subtitle toggles (clean single-line titles by default + long-press any row/card to toggle its explanation in place + a `显示说明 / 隐藏说明` pill button on every section/page header)**. Every section, card title, switch, and secondary screen listed below corresponds 1:1 with the actual `v13.8.6` app UI.
+The entire app (Level 1, Level 2, Level 3 screens, and all dialogs) is unified under the **Miuix (`top.yukonga.miuix.kmp`) UI system**, a **3-tab Liquid Glass floating dock (`Shizuku` · `Hardware` · `App Rules`)**, and **on-demand subtitle toggles (clean single-line titles by default + long-press any row/card to toggle its explanation in place + a `显示说明 / 隐藏说明` pill button on every section/page header)**. Every section, card title, switch, and secondary screen listed below corresponds 1:1 with the actual `v13.8.7` app UI.
 
 ---
 
@@ -70,11 +70,11 @@ The entire app (Level 1, Level 2, Level 3 screens, and all dialogs) is unified u
 - **`Outdoor High Brightness Mode`**: Temporarily boosts peak physical brightness under direct sunlight.
 - **`Battery Info & Health`**: Opens a scrollable Miuix `WindowDialog` reading real-time battery level, temperature, charging status, current, voltage, cycle count, and Samsung factory health, with a **`Refresh Data`** button.
 - **`App Cold Launch Boost & Cleanup`** (Tap to open the **`App Launch Boost`** secondary screen):
-  - Card 1 **`ART Machine Code Precompilation`**: Four action buttons:
-    - **`Selected Apps Precompile`** (`v13.8.1`): Opens a multi-select app picker supporting **`Full Speed (`speed`)`**, **`Profile-Guided (`speed-profile`)`**, and **`Reset Cache (`--reset`)`** modes, **`User Apps` / `All` / `System Apps`** filters, search, select all/clear, and real-time per-app compilation progress;
-    - **`Core Apps Precompile`**: Compiles system and core high-frequency apps;
-    - **`All Apps Precompile`**: Runs `speed-profile` compilation across all apps;
-    - **`Clear Compiled Cache`**: Resets compiled state.
+  - Card 1 **`ART Machine Code Precompilation`** (`v13.8.7` Plan A UI overhaul with Foreground Service + real-time notification/status-bar progress & CPU WakeLock keepalive): Four action buttons:
+    - **`Selected Apps Precompile`** (`自选应用编译`): Multi-select app picker supporting **`Profile-Guided (Recommended)` (`speed-profile`)**, **`Full Speed` (`speed`)**, and **`Reset Cache` (`--reset`)**, real-time compilation progress with one-click **`Send to Background`** (`转到后台`);
+    - **`Optimize System & Launcher`** (`优化系统与桌面`): Runs profile-guided speed optimization on Launcher, SystemUI, and system core components for instant butter-smooth navigation;
+    - **`Optimize All Apps`** (`全部应用极速优化`): Batch optimizes all installed apps using `speed-profile` to eliminate cold launch lag across the system;
+    - **`Clear Compiled Cache`** (`清除编译缓存`): Clears compiled native machine code caches and restores stock defaults.
   - Card 2 **`App Cache & Cached Process Cleanup`**: Tap **`Clean & Release Now`** to run `pm trim-caches` and `am kill-all`.
 
 #### 3. `Background & Deep Sleep`
@@ -133,7 +133,7 @@ The entire app (Level 1, Level 2, Level 3 screens, and all dialogs) is unified u
 
 ### Prebuilt APK
 Download the latest signed release APK from **[GitHub Releases](https://github.com/WEIHEWU/shizuku-sam/releases/latest)**:
-- Latest Release: **[`Shizuku-Sam-v13.8.6.apk`](https://github.com/WEIHEWU/shizuku-sam/releases/download/v13.8.6/Shizuku-Sam-v13.8.6.apk)** (also archived under [`releases/`](./releases/))
+- Latest Release: **[`Shizuku-Sam-v13.8.7.apk`](https://github.com/WEIHEWU/shizuku-sam/releases/download/v13.8.7/Shizuku-Sam-v13.8.7.apk)** (also archived under [`releases/`](./releases/))
 
 ### Build from Source
 - **JDK**: Java 21
