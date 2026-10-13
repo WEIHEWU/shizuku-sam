@@ -24,30 +24,34 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Publish Release v13.8.4 (Full-App Unified Miuix UI & On-Demand Subtitle Toggle)
+      - name: Publish Release v13.8.5 (Fix Authorized Apps Crash & Optimize Selected Apps AOT Precompile)
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v13.8.4
-          name: "Shizuku Sam v13.8.4 — 全应用一级/二级/三级页面及弹窗全面统一 Miuix 视觉组件与按需说明开关"
+          tag_name: v13.8.5
+          name: "Shizuku Sam v13.8.5 — 修复授权管理闪退 & 优化指定应用预编译体验"
           body: |
-            ### Shizuku Sam v13.8.4
-            - **全应用 100% 统一 Miuix (`top.yukonga.miuix.kmp`) 视觉与组件体系**：
-              - **二级/三级 Compose 子页面全面重构为原生 Miuix**：
-                - **设置中心 (`SettingsGlassScreen.kt`)**：升级为 Miuix `Scaffold` + `overScrollVertical()` 弹性阻尼滚动 + 无描边 `20.dp` Miuix `Card` + Miuix `SwitchPreference` / `ArrowPreference`；端口号修改弹窗与主题选择弹窗全部升级为 Miuix `WindowDialog`、`TextField` 与 `TextButton`。
-                - **应用授权管理页 (`ApplicationManagementActivity.kt`)**：重构为 Miuix Compose 页面（`MiuixSubPageTopBar` + Miuix `Card` + Miuix `BasicComponent` + Miuix `Switch` + Miuix `WindowDialog`）。
-                - **无线调试配对教程与手动配对弹窗 (`AdbPairingTutorialActivity.kt`)**：重构为原生 Miuix Compose 页面与 `MiuixManualPairingDialog`（Miuix `WindowDialog` + `TextField` + `TextButton` + `AdbMdns` 自动端口发现）。
-                - **终端授权教程页 (`ShellTutorialActivity.kt`) 与服务启动终端页 (`StarterActivity.kt`)**：重构为原生 Miuix Compose 页面与 Miuix `WindowDialog` 异常诊断弹窗。
-              - **MaxHz 二级/三级详情页全面对齐 Miuix 规范 (`LiquidGlassTheme.kt` / `MaxHzActivity.kt`)**：
-                - 统一亮色 `#F5F6F9` / 深色 `#0D0F12` 页面底色、无描边纯色 `20dp` Miuix 卡片（亮色 `#FFFFFF` / 深色 `#181A20`）、Miuix 蓝开关轨道（`#3482FF` / `#277AF7`）、Miuix 柔和浅色圆角图标底座与 `14dp` 圆角按钮。
-            - **全应用统一「方案 B：按需展开说明」极简交互（一级/二级/三级页面全覆盖）**：
-              - 所有页面默认仅展示干净利落的单行主标题，彻底消除多行小字视觉噪点；
-              - **长按任意单行或卡片**：即可在原位平滑展开/收起该功能的详细说明或包名；
-              - **分组/页面右上角 `显示说明 / 隐藏说明` 胶囊开关**：一键切换当前分组或整页全部说明的显示与隐藏。
+            ### Shizuku Sam v13.8.5
+
+            #### 🐛 崩溃与逻辑修复
+            - **修复「管理已授权应用」点击闪退 (`ApplicationManagementActivity.kt` / `AppIconCache.kt`)**：
+              - 移除会导致 Compose `painterResource` 抛出 `IllegalArgumentException` 崩溃的 `<adaptive-icon>` 占位符资源，改为安全矢量图标徽章 + 同步读取 `AppIconCache` 内存缓存。
+            - **修复「指定应用预编译」进度条假 100% 与结果弹窗误报 (`MaxHzActivity.kt`)**：
+              - 编译单个应用时进度条采用动态流光动画（`isIndeterminate = true`），编译多个应用时从 `0%` 按真实完成比例递增，全部完成才显示 `100%`；
+              - 移除会导致失败时耗时翻倍的重复 `||` 命令，严格校验 `dex2oat` 返回码与输出，清晰区分全部成功（`🎉 指定应用预编译已完成` + 单应用实际耗时）、部分完成（`⚠️`）与未成功（`❌ 指定应用预编译未成功` + 底层失败原因）。
+            - **修复「用户应用」列表混入已更新系统组件 (`MaxHzActivity.kt`)**：
+              - 过滤 `FLAG_UPDATED_SYSTEM_APP` 与无代码纯资源包（`FLAG_HAS_CODE`），`AICore`、`AlwaysOnDisplay`、`Android Auto`、`Android System Key Verifier` 等更新过的系统组件不再混入「用户应用」，并在筛选按钮上实时显示精确数量：`用户 (N)` / `全部 (N)` / `系统 (N)`。
+
+            #### ⚡ 体验与视觉优化
+            - **默认预编译模式切换为「热点极速 (推荐) (`speed-profile`)」**：
+              - 单应用仅需 `1 ~ 3 秒` 即可完成核心高频方法机器码编译（相比 `speed` 全量编译提速 10 倍以上且省空间），并在按钮下方实时显示当前模式的耗时与空间说明。
+            - **应用列表新增真实图标与「已热点 / 已全量」绿色状态胶囊 (`MaxHzActivity.kt` / `MaxHzPrefs.kt`)**：
+              - 列表每行异步加载真实应用图标，并对已编译过的应用持久化展示醒目的绿色胶囊标签（`已热点` / `已全量`）。
+            - **提升弹窗内筛选胶囊按钮的未选中底色对比度**。
           files: |
-            releases/Shizuku-Sam-v13.8.4.apk
+            releases/Shizuku-Sam-v13.8.5.apk
 
       - name: Publish Future Version Tag Release
-        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2' && github.ref_name != 'v13.8.3' && github.ref_name != 'v13.8.4'
+        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2' && github.ref_name != 'v13.8.3' && github.ref_name != 'v13.8.4' && github.ref_name != 'v13.8.5'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
