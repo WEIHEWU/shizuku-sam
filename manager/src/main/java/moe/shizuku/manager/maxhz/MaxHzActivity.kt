@@ -4918,7 +4918,9 @@ open class MaxHzActivity : AppBarActivity() {
         val aotBadge = statusBadge(enabledState(MaxHzPrefs.mDexoptEnabled(this@MaxHzActivity)))
         parent.addSpacedView(featureCard(
             "ART 机器码预编译加速",
-            "支持自选指定应用（可选 speed 全量极速编译或 speed-profile 热点编译）、系统核心或全量应用预编译机器码，大幅提升应用冷启动与滑屏流畅度。",
+            "【底层原理】App 安装包内的代码默认为 Dex 字节码，未预编译时每次打开与滑动都需边运行边翻译，容易冷启动慢或掉帧；AOT 预编译会提前将其翻译为 ARM64 原生机器码（.odex），让 CPU 直接全速执行。\n" +
+                "• 热点极速（speed-profile，默认推荐）：仅编译日常高频调用的 10%~20% 核心启动与滑动代码，单应用仅需 1~3 秒、仅占 10~30MB 空间，即可获得约 90% 的流畅度提升。\n" +
+                "• 全量编译（speed）：强制把应用内 100% 的所有类与插件 SDK 全部编译为机器码，单个大型应用需 15~60 秒、占用 100~400MB 空间，适合最重度使用的 3~5 个主力应用（如微信、大型游戏）或刚安装想立刻拉满性能的应用。",
             headerBadges(aotBadge)
         ) {
             addSpacedView(horizontalActions(
@@ -5088,9 +5090,9 @@ open class MaxHzActivity : AppBarActivity() {
                     )
                 }
                 modeDescView.text = when (compileMode) {
-                    "speed-profile" -> "推荐：仅将高频启动与界面滑动的热点方法编译为机器码（-m speed-profile -f），单应用仅需 1~3 秒，省空间且提速显著。"
-                    "speed" -> "深度：强制将应用 100% 字节码全部编译为机器码（-m speed -f）。大型应用（如微信/淘宝/游戏）含大量插件代码，耗时约 15~60 秒。"
-                    else -> "还原：清除所选应用的 AOT 编译缓存（--reset），释放存储空间并恢复系统初始状态。"
+                    "speed-profile" -> "⚡ 热点极速（默认推荐 · speed-profile）：仅编译日常高频调用的 10%~20% 启动与滑动代码。单应用仅需 1~3 秒、占 10~30MB 空间，即可获得约 90% 流畅度提升，适合绝大多数日常应用。"
+                    "speed" -> "🔥 全量编译（深度拉满 · speed）：强制将应用内 100% 所有类与插件 SDK 全部编译为原生机器码。大型应用耗时 15~60 秒、占 100~400MB 空间，适合最重度使用的 3~5 个主力应用（如微信/大型游戏）或新装应用。"
+                    else -> "🧹 重置缓存（--reset）：清除所选应用已生成的本地机器码（.odex）编译缓存，释放存储空间并恢复系统初始状态。"
                 }
             }
 

@@ -1742,7 +1742,7 @@ private fun QuickSwitchesCard(
                 icon = painterResource(R.drawable.ic_maxhz_cpu_24),
                 iconTint = if (isDark) Color(0xFFF87171) else Color(0xFFF54A45),
                 title = "应用冷启动加速与清理",
-                subtitle = "执行 Speed-Profile AOT 预编译加速应用启动，并回收系统冗余缓存",
+                subtitle = "将应用字节码提前编译为 CPU 原生机器码（支持 1~3 秒热点极速编译与 100% 全量编译），消除冷启动与滑动掉帧",
                 badgeText = if (isAppLaunchBoostActive) "已优化" else null,
                 badgeColor = if (isAppLaunchBoostActive) Color(0xFF10B981) else null,
                 groupExpanded = groupExpanded,
