@@ -24,34 +24,34 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Publish Release v13.8.5 (Fix Authorized Apps Crash & Optimize Selected Apps AOT Precompile)
+      - name: Publish Release v13.8.6 (Align Startup & Watchdog with ShizukuPlus & Fix AOT Precompile Timeout)
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v13.8.5
-          name: "Shizuku Sam v13.8.5 — 修复授权管理闪退 & 优化指定应用预编译体验"
+          tag_name: v13.8.6
+          name: "Shizuku Sam v13.8.6 — 对齐上游保活自愈链路 & 修复微信/抖音等大型应用预编译超时"
           body: |
-            ### Shizuku Sam v13.8.5
+            ### Shizuku Sam v13.8.6
 
-            #### 🐛 崩溃与逻辑修复
-            - **修复「管理已授权应用」点击闪退 (`ApplicationManagementActivity.kt` / `AppIconCache.kt`)**：
-              - 移除会导致 Compose `painterResource` 抛出 `IllegalArgumentException` 崩溃的 `<adaptive-icon>` 占位符资源，改为安全矢量图标徽章 + 同步读取 `AppIconCache` 内存缓存。
-            - **修复「指定应用预编译」进度条假 100% 与结果弹窗误报 (`MaxHzActivity.kt`)**：
-              - 编译单个应用时进度条采用动态流光动画（`isIndeterminate = true`），编译多个应用时从 `0%` 按真实完成比例递增，全部完成才显示 `100%`；
-              - 移除会导致失败时耗时翻倍的重复 `||` 命令，严格校验 `dex2oat` 返回码与输出，清晰区分全部成功（`🎉 指定应用预编译已完成` + 单应用实际耗时）、部分完成（`⚠️`）与未成功（`❌ 指定应用预编译未成功` + 底层失败原因）。
-            - **修复「用户应用」列表混入已更新系统组件 (`MaxHzActivity.kt`)**：
-              - 过滤 `FLAG_UPDATED_SYSTEM_APP` 与无代码纯资源包（`FLAG_HAS_CODE`），`AICore`、`AlwaysOnDisplay`、`Android Auto`、`Android System Key Verifier` 等更新过的系统组件不再混入「用户应用」，并在筛选按钮上实时显示精确数量：`用户 (N)` / `全部 (N)` / `系统 (N)`。
+            #### 🐛 修复 AOT 应用预编译（如微信、抖音）超时与阻塞假死问题
+            - **修复未授权 `su` 二进制文件引发的 Shell 阻塞假死 (`ShizukuShellBridge.kt` / `MaxHzShell.kt`)**：
+              - 在 `ShizukuShellBridge` 中移除优先尝试 `Shizuku.newProcess(arrayOf("su"))` 的逻辑，直接通过 Shizuku 启动 `/system/bin/sh`；
+              - 在 `MaxHzShell.detectRoot()` 中改为先执行 `waitFor(2, TimeUnit.SECONDS)` 再读取输出流，彻底消除部分机器存在未授权 `su` 二进制文件时卡死等待 Root 弹窗导致的 45 秒超时。
+            - **对齐 Android 14+ 官方 `ArtService` 主包优先与增量编译策略 (`MaxHzActivity.kt`)**：
+              - **热点极速 (`speed-profile`)**：优先使用 `--split ""` 仅重编主包 `base.apk`（跳过微信/抖音动态加载的几十个小程序/商城/直播插件 Secondary Dex），并在旧系统上自动回退增量编译（不加 `-f`）；
+              - **全量编译 (`speed`)**：优先执行增量编译（复用已编译的动态插件），若未触发则使用 `--split "" -f` 强制重编主包 `base.apk`。
+            - **放宽单应用超时阈值与实时秒数显示 (`MaxHzActivity.kt`)**：
+              - 单应用超时阈值提升至 `speed-profile` **180 秒** / `speed` **360 秒**，编译弹窗实时刷新已耗时秒数（如 `已耗时 12s`），并修正不同编译模式的专属超时提示文案。
 
-            #### ⚡ 体验与视觉优化
-            - **默认预编译模式切换为「热点极速 (推荐) (`speed-profile`)」**：
-              - 单应用仅需 `1 ~ 3 秒` 即可完成核心高频方法机器码编译（相比 `speed` 全量编译提速 10 倍以上且省空间），并在按钮下方实时显示当前模式的耗时与空间说明。
-            - **应用列表新增真实图标与「已热点 / 已全量」绿色状态胶囊 (`MaxHzActivity.kt` / `MaxHzPrefs.kt`)**：
-              - 列表每行异步加载真实应用图标，并对已编译过的应用持久化展示醒目的绿色胶囊标签（`已热点` / `已全量`）。
-            - **提升弹窗内筛选胶囊按钮的未选中底色对比度**。
+            #### 🔄 启动、配对与看门狗保活链路 1:1 严格对齐上游 `ShizukuPlus`
+            - **对齐 C++ 启动器与看门狗三层保活自愈体系**：
+              - 同步 `starter.cpp` 管道同步等待（`pipe` + `poll`）与 `switch_cgroup()` 逃逸、`Starter.kt` 的 `LD_LIBRARY_PATH` 注入；
+              - 同步 `AdbClient` 5 分钟密钥授权等待（`keyOfferInFlight`）、`AdbStarter` 先切 `tcpip:5555` 再执行自提权加固（`WRITE_SECURE_SETTINGS`、`ACCESS_RESTRICTED_SETTINGS`、Doze 白名单、`SCHEDULE_EXACT_ALARM`）；
+              - 同步 `WatchdogService` + `WatchdogWorker`（每 2 小时 + Android 15 锁屏加急通道）+ `WatchdogAlarmReceiver`（每 15 分钟 `RTC_WAKEUP` 精确闹钟跨进程唤醒）三层保活自愈机制。
           files: |
-            releases/Shizuku-Sam-v13.8.5.apk
+            releases/Shizuku-Sam-v13.8.6.apk
 
       - name: Publish Future Version Tag Release
-        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2' && github.ref_name != 'v13.8.3' && github.ref_name != 'v13.8.4' && github.ref_name != 'v13.8.5'
+        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2' && github.ref_name != 'v13.8.3' && github.ref_name != 'v13.8.4' && github.ref_name != 'v13.8.5' && github.ref_name != 'v13.8.6'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
