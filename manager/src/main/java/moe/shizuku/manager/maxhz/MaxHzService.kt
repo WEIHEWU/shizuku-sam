@@ -76,11 +76,16 @@ class MaxHzService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        createNotificationChannel()
-        registerReceiver(screenReceiver, IntentFilter().apply {
+        val filter = IntentFilter().apply {
             addAction(Intent.ACTION_SCREEN_OFF)
             addAction(Intent.ACTION_SCREEN_ON)
-        })
+        }
+        androidx.core.content.ContextCompat.registerReceiver(
+            this,
+            screenReceiver,
+            filter,
+            androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED
+        )
         monitorJob = scope.launch {
             while (isActive) {
                 val appRules = appRefreshRules()

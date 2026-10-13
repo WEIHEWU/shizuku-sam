@@ -10,11 +10,12 @@ if (NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
     message("Builing Release...")
 
     add_compile_options(-Os -flto -fvisibility=hidden -fvisibility-inlines-hidden)
-    add_link_options(-flto -Wl,--exclude-libs,ALL -Wl,--gc-sections -Wl,--strip-all)
+    add_link_options(-flto -Wl,--exclude-libs,ALL -Wl,--gc-sections -Wl,--strip-all -Wl,-z,max-page-size=16384)
 else ()
     message("Builing Debug...")
 
     add_definitions(-DDEBUG)
+    add_link_options(-Wl,-z,max-page-size=16384)
 endif ()
 
 find_package(boringssl REQUIRED CONFIG)

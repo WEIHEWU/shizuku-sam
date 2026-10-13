@@ -129,10 +129,16 @@ public class ShizukuConfigManager extends ConfigManager {
 
             boolean packagesChanged = true;
 
-            for (String packageName : entry.packages) {
-                if (packages.contains(packageName)) {
-                    packagesChanged = false;
-                    break;
+            if (entry.packages.isEmpty()) {
+                entry.packages.addAll(packages);
+                packagesChanged = false;
+                changed = true;
+            } else {
+                for (String packageName : entry.packages) {
+                    if (packages.contains(packageName)) {
+                        packagesChanged = false;
+                        break;
+                    }
                 }
             }
 

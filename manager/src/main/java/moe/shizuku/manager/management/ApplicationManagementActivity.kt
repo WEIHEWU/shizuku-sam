@@ -43,6 +43,7 @@ import moe.shizuku.manager.ktx.toHtml
 import moe.shizuku.manager.maxhz.GlassAppTheme
 import moe.shizuku.manager.utils.AppIconCache
 import moe.shizuku.manager.utils.CustomTabsHelper
+import moe.shizuku.manager.utils.Logger.LOGGER
 import moe.shizuku.manager.utils.ShizukuSystemApis
 import moe.shizuku.manager.utils.UserHandleCompat
 import rikka.html.text.HtmlCompat
@@ -92,10 +93,8 @@ class ApplicationManagementActivity : AppActivity() {
                 }
                 Status.ERROR -> {
                     isLoadingState.value = false
-                    finish()
                     val tr = it.error
-                    Toast.makeText(this, Objects.toString(tr, "unknown"), Toast.LENGTH_SHORT).show()
-                    tr?.printStackTrace()
+                    LOGGER.w(tr, "load packages error")
                 }
                 Status.LOADING -> {
                     isLoadingState.value = true
@@ -143,6 +142,9 @@ class ApplicationManagementActivity : AppActivity() {
 
     override fun onResume() {
         super.onResume()
+        if (Shizuku.pingBinder()) {
+            viewModel.load()
+        }
         refreshTickState.intValue++
     }
 }

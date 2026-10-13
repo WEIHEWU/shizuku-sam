@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <a href="./README.md">简体中文</a> | <a href="./README.en.md">English</a> | <a href="https://github.com/WEIHEWU/shizuku-sam/releases/latest"><b>⬇️ 下载最新正式版 (v13.8.7)</b></a>
+  <a href="./README.md">简体中文</a> | <a href="./README.en.md">English</a> | <a href="https://github.com/WEIHEWU/shizuku-sam/releases/latest"><b>⬇️ 下载最新正式版 (v13.8.8)</b></a>
 </p>
 
 ---
@@ -15,7 +15,7 @@
 
 **Shizuku Sam** 将原生 **Shizuku 特权服务** 与专为三星 Galaxy（One UI）定制的 **系统调度与硬件增强、后台与深度休眠、分应用刷新率规则** 整合为一体。
 
-全应用（一级页面、二级页面、三级页面及所有弹窗）全面统一采用 **Miuix (`top.yukonga.miuix.kmp`) 界面组件体系**、**底部三栏毛玻璃悬浮导航（`Shizuku` · `性能硬件` · `应用规则`）** 以及 **按需展开说明交互（默认单行极简主标题 + 长按单行展开/收起说明 + 顶部 `显示说明 / 隐藏说明` 胶囊开关）**。以下所有卡片名称、开关文案、按钮与二级页面均与当前 `v13.8.7` 真实界面逐字对应。
+全应用（一级页面、二级页面、三级页面及所有弹窗）全面统一采用 **Miuix (`top.yukonga.miuix.kmp`) 界面组件体系**、**底部三栏毛玻璃悬浮导航（`Shizuku` · `性能硬件` · `应用规则`）** 以及 **按需展开说明交互（默认单行极简主标题 + 长按单行展开/收起说明 + 顶部 `显示说明 / 隐藏说明` 胶囊开关）**。以下所有卡片名称、开关文案、按钮与二级页面均与当前 `v13.8.8` 真实界面逐字对应，并全面百分之百深度适配 **Samsung One UI 9 / Android 17**。
 
 ---
 
@@ -137,7 +137,7 @@
 
 ### 直接下载安装包
 前往 **[GitHub Releases](https://github.com/WEIHEWU/shizuku-sam/releases/latest)** 下载最新签名正式版 APK：
-- 最新版本：**[`Shizuku-Sam-v13.8.7.apk`](https://github.com/WEIHEWU/shizuku-sam/releases/download/v13.8.7/Shizuku-Sam-v13.8.7.apk)**（仓库 [`releases/`](./releases/) 目录下亦同步存档）
+- 最新版本：**[`Shizuku-Sam-v13.8.8.apk`](https://github.com/WEIHEWU/shizuku-sam/releases/download/v13.8.8/Shizuku-Sam-v13.8.8.apk)**（仓库 [`releases/`](./releases/) 目录下亦同步存档）
 
 ### 本地编译
 - **JDK**：Java 21

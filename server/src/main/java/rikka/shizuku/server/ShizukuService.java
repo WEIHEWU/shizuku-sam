@@ -300,7 +300,8 @@ public class ShizukuService extends Service<ShizukuUserServiceManager, ShizukuCl
         List<ClientRecord> records = clientManager.findClients(requestUid);
         List<String> packages = new ArrayList<>();
         if (records.isEmpty()) {
-            LOGGER.w("dispatchPermissionConfirmationResult: no client for uid %d was found", requestUid);
+            LOGGER.w("dispatchPermissionConfirmationResult: no client for uid %d was found, fetching from PMS", requestUid);
+            packages.addAll(PackageManagerApis.getPackagesForUidNoThrow(requestUid));
         } else {
             for (ClientRecord record : records) {
                 packages.add(record.packageName);
@@ -309,6 +310,9 @@ public class ShizukuService extends Service<ShizukuUserServiceManager, ShizukuCl
                     record.dispatchRequestPermissionResult(requestCode, allowed);
                 }
             }
+        }
+        if (packages.isEmpty()) {
+            packages.addAll(PackageManagerApis.getPackagesForUidNoThrow(requestUid));
         }
 
         if (!onetime) {
@@ -430,7 +434,7 @@ public class ShizukuService extends Service<ShizukuUserServiceManager, ShizukuCl
                 int flags = 0;
                 ShizukuConfig.PackageEntry entry = configManager.find(uid);
                 if (entry != null) {
-                    if (entry.packages != null && !entry.packages.contains(pi.packageName))
+                    if (entry.packages != null && !entry.packages.isEmpty() && !entry.packages.contains(pi.packageName))
                         continue;
                     flags = entry.flags & ConfigManager.MASK_PERMISSION;
                 }
