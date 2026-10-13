@@ -50,7 +50,7 @@ import moe.shizuku.manager.adb.AdbClient
 import moe.shizuku.manager.adb.AdbKey
 import moe.shizuku.manager.adb.AdbKeyException
 import moe.shizuku.manager.adb.AdbPairingTutorialActivity
-import moe.shizuku.manager.adb.PreferenceAdbKeyStore
+import moe.shizuku.manager.adb.AdbStarter
 import moe.shizuku.manager.app.AppActivity
 import moe.shizuku.manager.app.ThemeHelper
 import moe.shizuku.manager.home.GroupHeaderWithToggle
@@ -58,6 +58,7 @@ import moe.shizuku.manager.home.MiuixRowIcon
 import moe.shizuku.manager.home.MiuixSubPageTopBar
 import moe.shizuku.manager.home.onLongPressToggle
 import moe.shizuku.manager.maxhz.GlassAppTheme
+import moe.shizuku.manager.service.WatchdogService
 import moe.shizuku.manager.utils.AccessibilityHelper
 import moe.shizuku.manager.utils.EnvironmentUtils
 import moe.shizuku.manager.utils.RootBootScriptHelper
@@ -473,8 +474,9 @@ private fun StarterMiuixScreen(
     }
 }
 
-private class ViewModel(private val context: Context, root: Boolean, host: String?, port: Int) : androidx.lifecycle.ViewModel() {
+private class ViewModel(context: Context, root: Boolean, host: String?, port: Int) : androidx.lifecycle.ViewModel() {
 
+    private val appContext = context.applicationContext
     private val sb = StringBuilder()
     private val _output = MutableLiveData<Resource<StringBuilder>>()
 
@@ -485,7 +487,7 @@ private class ViewModel(private val context: Context, root: Boolean, host: Strin
             if (root) {
                 startRoot()
             } else {
-                startAdb(host!!, port)
+                startAdb(host ?: "127.0.0.1", port)
             }
         } catch (e: Throwable) {
             postResult(e)
@@ -532,6 +534,11 @@ private class ViewModel(private val context: Context, root: Boolean, host: Strin
                     postResult()
                 } else {
                     ShizukuSettings.setLastLaunchMode(ShizukuSettings.LaunchMethod.ROOT)
+                    ShizukuSettings.setLastSettledStateRunning(true)
+                    Shell.cmd(AdbStarter.buildSelfHardeningCommand(appContext)).submit()
+                    if (ShizukuSettings.getWatchdog()) {
+                        runCatching { WatchdogService.start(appContext) }
+                    }
                     if (ShizukuSettings.getPreferences().getBoolean(ShizukuSettings.KEEP_START_ON_BOOT, false)) {
                         RootBootScriptHelper.installBootScript()
                     }
@@ -541,63 +548,20 @@ private class ViewModel(private val context: Context, root: Boolean, host: Strin
     }
 
     private fun startAdb(host: String, port: Int) {
-        sb.append("Starting with wireless adb in port $port...").append('\n')
-        postResult()
-
         viewModelScope.launch(Dispatchers.IO) {
-            val key = try {
-                AdbKey(PreferenceAdbKeyStore(ShizukuSettings.getPreferences()), "shizuku")
+            try {
+                AdbStarter.startAdb(appContext, port) {
+                    sb.append(it)
+                    postResult()
+                }
+                Starter.waitForBinder {
+                    sb.append(it)
+                    postResult()
+                }
             } catch (e: Throwable) {
                 e.printStackTrace()
                 sb.append('\n').append(Log.getStackTraceString(e))
-                postResult(AdbKeyException(e))
-                return@launch
-            }
-            var connected = false
-            var lastError: Throwable? = null
-            var retryDelay = 400L
-            for (attempt in 1..8) {
-                try {
-                    AdbClient(host, port, key).use { client ->
-                        client.connect()
-                        connected = true
-                        client.shellCommand(Starter.internalCommand) {
-                            sb.append(String(it))
-                            postResult()
-                        }
-
-                        val tcpPort = ShizukuSettings.getTcpPort()
-                        if (ShizukuSettings.getTcpMode() && port != tcpPort) {
-                            runCatching {
-                                client.command("tcpip:$tcpPort")
-                            }.onFailure {
-                                if (it !is java.io.EOFException && it !is java.net.SocketException) {
-                                    Log.w("StarterActivity", "tcpip command error", it)
-                                }
-                            }
-                            ShizukuSettings.setLastPort(tcpPort)
-                        } else {
-                            ShizukuSettings.setLastPort(port)
-                        }
-
-                        ShizukuSettings.setLastLaunchMode(ShizukuSettings.LaunchMethod.ADB)
-                    }
-                    break
-                } catch (e: Throwable) {
-                    lastError = e
-                    if (attempt < 8 && (e is ConnectException || e is SocketException)) {
-                        delay(retryDelay)
-                        retryDelay = (retryDelay * 1.4).toLong().coerceAtMost(2500L)
-                    } else {
-                        break
-                    }
-                }
-            }
-
-            if (!connected && lastError != null) {
-                lastError.printStackTrace()
-                sb.append('\n').append(Log.getStackTraceString(lastError))
-                postResult(lastError)
+                postResult(e)
             }
         }
     }

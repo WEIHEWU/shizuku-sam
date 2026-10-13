@@ -72,6 +72,21 @@ class AdbPairingTutorialActivity : AppActivity() {
 
     private val notificationEnabledState = mutableStateOf(false)
     private var launchedDeveloperOptions: Boolean = false
+    private val binderReceivedListener = rikka.shizuku.Shizuku.OnBinderReceivedListener {
+        if (!isFinishing) {
+            window?.decorView?.post { if (!isFinishing) finish() }
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        rikka.shizuku.Shizuku.addBinderReceivedListenerSticky(binderReceivedListener)
+    }
+
+    override fun onStop() {
+        super.onStop()
+        rikka.shizuku.Shizuku.removeBinderReceivedListener(binderReceivedListener)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

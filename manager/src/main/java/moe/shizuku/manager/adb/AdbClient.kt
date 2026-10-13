@@ -42,51 +42,61 @@ class AdbClient(private val host: String, private val port: Int, private val key
     private val inputStream get() = if (useTls) tlsInputStream else plainInputStream
     private val outputStream get() = if (useTls) tlsOutputStream else plainOutputStream
 
-    fun connect() {
+    fun connect(onKeyOffered: (() -> Unit)? = null, onKeyOfferDone: (() -> Unit)? = null) {
+        useTls = false
         socket = Socket()
-        socket.connect(InetSocketAddress(host, port), 5000)
-        socket.tcpNoDelay = true
-        socket.soTimeout = 5000 // 5 秒读取超时，防止连接到非 ADB 端口时永久假死挂起
-        socket.keepAlive = true
-        plainInputStream = DataInputStream(socket.getInputStream())
-        plainOutputStream = DataOutputStream(socket.getOutputStream())
+        try {
+            socket.connect(InetSocketAddress(host, port), 5000)
+            socket.tcpNoDelay = true
+            socket.soTimeout = 15000
+            socket.keepAlive = true
+            plainInputStream = DataInputStream(socket.getInputStream())
+            plainOutputStream = DataOutputStream(socket.getOutputStream())
 
-        write(A_CNXN, A_VERSION, A_MAXDATA, "host::")
+            write(A_CNXN, A_VERSION, A_MAXDATA, "host::")
 
-        var message = read()
-        if (message.command == A_STLS) {
-            if (!BuildUtils.atLeast29) {
-                error("Connect to adb with TLS is not supported before Android 9")
-            }
-            write(A_STLS, A_STLS_VERSION, 0)
+            var message = read()
+            if (message.command == A_STLS) {
+                if (!BuildUtils.atLeast29) {
+                    error("Connect to adb with TLS is not supported before Android 9")
+                }
+                write(A_STLS, A_STLS_VERSION, 0)
 
-            val sslContext = key.sslContext
-            tlsSocket = sslContext.socketFactory.createSocket(socket, host, port, true) as SSLSocket
-            tlsSocket.soTimeout = 15000
-            tlsSocket.startHandshake()
-            Log.d(TAG, "Handshake succeeded.")
+                val sslContext = key.sslContext
+                tlsSocket = sslContext.socketFactory.createSocket(socket, host, port, true) as SSLSocket
+                tlsSocket.soTimeout = 15000
+                tlsSocket.startHandshake()
+                Log.d(TAG, "Handshake succeeded.")
 
-            tlsInputStream = DataInputStream(tlsSocket.inputStream)
-            tlsOutputStream = DataOutputStream(tlsSocket.outputStream)
-            useTls = true
+                tlsInputStream = DataInputStream(tlsSocket.inputStream)
+                tlsOutputStream = DataOutputStream(tlsSocket.outputStream)
+                useTls = true
 
-            message = read()
-        } else if (message.command == A_AUTH) {
-            if (message.command != A_AUTH && message.arg0 != ADB_AUTH_TOKEN) error("not A_AUTH ADB_AUTH_TOKEN")
-            write(A_AUTH, ADB_AUTH_SIGNATURE, 0, key.sign(message.data))
-
-            message = read()
-            if (message.command != A_CNXN) {
-                write(A_AUTH, ADB_AUTH_RSAPUBLICKEY, 0, key.adbPublicKey)
-                // 关键点：发送 RSA 公钥后，系统会弹出「是否允许 USB 调试？」授权弹窗。
-                // 给予用户充裕的 60 秒时间去勾选「一律允许」并点击「确定」！
-                socket.soTimeout = 60000
                 message = read()
-                socket.soTimeout = 15000
-            }
-        }
+            } else if (message.command == A_AUTH) {
+                if (message.arg0 != ADB_AUTH_TOKEN) error("not A_AUTH ADB_AUTH_TOKEN")
+                write(A_AUTH, ADB_AUTH_SIGNATURE, 0, key.sign(message.data))
 
-        if (message.command != A_CNXN) error("not A_CNXN")
+                message = read()
+                if (message.command != A_CNXN) {
+                    write(A_AUTH, ADB_AUTH_RSAPUBLICKEY, 0, key.adbPublicKey)
+                    val prevTimeout = socket.soTimeout
+                    socket.soTimeout = 5 * 60 * 1000 // 5 min — wait for Allow/Deny dialog
+                    onKeyOffered?.invoke()
+                    try {
+                        message = read()
+                    } finally {
+                        socket.soTimeout = prevTimeout
+                        onKeyOfferDone?.invoke()
+                    }
+                }
+            }
+
+            if (message.command != A_CNXN) error("not A_CNXN")
+        } catch (e: Exception) {
+            close()
+            throw e
+        }
     }
 
     fun shellCommand(command: String, listener: ((ByteArray) -> Unit)?) {

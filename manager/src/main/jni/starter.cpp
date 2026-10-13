@@ -11,6 +11,7 @@
 #include <cerrno>
 #include <string>
 #include <termios.h>
+#include <poll.h>
 #include "android.h"
 #include "misc.h"
 #include "selinux.h"
@@ -114,14 +115,22 @@ v_current = (uintptr_t) v + v_size - sizeof(char *); \
 }
 
 static void start_server(const char *path, const char *main_class, const char *process_name) {
+    int fds[2];
+    bool has_pipe = (pipe(fds) == 0);
+
     pid_t pid = fork();
     switch (pid) {
         case -1: {
+            if (has_pipe) {
+                close(fds[0]);
+                close(fds[1]);
+            }
             perrorf("fatal: can't fork\n");
             exit(EXIT_FATAL_FORK);
         }
         case 0: {
             LOGD("child");
+            if (has_pipe) close(fds[0]);
             setsid();
             chdir("/");
             int fd = open("/dev/null", O_RDWR);
@@ -131,11 +140,27 @@ static void start_server(const char *path, const char *main_class, const char *p
                 dup2(fd, STDERR_FILENO);
                 if (fd > 2) close(fd);
             }
+            if (has_pipe) {
+                char ready = 1;
+                (void) write(fds[1], &ready, 1);
+                close(fds[1]);
+            }
             run_server(path, main_class, process_name);
         }
         default: {
             printf("info: shizuku_server pid is %d\n", pid);
+            fflush(stdout);
+            if (has_pipe) {
+                close(fds[1]);
+                struct pollfd pfd = { .fd = fds[0], .events = POLLIN, .revents = 0 };
+                if (poll(&pfd, 1, 5000) > 0 && (pfd.revents & POLLIN)) {
+                    char ready = 0;
+                    (void) read(fds[0], &ready, 1);
+                }
+                close(fds[0]);
+            }
             printf("info: shizuku_starter exit with 0\n");
+            fflush(stdout);
             exit(EXIT_SUCCESS);
         }
     }
@@ -197,9 +222,11 @@ int main(int argc, char *argv[]) {
 
     se::init();
 
-    if (uid == 0) {
+    if (uid == 0 || uid == 2000) {
         switch_cgroup();
+    }
 
+    if (uid == 0) {
         if (android_get_device_api_level() >= 29) {
             printf("info: switching mount namespace to init...\n");
             switch_mnt_ns(1);

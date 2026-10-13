@@ -129,6 +129,7 @@ class MaxHzAccessibilityService : AccessibilityService() {
             event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
             event.eventType != AccessibilityEvent.TYPE_WINDOWS_CHANGED
         ) return
+
         gameAutoDiagnostic(
             "event type=${event.eventType} package=$foregroundPackage last=$lastSeenPackage " +
                 "pending=$pendingGameAutoTarget generation=$gameAutoGeneration"

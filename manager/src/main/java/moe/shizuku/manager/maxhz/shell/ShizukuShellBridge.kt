@@ -59,21 +59,12 @@ object ShizukuShellBridge {
         val method = newProcessMethod
             ?: throw IllegalStateException("Shizuku.newProcess API method not accessible.")
         return try {
-            try {
-                method.invoke(
-                    null,
-                    arrayOf("su"),
-                    null,
-                    null
-                ) as Process
-            } catch (t: Throwable) {
-                method.invoke(
-                    null,
-                    arrayOf("/system/bin/sh"),
-                    null,
-                    null
-                ) as Process
-            }
+            method.invoke(
+                null,
+                arrayOf("/system/bin/sh"),
+                null,
+                null
+            ) as Process
         } catch (e: java.lang.reflect.InvocationTargetException) {
             val target = e.targetException ?: e
             if (target is SecurityException) {

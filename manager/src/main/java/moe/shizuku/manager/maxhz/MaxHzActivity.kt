@@ -4919,8 +4919,8 @@ open class MaxHzActivity : AppBarActivity() {
         parent.addSpacedView(featureCard(
             "ART 机器码预编译加速",
             "【底层原理】App 安装包内的代码默认为 Dex 字节码，未预编译时每次打开与滑动都需边运行边翻译，容易冷启动慢或掉帧；AOT 预编译会提前将其翻译为 ARM64 原生机器码（.odex），让 CPU 直接全速执行。\n" +
-                "• 热点极速（speed-profile，默认推荐）：仅编译日常高频调用的 10%~20% 核心启动与滑动代码，单应用仅需 1~3 秒、仅占 10~30MB 空间，即可获得约 90% 的流畅度提升。\n" +
-                "• 全量编译（speed）：强制把应用内 100% 的所有类与插件 SDK 全部编译为机器码，单个大型应用需 15~60 秒、占用 100~400MB 空间，适合最重度使用的 3~5 个主力应用（如微信、大型游戏）或刚安装想立刻拉满性能的应用。",
+                "• 热点极速（speed-profile，默认推荐）：仅编译日常高频调用的 10%~20% 核心启动与滑动代码，单应用仅需 1~5 秒、仅占 10~30MB 空间，即可获得约 90% 的流畅度提升（下方「核心应用预编译」与「全量应用预编译」均采用此极速模式）。\n" +
+                "• 全量编译（speed）：强制把应用内 100% 的所有类与字节码全部编译为机器码，单个大型应用需 15~60 秒、占用 100~400MB 空间，适合在「指定应用预编译」中为最重度使用的 3~5 个主力应用（如微信、大型游戏）单独开启。",
             headerBadges(aotBadge)
         ) {
             addSpacedView(horizontalActions(
@@ -5443,6 +5443,7 @@ open class MaxHzActivity : AppBarActivity() {
                     val (pkg, label) = appList[i]
                     val currentStep = i + 1
                     val startPercent = (i * 100) / total
+                    val hint = if (compileMode == "speed") "\n（全量编译 100% 字节码，大型应用约需 15~60 秒）" else ""
 
                     withContext(Dispatchers.Main) {
                         if (progressDialog.isShowing && !isCancelled) {
@@ -5455,21 +5456,32 @@ open class MaxHzActivity : AppBarActivity() {
                             } else {
                                 "正在编译 [$currentStep/$total] ($startPercent%)"
                             }
-                            val hint = if (compileMode == "speed") "\n（全量编译 100% 字节码，大型应用约需 10~45 秒）" else ""
                             currentAppTextView.text = "当前应用：$label\n($pkg)$hint"
                         }
                     }
 
                     val appStartMs = android.os.SystemClock.elapsedRealtime()
+                    val tickerJob = launch(Dispatchers.Main) {
+                        while (true) {
+                            delay(1000L)
+                            if (!progressDialog.isShowing || isCancelled) break
+                            val sec = (android.os.SystemClock.elapsedRealtime() - appStartMs) / 1000L
+                            if (sec >= 2L) {
+                                currentAppTextView.text = "当前应用：$label（已耗时 ${sec}s...）\n($pkg)$hint"
+                            }
+                        }
+                    }
+
                     val cmd = when (compileMode) {
-                        "speed" -> "cmd package compile -m speed -f \"$pkg\""
-                        "speed-profile" -> "cmd package compile -m speed-profile -f \"$pkg\""
+                        "speed" -> "cmd package compile -m speed --split \"\" -f \"$pkg\" 2>/dev/null || cmd package compile -m speed -f \"$pkg\""
+                        "speed-profile" -> "cmd package compile -m speed-profile --split \"\" -f \"$pkg\" 2>/dev/null || cmd package compile -m speed-profile \"$pkg\""
                         else -> "cmd package compile --reset \"$pkg\""
                     }
                     val res = MaxHzShell.execRaw(
                         cmd,
-                        timeoutMs = if (compileMode == "speed") 180_000L else 45_000L
+                        timeoutMs = if (compileMode == "speed") 360_000L else 180_000L
                     )
+                    tickerJob.cancel()
                     val elapsedSec = ((android.os.SystemClock.elapsedRealtime() - appStartMs) / 100L) / 10.0
                     val combinedOutput = "${res.out}\n${res.err}".trim()
                     val isOk = res.code == 0 &&
@@ -5482,9 +5494,14 @@ open class MaxHzActivity : AppBarActivity() {
                         succeededSummary.add("• $label（耗时 ${elapsedSec}s）")
                     } else {
                         val reason = when {
-                            res.code == -1 -> "编译超时（该应用体积过大，建议改用「热点极速」模式）"
-                            combinedOutput.isNotBlank() -> combinedOutput.lineSequence().firstOrNull()?.take(80) ?: "退出码 ${res.code}"
-                            else -> "系统拒绝编译或无独立字节码（退出码 ${res.code}）"
+                            res.code == -1 && compileMode == "speed" ->
+                                "编译超时（全量编译体积过大，建议改用「热点极速」模式）"
+                            res.code == -1 ->
+                                "编译超时（内部动态插件过多或后台特权通道未响应）"
+                            combinedOutput.isNotBlank() ->
+                                combinedOutput.lineSequence().firstOrNull()?.take(80) ?: "退出码 ${res.code}"
+                            else ->
+                                "系统拒绝编译或无独立字节码（退出码 ${res.code}）"
                         }
                         failedSummary.add("• $label：$reason")
                     }
@@ -5533,7 +5550,11 @@ open class MaxHzActivity : AppBarActivity() {
                 val msg = buildString {
                     append("所选 $total 个应用均未完成编译：\n\n")
                     append(failedSummary.take(6).joinToString("\n"))
-                    append("\n\n💡 提示：若大型应用在「全量编译 (speed)」下耗时过长，建议改选「热点极速 (speed-profile)」，仅需 1~3 秒即可完成提速。")
+                    if (compileMode == "speed") {
+                        append("\n\n💡 提示：若大型应用在「全量编译 (speed)」下耗时过长，建议改选「热点极速 (speed-profile)」，仅需数秒即可完成提速。")
+                    } else {
+                        append("\n\n💡 提示：请确认 Shizuku 服务处于正常运行状态后重试。")
+                    }
                 }
                 MaterialAlertDialogBuilder(this@MaxHzActivity)
                     .setTitle("❌ 指定应用预编译未成功")
@@ -5712,8 +5733,8 @@ open class MaxHzActivity : AppBarActivity() {
                     }
 
                     val res = MaxHzShell.execRaw(
-                        "cmd package compile -m speed-profile -f \"$pkg\"",
-                        timeoutMs = 35000
+                        "cmd package compile -m speed-profile --split \"\" -f \"$pkg\" 2>/dev/null || cmd package compile -m speed-profile \"$pkg\"",
+                        timeoutMs = 120_000L
                     )
                     val combinedOutput = "${res.out}\n${res.err}".trim()
                     if (res.code == 0 && !combinedOutput.contains("Failure", ignoreCase = true)) {

@@ -11,17 +11,42 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import moe.shizuku.manager.R
 import moe.shizuku.manager.ShizukuSettings
+import moe.shizuku.manager.service.WatchdogService
 import moe.shizuku.manager.starter.Starter
 import moe.shizuku.manager.utils.EnvironmentUtils
 import java.io.EOFException
+import java.io.File
 import java.net.SocketException
 import java.net.SocketTimeoutException
 
 object AdbStarter {
 
+    @Volatile
+    var keyOfferInFlight: Boolean = false
+
+    fun buildSelfHardeningCommand(context: Context): String {
+        val pkg = context.packageName
+        val nativeDir = context.applicationInfo.nativeLibraryDir
+        val libPath = File(nativeDir, "libshizuku.so").absolutePath
+        return buildString {
+            append("cmd appops set $pkg ACCESS_RESTRICTED_SETTINGS allow 2>/dev/null; ")
+            append("appops set $pkg ACCESS_RESTRICTED_SETTINGS allow 2>/dev/null; ")
+            append("pm grant $pkg android.permission.WRITE_SECURE_SETTINGS 2>/dev/null; ")
+            append("dumpsys deviceidle whitelist +$pkg 2>/dev/null; ")
+            append("cmd appops set $pkg SYSTEM_ALERT_WINDOW allow 2>/dev/null; ")
+            append("cmd appops set $pkg GET_USAGE_STATS allow 2>/dev/null; ")
+            append("cmd appops set $pkg SCHEDULE_EXACT_ALARM allow 2>/dev/null; ")
+            append("cmd appops set $pkg RUN_IN_BACKGROUND allow 2>/dev/null; ")
+            append("cmd appops set $pkg RUN_ANY_IN_BACKGROUND allow 2>/dev/null; ")
+            append("am set-standby-bucket $pkg active 2>/dev/null; ")
+            append("cp $libPath /data/local/tmp/shizuku 2>/dev/null && chmod 755 /data/local/tmp/shizuku 2>/dev/null; ")
+            append("true")
+        }
+    }
+
     suspend fun startAdb(context: Context, port: Int, log: ((String) -> Unit)? = null) {
         try {
-            log?.invoke("Starting with wireless adb...\n")
+            log?.invoke("Starting with wireless adb in port $port...\n")
 
             withContext(Dispatchers.IO) {
                 val key = runCatching {
@@ -35,24 +60,32 @@ object AdbStarter {
                 val tcpMode = ShizukuSettings.getTcpMode()
                 val tcpPort = ShizukuSettings.getTcpPort()
                 if (tcpMode && activePort != tcpPort) {
-                    log?.invoke("Connecting on port $activePort...")
+                    log?.invoke("Connecting on port $activePort...\n")
                     AdbClient("127.0.0.1", activePort, key).use { client ->
-                        client.connect()
-                        log?.invoke("Successfully connected on port $activePort...")
-                        log?.invoke("\nRestarting in TCP mode port: $tcpPort")
+                        connectWithRetry(client)
+                        log?.invoke("Successfully connected on port $activePort...\n")
+                        log?.invoke("Restarting in TCP mode port: $tcpPort\n")
                         activePort = tcpPort
                         runCatching { client.command("tcpip:$activePort") }
                             .onFailure { if (it !is EOFException && it !is SocketException) throw it }
                     }
                 }
 
-                log?.invoke("Connecting on port $activePort...")
+                log?.invoke("Connecting on port $activePort...\n")
                 AdbClient("127.0.0.1", activePort, key).use { client ->
                     connectWithRetry(client)
                     log?.invoke("Successfully connected on port $activePort...\n")
                     client.command("shell:${Starter.internalCommand}") { log?.invoke(String(it)) }
+                    runCatching {
+                        client.command("shell:${buildSelfHardeningCommand(context)}")
+                    }
                 }
                 ShizukuSettings.setLastPort(activePort)
+                ShizukuSettings.setLastLaunchMode(ShizukuSettings.LaunchMethod.ADB)
+                ShizukuSettings.setLastSettledStateRunning(true)
+                if (ShizukuSettings.getWatchdog()) {
+                    runCatching { WatchdogService.start(context.applicationContext) }
+                }
             }
         } finally {
             if (ShizukuSettings.getAutoDisableUsbDebugging() && context.checkSelfPermission(WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED) {
@@ -104,7 +137,10 @@ object AdbStarter {
                     delay(delayTime)
                     delayTime = (delayTime * 1.5).toLong().coerceAtMost(3000L) // Exponential backoff up to 3s
                 }
-                client.connect()
+                client.connect(
+                    onKeyOffered = { keyOfferInFlight = true },
+                    onKeyOfferDone = { keyOfferInFlight = false }
+                )
                 break
             } catch (e: Exception) {
                 if (attempt == maxAttempts || e is CancellationException) throw e

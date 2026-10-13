@@ -39,6 +39,7 @@ public class ShizukuSettings {
     public static final String LANGUAGE = "language";
     public static final String KEEP_START_ON_BOOT = "start_on_boot";
     public static final String WATCHDOG = "watchdog";
+    public static final String LAST_SETTLED_STATE_RUNNING = "last_settled_state_running";
     public static final String TCP_MODE = "tcp_mode";
     public static final String TCP_PORT = "tcp_port";
     public static final String LAST_PORT = "last_port";
@@ -100,7 +101,19 @@ public class ShizukuSettings {
     }
 
     public static void setLastLaunchMode(@LaunchMethod int method) {
-        getPreferences().edit().putInt("mode", method).apply();
+        SharedPreferences.Editor editor = getPreferences().edit().putInt("mode", method);
+        if (method == LaunchMethod.ROOT || method == LaunchMethod.ADB) {
+            editor.putBoolean(LAST_SETTLED_STATE_RUNNING, true);
+        }
+        editor.apply();
+    }
+
+    public static boolean isLastSettledStateRunning() {
+        return getPreferences().getBoolean(LAST_SETTLED_STATE_RUNNING, getLastLaunchMode() != LaunchMethod.UNKNOWN);
+    }
+
+    public static void setLastSettledStateRunning(boolean running) {
+        getPreferences().edit().putBoolean(LAST_SETTLED_STATE_RUNNING, running).apply();
     }
 
     public static String getAuthToken() {
@@ -118,7 +131,7 @@ public class ShizukuSettings {
     }
 
     public static boolean getWatchdog() {
-        return getPreferences().getBoolean(WATCHDOG, false);
+        return getPreferences().getBoolean(WATCHDOG, true);
     }
 
     public static boolean isWatchdogRunning() {
@@ -126,12 +139,16 @@ public class ShizukuSettings {
     }
 
     public static void setWatchdog(Context context, boolean enable) {
+        getPreferences().edit().putBoolean(WATCHDOG, enable).apply();
         if (enable) {
             WatchdogService.start(context);
+            moe.shizuku.manager.service.WatchdogWorker.enqueue(context);
+            moe.shizuku.manager.service.WatchdogAlarmReceiver.scheduleNext(context);
         } else {
             WatchdogService.stop(context);
+            moe.shizuku.manager.service.WatchdogWorker.cancel(context);
+            moe.shizuku.manager.service.WatchdogAlarmReceiver.cancel(context);
         }
-        getPreferences().edit().putBoolean(WATCHDOG, enable).apply();
     }
 
     public static boolean getTcpMode() {

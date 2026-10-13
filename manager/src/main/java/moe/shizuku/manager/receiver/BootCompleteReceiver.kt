@@ -9,38 +9,43 @@ import moe.shizuku.manager.AppConstants
 import moe.shizuku.manager.ShizukuSettings
 import moe.shizuku.manager.maxhz.MaxHzPrefs
 import moe.shizuku.manager.maxhz.MaxHzService
+import moe.shizuku.manager.service.WatchdogAlarmReceiver
 import moe.shizuku.manager.service.WatchdogService
-import moe.shizuku.manager.utils.UserHandleCompat
-import rikka.shizuku.Shizuku
 
 class BootCompleteReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
-        if (Intent.ACTION_LOCKED_BOOT_COMPLETED != intent.action
-            && Intent.ACTION_BOOT_COMPLETED != intent.action) {
-            return
+        val action = intent.action ?: return
+        val handled = when (action) {
+            Intent.ACTION_BOOT_COMPLETED,
+            Intent.ACTION_LOCKED_BOOT_COMPLETED,
+            Intent.ACTION_MY_PACKAGE_REPLACED,
+            "android.intent.action.QUICKBOOT_POWERON",
+            "com.htc.intent.action.QUICKBOOT_POWERON" -> true
+            else -> false
         }
+        if (!handled) return
 
-        val userManager = context.getSystemService(android.os.UserManager::class.java)
-        if (userManager != null && !userManager.isUserUnlocked) {
-            // 用户未解锁设备前，CE 加密存储不可读，直接返回等待 ACTION_BOOT_COMPLETED
-            return
-        }
+        Log.i(AppConstants.TAG, "BootCompleteReceiver triggered by: $action")
 
-        startMaxHzServiceIfNeeded(context)
-
-        if (Intent.ACTION_BOOT_COMPLETED == intent.action) {
-            if (UserHandleCompat.myUserId() > 0 || Shizuku.pingBinder()) return
-            val pendingResult = goAsync()
-            ShizukuReceiverStarter.start(context) {
-                try {
-                    pendingResult.finish()
-                } catch (_: Throwable) {}
+        if (action != Intent.ACTION_LOCKED_BOOT_COMPLETED) {
+            startMaxHzServiceIfNeeded(context)
+            try {
+                ShizukuReceiverStarter.start(context)
+            } catch (e: Exception) {
+                Log.w(AppConstants.TAG, "Auto-start skipped (service not ready, e.g. direct boot)", e)
             }
+        } else {
+            Log.d(AppConstants.TAG, "LOCKED_BOOT_COMPLETED — deferring start to BOOT_COMPLETED")
+        }
+
+        try {
             if (ShizukuSettings.getWatchdog()) {
-                runCatching { WatchdogService.start(context) }
-                    .onFailure { Log.w(AppConstants.TAG, "Unable to start Shizuku watchdog", it) }
+                WatchdogService.start(context)
+                WatchdogAlarmReceiver.scheduleNext(context)
             }
+        } catch (e: Exception) {
+            Log.w(AppConstants.TAG, "Watchdog start skipped", e)
         }
     }
 

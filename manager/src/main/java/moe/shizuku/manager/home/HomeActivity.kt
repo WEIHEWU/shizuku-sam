@@ -142,6 +142,7 @@ abstract class HomeActivity : MaxHzActivity() {
     private val isInstantSwitchActiveState = mutableStateOf(false)
     private val supportedRefreshRatesState = mutableStateOf<List<Int>>(listOf(10, 24, 30, 48, 60, 90, 120))
     private var lastRecordedThemeKey: String? = null
+    private var autoRestartAttempted = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -152,7 +153,22 @@ abstract class HomeActivity : MaxHzActivity() {
             homeStatusState.value = homeModel.serviceStatus.value?.data
             if (it.status == Status.SUCCESS) {
                 val status = homeModel.serviceStatus.value?.data ?: return@observe
-                ShizukuSettings.setLastLaunchMode(if (status.uid == 0) ShizukuSettings.LaunchMethod.ROOT else ShizukuSettings.LaunchMethod.ADB)
+                if (status.isRunning) {
+                    autoRestartAttempted = true
+                    ShizukuSettings.setLastLaunchMode(if (status.uid == 0) ShizukuSettings.LaunchMethod.ROOT else ShizukuSettings.LaunchMethod.ADB)
+                } else if (!autoRestartAttempted &&
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+                    ShizukuSettings.getLastLaunchMode() == ShizukuSettings.LaunchMethod.ADB &&
+                    checkSelfPermission(android.Manifest.permission.WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED
+                ) {
+                    val sysPropPort = EnvironmentUtils.getAdbTcpPort()
+                    val discoveredPort = activeAdbPortState.intValue
+                    val hasLivePort = sysPropPort in 1..65535 || discoveredPort in 1..65535
+                    if (hasLivePort) {
+                        autoRestartAttempted = true
+                        moe.shizuku.manager.adb.AdbStartWorker.enqueue(this)
+                    }
+                }
                 // Compose 版通过 homeStatusState 快照自动重组，无需手动重渲染
                 if (selectedPage == Page.SHIZUKU && homeComposeView == null) {
                     renderShizukuDslPage()
@@ -175,7 +191,9 @@ abstract class HomeActivity : MaxHzActivity() {
         setupInitialPage()
         updateMaxHzServiceState()
         syncStatusChangeLogs()
-        moe.shizuku.manager.receiver.ShizukuReceiverStarter.cancelAdbStart(this)
+        if (Shizuku.pingBinder()) {
+            moe.shizuku.manager.receiver.ShizukuReceiverStarter.cancelAdbStart(this)
+        }
 
         lifecycleScope.launch(Dispatchers.IO) {
             val rootAvail = MaxHzShell.isRootAvailable()
@@ -446,12 +464,14 @@ abstract class HomeActivity : MaxHzActivity() {
             MaterialAlertDialogBuilder(this)
                 .setMessage(R.string.dialog_stop_message)
                 .setPositiveButton(android.R.string.ok) { _, _ ->
+                    ShizukuSettings.setLastSettledStateRunning(false)
                     try { Shizuku.exit() } catch (_: Throwable) {}
                 }
                 .setNegativeButton(android.R.string.cancel, null)
                 .show()
         },
         onConfirmStopService = {
+            ShizukuSettings.setLastSettledStateRunning(false)
             try { Shizuku.exit() } catch (_: Throwable) {}
         },
         onModeChange = { mode -> handleModeChange(mode) },
@@ -1422,6 +1442,7 @@ abstract class HomeActivity : MaxHzActivity() {
                                     MaterialAlertDialogBuilder(this@HomeActivity)
                                         .setMessage(R.string.dialog_stop_message)
                                         .setPositiveButton(android.R.string.ok) { _, _ ->
+                                            ShizukuSettings.setLastSettledStateRunning(false)
                                             try { Shizuku.exit() } catch (_: Throwable) {}
                                         }
                                         .setNegativeButton(android.R.string.cancel, null)
@@ -1472,6 +1493,14 @@ abstract class HomeActivity : MaxHzActivity() {
         if (rikka.shizuku.Shizuku.pingBinder()) {
             Toast.makeText(this, "Shizuku 服务已在运行中", Toast.LENGTH_SHORT).show()
             return
+        }
+
+        if (checkSelfPermission(android.Manifest.permission.WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED) {
+            runCatching {
+                Settings.Global.putInt(contentResolver, Settings.Global.ADB_ENABLED, 1)
+                Settings.Global.putLong(contentResolver, "adb_allowed_connection_time", 0L)
+                Settings.Global.putInt(contentResolver, "adb_wifi_enabled", 1)
+            }
         }
 
         if (!EnvironmentUtils.isAdbEnabled(this)) {
@@ -1689,6 +1718,16 @@ abstract class HomeActivity : MaxHzActivity() {
                 isWifiConnectedState.value = wifi
                 isHotspotActiveState.value = hotspot
                 activeAdbPortState.intValue = port
+                if (!Shizuku.pingBinder() &&
+                    !autoRestartAttempted &&
+                    port in 1..65535 &&
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+                    ShizukuSettings.getLastLaunchMode() == ShizukuSettings.LaunchMethod.ADB &&
+                    checkSelfPermission(android.Manifest.permission.WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED
+                ) {
+                    autoRestartAttempted = true
+                    moe.shizuku.manager.adb.AdbStartWorker.enqueue(this@HomeActivity)
+                }
             }
         }
     }
@@ -1724,6 +1763,7 @@ abstract class HomeActivity : MaxHzActivity() {
                 MaterialAlertDialogBuilder(this)
                     .setMessage(R.string.dialog_stop_message)
                     .setPositiveButton(android.R.string.ok) { _: DialogInterface?, _: Int ->
+                        ShizukuSettings.setLastSettledStateRunning(false)
                         try {
                             Shizuku.exit()
                         } catch (_: Throwable) {

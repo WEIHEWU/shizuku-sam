@@ -43,7 +43,8 @@ internal object ShellScriptTransport {
         val stdinThread = daemonThread("MaxHzShell-stdin") {
             try {
                 process.outputStream.use { input ->
-                    input.write(script.toByteArray(StandardCharsets.UTF_8))
+                    val payload = if (script.endsWith("\n")) script else "$script\n"
+                    input.write(payload.toByteArray(StandardCharsets.UTF_8))
                     input.flush()
                 }
             } catch (t: Throwable) {

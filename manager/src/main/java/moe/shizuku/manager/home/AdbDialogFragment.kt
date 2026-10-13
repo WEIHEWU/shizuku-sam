@@ -88,6 +88,13 @@ class AdbDialogFragment : DialogFragment() {
     private fun onDialogShow(dialog: AlertDialog) {
         adbMdns.start()
         val context = dialog.context
+        if (context.checkSelfPermission(WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED) {
+            runCatching {
+                Settings.Global.putInt(context.contentResolver, Settings.Global.ADB_ENABLED, 1)
+                Settings.Global.putLong(context.contentResolver, "adb_allowed_connection_time", 0L)
+                Settings.Global.putInt(context.contentResolver, "adb_wifi_enabled", 1)
+            }
+        }
 
         val isWifi = HotspotHelper.isWifiConnected(context)
         if (!isWifi) {

@@ -43,17 +43,22 @@ object MaxHzShell {
      * Fix CVE-M01: 使用 uid=0(root) 精确匹配，避免 "rootdir" 等字符串误判。
      */
     private fun detectRoot(): Boolean {
+        var p: Process? = null
         return try {
-            val p = Runtime.getRuntime().exec(arrayOf("su", "-c", "id"))
-            val output = p.inputStream.bufferedReader().use { it.readText() }
-            // Fix CVE-M01: 限制等待时间，超时则强制销毁进程
-            val exited = p.waitFor(3, TimeUnit.SECONDS)
+            p = Runtime.getRuntime().exec(arrayOf("su", "-c", "id"))
+            p.outputStream.close()
+            val exited = p.waitFor(2, TimeUnit.SECONDS)
             if (!exited) {
                 p.destroyForcibly()
+                return false
             }
-            // Fix CVE-M01: 精确匹配 uid=0(root)，而非宽泛的 contains("root")
-            exited && p.exitValue() == 0 && output.contains(Regex("""uid=0\(root\)"""))
+            if (p.exitValue() != 0) {
+                return false
+            }
+            val output = p.inputStream.bufferedReader().use { it.readText() }
+            output.contains(Regex("""uid=0\(root\)"""))
         } catch (t: Throwable) {
+            runCatching { p?.destroyForcibly() }
             false
         }
     }
