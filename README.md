@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <a href="./README.md">简体中文</a> | <a href="./README.en.md">English</a> | <a href="https://github.com/WEIHEWU/shizuku-sam/releases/latest"><b>⬇️ 下载最新正式版 (v13.8.4)</b></a>
+  <a href="./README.md">简体中文</a> | <a href="./README.en.md">English</a> | <a href="https://github.com/WEIHEWU/shizuku-sam/releases/latest"><b>⬇️ 下载最新正式版 (v13.8.5)</b></a>
 </p>
 
 ---
@@ -15,7 +15,7 @@
 
 **Shizuku Sam** 将原生 **Shizuku 特权服务** 与专为三星 Galaxy（One UI）定制的 **系统调度与硬件增强、后台与深度休眠、分应用刷新率规则** 整合为一体。
 
-全应用（一级页面、二级页面、三级页面及所有弹窗）全面统一采用 **Miuix (`top.yukonga.miuix.kmp`) 界面组件体系**、**底部三栏毛玻璃悬浮导航（`Shizuku` · `性能硬件` · `应用规则`）** 以及 **按需展开说明交互（默认单行极简主标题 + 长按单行展开/收起说明 + 顶部 `显示说明 / 隐藏说明` 胶囊开关）**。以下所有卡片名称、开关文案、按钮与二级页面均与当前 `v13.8.4` 真实界面逐字对应。
+全应用（一级页面、二级页面、三级页面及所有弹窗）全面统一采用 **Miuix (`top.yukonga.miuix.kmp`) 界面组件体系**、**底部三栏毛玻璃悬浮导航（`Shizuku` · `性能硬件` · `应用规则`）** 以及 **按需展开说明交互（默认单行极简主标题 + 长按单行展开/收起说明 + 顶部 `显示说明 / 隐藏说明` 胶囊开关）**。以下所有卡片名称、开关文案、按钮与二级页面均与当前 `v13.8.5` 真实界面逐字对应。
 
 ---
 
@@ -71,7 +71,7 @@
 - **`电池运行信息与健康度`**（带 `实时直读` 标签）：点击弹出 Miuix `WindowDialog` 顶层可滚动弹窗，实时读取电量、温度、充电状态、电流、电压、循环数、三星原厂健康度等硬件信息，支持 **`刷新数据`**。
 - **`应用冷启动加速与清理`**（点击进入二级页面 **`应用启动加速`**）：
   - 卡片 1 **`ART 机器码预编译加速`**：提供四个操作按钮——
-    - **`指定应用预编译`**（`v13.8.1` 新增）：弹出应用多选窗口，支持切换 **`极速全编译` (`speed`)**、**`热点编译` (`speed-profile`)**、**`重置缓存` (`--reset`)** 三档模式，支持按 **`用户应用` / `全部` / `系统应用`** 筛选、关键词搜索、全选/清空，并实时显示逐应用编译百分比进度；
+    - **`指定应用预编译`**（`v13.8.5` 增强）：弹出应用多选窗口，默认选中 **`热点极速 (推荐)` (`speed-profile`，单应用 1~3 秒)**，支持切换 **`全量编译` (`speed`)**、**`重置缓存` (`--reset`)** 三档模式；精准区分 **`用户 (N)` / `全部 (N)` / `系统 (N)`** 应用，展示真实应用图标与 **`已热点` / `已全量`** 编译状态胶囊，并实时显示真实编译进度与单应用耗时；
     - **`核心应用预编译`**：仅对系统与高频核心应用执行预编译；
     - **`全量应用预编译`**：对全部应用执行 `speed-profile` 预编译；
     - **`清除编译缓存`**：还原预编译状态。
@@ -137,7 +137,7 @@
 
 ### 直接下载安装包
 前往 **[GitHub Releases](https://github.com/WEIHEWU/shizuku-sam/releases/latest)** 下载最新签名正式版 APK：
-- 最新版本：**[`Shizuku-Sam-v13.8.4.apk`](https://github.com/WEIHEWU/shizuku-sam/releases/download/v13.8.4/Shizuku-Sam-v13.8.4.apk)**（仓库 [`releases/`](./releases/) 目录下亦同步存档）
+- 最新版本：**[`Shizuku-Sam-v13.8.5.apk`](https://github.com/WEIHEWU/shizuku-sam/releases/download/v13.8.5/Shizuku-Sam-v13.8.5.apk)**（仓库 [`releases/`](./releases/) 目录下亦同步存档）
 
 ### 本地编译
 - **JDK**：Java 21

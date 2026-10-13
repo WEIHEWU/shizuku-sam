@@ -337,7 +337,7 @@ fun SettingsGlassScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "Shizuku Sam v13.8.4",
+                        text = "Shizuku Sam v13.8.5",
                         fontSize = 11.5.sp,
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                     )

@@ -348,29 +348,41 @@ private fun AppManagementMiuixRow(
     val showSubtitle = groupExpanded xor rowToggled
 
     val appLabel = remember(pkgName, uid) {
-        val userId = UserHandleCompat.getUserId(uid)
-        val baseLabel = ai.loadLabel(pm).toString()
-        if (userId != UserHandleCompat.myUserId()) {
-            val userInfo = ShizukuSystemApis.getUserInfo(userId)
-            "$baseLabel - ${userInfo.name} ($userId)"
-        } else {
-            baseLabel
-        }
+        runCatching {
+            val userId = UserHandleCompat.getUserId(uid)
+            val baseLabel = ai.loadLabel(pm).toString()
+            if (userId != UserHandleCompat.myUserId()) {
+                val userInfo = ShizukuSystemApis.getUserInfo(userId)
+                "$baseLabel - ${userInfo.name} ($userId)"
+            } else {
+                baseLabel
+            }
+        }.getOrDefault(pkgName)
     }
 
     val requiresRoot = remember(pkgName, uid) {
-        ai.metaData != null && ai.metaData.getBoolean("moe.shizuku.client.V3_REQUIRES_ROOT")
+        runCatching {
+            ai.metaData != null && ai.metaData.getBoolean("moe.shizuku.client.V3_REQUIRES_ROOT")
+        }.getOrDefault(false)
     }
 
     var granted by remember(pkgName, uid, refreshTick) {
         mutableStateOf(runCatching { AuthorizationManager.granted(pkgName, uid) }.getOrDefault(false))
     }
 
-    val iconBitmap by produceState<Bitmap?>(initialValue = null, pkgName, uid) {
-        value = withContext(AppIconCache.dispatcher()) {
-            runCatching {
-                AppIconCache.getOrLoadBitmap(context, ai, uid / 100000, iconSizePx)
-            }.getOrNull()
+    val iconBitmap by produceState<Bitmap?>(
+        initialValue = remember(pkgName, uid) {
+            runCatching { AppIconCache.get(pkgName, uid / 100000, iconSizePx) }.getOrNull()
+        },
+        pkgName,
+        uid
+    ) {
+        if (value == null) {
+            value = withContext(AppIconCache.dispatcher()) {
+                runCatching {
+                    AppIconCache.getOrLoadBitmap(context, ai, uid / 100000, iconSizePx)
+                }.getOrNull()
+            }
         }
     }
 
@@ -389,6 +401,7 @@ private fun AppManagementMiuixRow(
             if (serverUid != 0 && serverUid != -1) {
                 onAdbLimited()
             }
+        } catch (_: Throwable) {
         }
     }
 
@@ -419,11 +432,19 @@ private fun AppManagementMiuixRow(
                             contentScale = ContentScale.Crop
                         )
                     } else {
-                        Image(
-                            painter = painterResource(R.drawable.ic_default_app_icon),
-                            contentDescription = appLabel,
-                            modifier = Modifier.fillMaxSize()
-                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(if (isDark) Color(0xFF162946) else Color(0xFFEBF3FF)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            androidx.compose.material3.Icon(
+                                painter = painterResource(R.drawable.ic_maxhz_apps_24),
+                                contentDescription = appLabel,
+                                tint = if (isDark) Color(0xFF277AF7) else Color(0xFF3482FF),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
                 }
             },

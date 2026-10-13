@@ -54,7 +54,7 @@ object AppIconCache : CoroutineScope {
         return dispatcher
     }
 
-    private fun get(packageName: String, userId: Int, size: Int): Bitmap? {
+    fun get(packageName: String, userId: Int, size: Int): Bitmap? {
         return lruCache[Triple(packageName, userId, size)]
     }
 

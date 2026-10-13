@@ -4968,6 +4968,11 @@ open class MaxHzActivity : AppBarActivity() {
     }
 
     private fun showAotSpecificAppsPickerDialog(onCompleteState: () -> Unit) {
+        if (!runCatching { MaxHzShell.isReady() }.getOrDefault(false)) {
+            Toast.makeText(this, "特权通道未就绪，请先启动 Shizuku 或授予 Root 权限", Toast.LENGTH_SHORT).show()
+            return
+        }
+
         val loadingDialog = MaterialAlertDialogBuilder(this)
             .setTitle("指定应用 ART 预编译")
             .setView(emptyText("正在加载已安装应用列表，请稍候..."))
@@ -4988,16 +4993,20 @@ open class MaxHzActivity : AppBarActivity() {
                 }
                 installed
                     .asSequence()
-                    .filter { it.enabled && !it.packageName.isNullOrBlank() && it.packageName != packageName }
+                    .filter {
+                        it.enabled &&
+                            !it.packageName.isNullOrBlank() &&
+                            it.packageName != packageName &&
+                            (it.flags and ApplicationInfo.FLAG_HAS_CODE) != 0
+                    }
                     .map { info ->
                         val label = safeLoadLabel(info)
-                        val isUser = (info.flags and ApplicationInfo.FLAG_SYSTEM) == 0 ||
-                            (info.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
+                        val isSys = isSystemApp(info)
                         val trustClass = MaxHzPackagePolicy.trustClass(this@MaxHzActivity, info)
                         UserAppChoice(
                             label = label,
                             packageName = info.packageName,
-                            systemApp = !isUser,
+                            systemApp = isSys,
                             trustClass = trustClass
                         )
                     }
@@ -5014,9 +5023,12 @@ open class MaxHzActivity : AppBarActivity() {
                 return@launch
             }
 
+            val isDark = isDarkMode()
+            val compiledMap = MaxHzPrefs.mDexoptCompiledMap(this@MaxHzActivity).toMutableMap()
+            val iconCache = mutableMapOf<String, Drawable?>()
             val selectedPackages = linkedSetOf<String>()
             var selectedFilter = if (allApps.any { !it.systemApp }) AppListFilter.USER else AppListFilter.ALL
-            var compileMode = "speed" // "speed" | "speed-profile" | "reset"
+            var compileMode = "speed-profile" // 默认推荐热点极速编译（1~3秒完成，兼顾速度与体积）
             var searchQuery = ""
             val visibleApps = mutableListOf<UserAppChoice>()
 
@@ -5042,7 +5054,12 @@ open class MaxHzActivity : AppBarActivity() {
             }
 
             fun updateSelectionSummary() {
-                selectionCountView.text = "已勾选 ${selectedPackages.size} 个应用"
+                val compiledCount = compiledMap.size
+                selectionCountView.text = if (compiledCount > 0) {
+                    "已选 ${selectedPackages.size} 个 · 已编译 $compiledCount 个"
+                } else {
+                    "已勾选 ${selectedPackages.size} 个应用"
+                }
             }
 
             fun refreshList() {
@@ -5055,8 +5072,8 @@ open class MaxHzActivity : AppBarActivity() {
             fun updateModeChips() {
                 modeContainer.removeAllViews()
                 val modes = listOf(
-                    "speed" to "极速全编译",
-                    "speed-profile" to "热点编译",
+                    "speed-profile" to "热点极速",
+                    "speed" to "全量编译",
                     "reset" to "重置缓存"
                 )
                 modes.forEachIndexed { idx, (modeKey, label) ->
@@ -5071,18 +5088,20 @@ open class MaxHzActivity : AppBarActivity() {
                     )
                 }
                 modeDescView.text = when (compileMode) {
-                    "speed" -> "模式说明：强制将所选应用 100% 字节码编译为本地机器码（-m speed -f），无需等待系统收集热点，冷启动与滑屏提速最彻底。"
-                    "speed-profile" -> "模式说明：基于已记录的热点方法进行 AOT 编译（-m speed-profile -f），编译速度快、空间占用小。"
-                    else -> "模式说明：清除所选应用的 AOT 编译产物（--reset），还原为系统初始编译状态。"
+                    "speed-profile" -> "推荐：仅将高频启动与界面滑动的热点方法编译为机器码（-m speed-profile -f），单应用仅需 1~3 秒，省空间且提速显著。"
+                    "speed" -> "深度：强制将应用 100% 字节码全部编译为机器码（-m speed -f）。大型应用（如微信/淘宝/游戏）含大量插件代码，耗时约 15~60 秒。"
+                    else -> "还原：清除所选应用的 AOT 编译缓存（--reset），释放存储空间并恢复系统初始状态。"
                 }
             }
 
             fun updateFilterChips() {
                 filterContainer.removeAllViews()
+                val userCount = allApps.count { !it.systemApp }
+                val sysCount = allApps.count { it.systemApp }
                 listOf(
-                    AppListFilter.USER to "用户应用",
-                    AppListFilter.ALL to "全部",
-                    AppListFilter.SYSTEM to "系统应用"
+                    AppListFilter.USER to "用户 ($userCount)",
+                    AppListFilter.ALL to "全部 (${allApps.size})",
+                    AppListFilter.SYSTEM to "系统 ($sysCount)"
                 ).forEachIndexed { idx, (filter, label) ->
                     filterContainer.addView(
                         filterChip(label, selectedFilter == filter) {
@@ -5110,30 +5129,66 @@ open class MaxHzActivity : AppBarActivity() {
                     override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
                         val app = getItem(position) ?: visibleApps[position]
                         val isChecked = selectedPackages.contains(app.packageName)
+                        val compiledMode = compiledMap[app.packageName]
                         val showSub = showDialogSubtitles || expandedRowPkgs.contains(app.packageName)
                         return LinearLayout(this@MaxHzActivity).apply {
                             orientation = LinearLayout.HORIZONTAL
                             gravity = Gravity.CENTER_VERTICAL
-                            minimumHeight = dp(48)
-                            setPadding(dp(12), dp(6), dp(12), dp(6))
+                            minimumHeight = dp(52)
+                            setPadding(dp(8), dp(7), dp(8), dp(7))
                             layoutParams = AbsListView.LayoutParams(
                                 AbsListView.LayoutParams.MATCH_PARENT,
                                 AbsListView.LayoutParams.WRAP_CONTENT
                             )
+                            val iconDrawable = iconCache.getOrPut(app.packageName) {
+                                runCatching { packageManager.getApplicationIcon(app.packageName) }.getOrNull()
+                            }
+                            addView(ImageView(this@MaxHzActivity).apply {
+                                if (iconDrawable != null) {
+                                    setImageDrawable(iconDrawable)
+                                } else {
+                                    setImageResource(R.drawable.ic_maxhz_apps_24)
+                                    setColorFilter(themeColors.primary)
+                                }
+                                scaleType = ImageView.ScaleType.FIT_CENTER
+                            }, LinearLayout.LayoutParams(dp(34), dp(34)).apply {
+                                rightMargin = dp(12)
+                            })
                             addView(LinearLayout(this@MaxHzActivity).apply {
                                 orientation = LinearLayout.VERTICAL
-                                addView(TextView(this@MaxHzActivity).apply {
-                                    text = app.label
-                                    textSize = 14f
-                                    setTextColor(if (isChecked) themeColors.primary else themeColors.onSurface)
-                                    setTypeface(typeface, if (isChecked) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
-                                    includeFontPadding = false
-                                    maxLines = 1
-                                    ellipsize = TextUtils.TruncateAt.END
+                                addView(LinearLayout(this@MaxHzActivity).apply {
+                                    orientation = LinearLayout.HORIZONTAL
+                                    gravity = Gravity.CENTER_VERTICAL
+                                    addView(TextView(this@MaxHzActivity).apply {
+                                        text = app.label
+                                        textSize = 14.5f
+                                        setTextColor(if (isChecked) themeColors.primary else themeColors.onSurface)
+                                        setTypeface(typeface, if (isChecked) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
+                                        includeFontPadding = false
+                                        maxLines = 1
+                                        ellipsize = TextUtils.TruncateAt.END
+                                    }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                                    if (compiledMode != null) {
+                                        addView(TextView(this@MaxHzActivity).apply {
+                                            text = if (compiledMode == "speed") "已全量" else "已热点"
+                                            textSize = 10.5f
+                                            setTextColor(if (isDark) 0xFF34D399.toInt() else 0xFF059669.toInt())
+                                            setTypeface(typeface, android.graphics.Typeface.BOLD)
+                                            includeFontPadding = false
+                                            setPadding(dp(7), dp(2), dp(7), dp(2))
+                                            background = GradientDrawable().apply {
+                                                cornerRadius = dp(999).toFloat()
+                                                setColor(if (isDark) 0x2610B981 else 0x1F10B981)
+                                            }
+                                        }, LinearLayout.LayoutParams(
+                                            LinearLayout.LayoutParams.WRAP_CONTENT,
+                                            LinearLayout.LayoutParams.WRAP_CONTENT
+                                        ).apply { leftMargin = dp(6) })
+                                    }
                                 })
                                 if (showSub) {
                                     addView(TextView(this@MaxHzActivity).apply {
-                                        text = "${app.packageName} · ${if (app.systemApp) "系统" else "用户"}"
+                                        text = "${app.packageName} · ${if (app.systemApp) "系统应用" else "用户应用"}"
                                         textSize = 11.5f
                                         setTextColor(themeColors.onSurfaceVariant)
                                         includeFontPadding = false
@@ -5148,7 +5203,10 @@ open class MaxHzActivity : AppBarActivity() {
                                 isClickable = false
                                 isFocusable = false
                                 buttonTintList = ColorStateList.valueOf(themeColors.primary)
-                            })
+                            }, LinearLayout.LayoutParams(
+                                LinearLayout.LayoutParams.WRAP_CONTENT,
+                                LinearLayout.LayoutParams.WRAP_CONTENT
+                            ).apply { leftMargin = dp(6) })
                         }
                     }
                 }
@@ -5189,7 +5247,7 @@ open class MaxHzActivity : AppBarActivity() {
                     setTextColor(themeColors.onSurfaceVariant)
                     setLineSpacing(0f, 1.2f)
                     setPadding(dp(2), 0, dp(2), dp(8))
-                    visibility = View.GONE
+                    visibility = View.VISIBLE
                 }
                 addView(modeDescView)
 
@@ -5203,7 +5261,10 @@ open class MaxHzActivity : AppBarActivity() {
                     includeFontPadding = false
                     gravity = Gravity.CENTER_VERTICAL
                     setPadding(dp(14), 0, dp(14), 0)
-                    background = rounded(themeColors.surfaceContainerHigh, dp(20).toFloat())
+                    background = GradientDrawable().apply {
+                        cornerRadius = dp(14).toFloat()
+                        setColor(if (isDark) 0xFF282C37.toInt() else 0xFFE6EAF2.toInt())
+                    }
                     minHeight = dp(40)
                     addTextChangedListener(object : TextWatcher {
                         override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
@@ -5241,7 +5302,6 @@ open class MaxHzActivity : AppBarActivity() {
                             v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
                             showDialogSubtitles = !showDialogSubtitles
                             expandedRowPkgs.clear()
-                            modeDescView.visibility = if (showDialogSubtitles) View.VISIBLE else View.GONE
                             styleOptionBTogglePill(this, showDialogSubtitles)
                             listAdapter.notifyDataSetChanged()
                         }
@@ -5294,7 +5354,7 @@ open class MaxHzActivity : AppBarActivity() {
                     return@setOnClickListener
                 }
                 val appMap = allApps.associateBy { it.packageName }
-                val targetList = selectedPackages.mapNotNull { pkg ->
+                val targetList = selectedPackages.map { pkg ->
                     val app = appMap[pkg]
                     pkg to (app?.label ?: pkg)
                 }
@@ -5310,31 +5370,37 @@ open class MaxHzActivity : AppBarActivity() {
         onCompleteState: () -> Unit
     ) {
         if (appList.isEmpty()) return
+        if (!runCatching { MaxHzShell.isReady() }.getOrDefault(false)) {
+            Toast.makeText(this, "特权通道未就绪，请先启动 Shizuku 或授予 Root 权限", Toast.LENGTH_SHORT).show()
+            return
+        }
         val isReset = compileMode == "reset"
         val modeTitle = when (compileMode) {
-            "speed" -> "指定应用极速全编译 (speed)"
-            "speed-profile" -> "指定应用热点预编译 (speed-profile)"
+            "speed" -> "指定应用全量深度编译 (speed)"
+            "speed-profile" -> "指定应用热点极速编译 (speed-profile)"
             else -> "重置指定应用编译缓存 (--reset)"
         }
         var isCancelled = false
         val isDark = isDarkMode()
         val progressBar = ProgressBar(this@MaxHzActivity, null, android.R.attr.progressBarStyleHorizontal).apply {
-            isIndeterminate = false
+            isIndeterminate = appList.size == 1
             max = 100
             progress = 0
             progressTintList = ColorStateList.valueOf(themeColors.primary)
+            indeterminateTintList = ColorStateList.valueOf(themeColors.primary)
             progressBackgroundTintList = ColorStateList.valueOf(if (isDark) 0x33FFFFFF.toInt() else 0x1A000000.toInt())
         }
         val statusTextView = TextView(this@MaxHzActivity).apply {
-            text = "准备处理 [0/${appList.size}] (0%)"
+            text = "正在准备处理 [1/${appList.size}]..."
             textSize = 15f
             setTextColor(themeColors.onSurface)
             setTypeface(typeface, android.graphics.Typeface.BOLD)
         }
         val currentAppTextView = TextView(this@MaxHzActivity).apply {
-            text = "正在初始化 ART 编译器环境..."
+            text = "正在调用系统 dex2oat 编译器..."
             textSize = 13f
             setTextColor(themeColors.onSurfaceVariant)
+            setLineSpacing(0f, 1.2f)
         }
 
         val contentLayout = LinearLayout(this@MaxHzActivity).apply {
@@ -5364,37 +5430,68 @@ open class MaxHzActivity : AppBarActivity() {
         lifecycleScope.launch {
             var successCount = 0
             val total = appList.size
+            val succeededPkgs = mutableListOf<String>()
+            val succeededSummary = mutableListOf<String>()
+            val failedSummary = mutableListOf<String>()
+            val batchStartMs = android.os.SystemClock.elapsedRealtime()
 
             withContext(Dispatchers.IO) {
                 for (i in 0 until total) {
                     if (isCancelled) break
                     val (pkg, label) = appList[i]
                     val currentStep = i + 1
-                    val progressPercent = (currentStep * 100) / total
+                    val startPercent = (i * 100) / total
 
                     withContext(Dispatchers.Main) {
                         if (progressDialog.isShowing && !isCancelled) {
-                            progressBar.progress = progressPercent
-                            statusTextView.text = if (isReset) {
-                                "正在重置 [$currentStep/$total] ($progressPercent%)"
-                            } else {
-                                "正在预编译 [$currentStep/$total] ($progressPercent%)"
+                            if (total > 1) {
+                                progressBar.isIndeterminate = false
+                                progressBar.progress = startPercent
                             }
-                            currentAppTextView.text = "当前应用：$label\n($pkg)"
+                            statusTextView.text = if (isReset) {
+                                "正在重置 [$currentStep/$total] ($startPercent%)"
+                            } else {
+                                "正在编译 [$currentStep/$total] ($startPercent%)"
+                            }
+                            val hint = if (compileMode == "speed") "\n（全量编译 100% 字节码，大型应用约需 10~45 秒）" else ""
+                            currentAppTextView.text = "当前应用：$label\n($pkg)$hint"
                         }
                     }
 
+                    val appStartMs = android.os.SystemClock.elapsedRealtime()
                     val cmd = when (compileMode) {
-                        "speed" -> "cmd package compile -m speed -f \"$pkg\" 2>/dev/null || cmd package compile -m speed \"$pkg\""
-                        "speed-profile" -> "cmd package compile -m speed-profile -f \"$pkg\" 2>/dev/null || cmd package compile -m speed-profile \"$pkg\""
+                        "speed" -> "cmd package compile -m speed -f \"$pkg\""
+                        "speed-profile" -> "cmd package compile -m speed-profile -f \"$pkg\""
                         else -> "cmd package compile --reset \"$pkg\""
                     }
                     val res = MaxHzShell.execRaw(
                         cmd,
-                        timeoutMs = if (compileMode == "speed") 60000 else 30000
+                        timeoutMs = if (compileMode == "speed") 180_000L else 45_000L
                     )
-                    if (res.code == 0) {
+                    val elapsedSec = ((android.os.SystemClock.elapsedRealtime() - appStartMs) / 100L) / 10.0
+                    val combinedOutput = "${res.out}\n${res.err}".trim()
+                    val isOk = res.code == 0 &&
+                        !combinedOutput.contains("Failure", ignoreCase = true) &&
+                        !combinedOutput.contains("Error", ignoreCase = true)
+
+                    if (isOk) {
                         successCount++
+                        succeededPkgs.add(pkg)
+                        succeededSummary.add("• $label（耗时 ${elapsedSec}s）")
+                    } else {
+                        val reason = when {
+                            res.code == -1 -> "编译超时（该应用体积过大，建议改用「热点极速」模式）"
+                            combinedOutput.isNotBlank() -> combinedOutput.lineSequence().firstOrNull()?.take(80) ?: "退出码 ${res.code}"
+                            else -> "系统拒绝编译或无独立字节码（退出码 ${res.code}）"
+                        }
+                        failedSummary.add("• $label：$reason")
+                    }
+
+                    val donePercent = (currentStep * 100) / total
+                    withContext(Dispatchers.Main) {
+                        if (progressDialog.isShowing && !isCancelled && total > 1) {
+                            progressBar.progress = donePercent
+                        }
                     }
                 }
             }
@@ -5403,6 +5500,12 @@ open class MaxHzActivity : AppBarActivity() {
                 runCatching { progressDialog.dismiss() }
             }
 
+            if (succeededPkgs.isNotEmpty()) {
+                MaxHzPrefs.recordMDexoptCompiled(this@MaxHzActivity, succeededPkgs, compileMode)
+            }
+
+            val totalElapsedSec = ((android.os.SystemClock.elapsedRealtime() - batchStartMs) / 100L) / 10.0
+
             if (isCancelled) {
                 Toast.makeText(
                     this@MaxHzActivity,
@@ -5410,18 +5513,53 @@ open class MaxHzActivity : AppBarActivity() {
                     Toast.LENGTH_LONG
                 ).show()
             } else if (isReset) {
+                val msg = buildString {
+                    append("已成功重置 $successCount / $total 个指定应用的编译缓存（总耗时 ${totalElapsedSec}s）。")
+                    if (succeededSummary.isNotEmpty()) {
+                        append("\n\n").append(succeededSummary.take(8).joinToString("\n"))
+                    }
+                    if (failedSummary.isNotEmpty()) {
+                        append("\n\n未成功项：\n").append(failedSummary.take(5).joinToString("\n"))
+                    }
+                }
                 MaterialAlertDialogBuilder(this@MaxHzActivity)
-                    .setTitle("✅ 编译缓存已重置")
-                    .setMessage("已成功重置 $successCount / $total 个指定应用的编译缓存。")
+                    .setTitle(if (successCount > 0) "✅ 编译缓存已重置" else "⚠️ 重置未生效")
+                    .setMessage(msg)
+                    .setPositiveButton("确定", null)
+                    .show()
+            } else if (successCount == 0) {
+                val msg = buildString {
+                    append("所选 $total 个应用均未完成编译：\n\n")
+                    append(failedSummary.take(6).joinToString("\n"))
+                    append("\n\n💡 提示：若大型应用在「全量编译 (speed)」下耗时过长，建议改选「热点极速 (speed-profile)」，仅需 1~3 秒即可完成提速。")
+                }
+                MaterialAlertDialogBuilder(this@MaxHzActivity)
+                    .setTitle("❌ 指定应用预编译未成功")
+                    .setMessage(msg)
                     .setPositiveButton("确定", null)
                     .show()
             } else {
                 MaxHzPrefs.setMDexoptEnabled(this@MaxHzActivity, true)
                 onCompleteState()
-                val modeDesc = if (compileMode == "speed") "极速全量机器码 (speed)" else "热点配置机器码 (speed-profile)"
+                val modeDesc = if (compileMode == "speed") "全量机器码 (speed)" else "热点机器码 (speed-profile)"
+                val titleText = if (successCount == total) {
+                    "🎉 指定应用预编译已完成"
+                } else {
+                    "⚠️ 指定应用预编译部分完成 ($successCount / $total)"
+                }
+                val msg = buildString {
+                    append("已成功为 $successCount / $total 个应用完成 [$modeDesc] 编译（总耗时 ${totalElapsedSec}s）：\n\n")
+                    append(succeededSummary.take(10).joinToString("\n"))
+                    if (succeededSummary.size > 10) {
+                        append("\n…等共 ${succeededSummary.size} 个应用")
+                    }
+                    if (failedSummary.isNotEmpty()) {
+                        append("\n\n未成功项：\n").append(failedSummary.take(5).joinToString("\n"))
+                    }
+                }
                 MaterialAlertDialogBuilder(this@MaxHzActivity)
-                    .setTitle("🎉 指定应用预编译已完成")
-                    .setMessage("已成功为 $successCount / $total 个指定应用完成 [$modeDesc] 编译！\n所选应用的冷启动速度与界面滑动流畅度已显著提升。")
+                    .setTitle(titleText)
+                    .setMessage(msg)
                     .setPositiveButton("确定", null)
                     .show()
             }
@@ -5433,6 +5571,10 @@ open class MaxHzActivity : AppBarActivity() {
         isFull: Boolean,
         onCompleteState: () -> Unit
     ) {
+        if (!runCatching { MaxHzShell.isReady() }.getOrDefault(false)) {
+            Toast.makeText(this, "特权通道未就绪，请先启动 Shizuku 或授予 Root 权限", Toast.LENGTH_SHORT).show()
+            return
+        }
         val loadingDialog = MaterialAlertDialogBuilder(this)
             .setTitle(title)
             .setMessage("正在统计待优化的应用列表，请稍候...")
@@ -5457,7 +5599,7 @@ open class MaxHzActivity : AppBarActivity() {
                 for (pkg in corePackages) {
                     try {
                         val appInfo = packageManager.getApplicationInfo(pkg, 0)
-                        if (appInfo.enabled) {
+                        if (appInfo.enabled && (appInfo.flags and ApplicationInfo.FLAG_HAS_CODE) != 0) {
                             val label = appInfo.loadLabel(packageManager)?.toString()?.takeIf { it.isNotBlank() } ?: pkg
                             targetPackages.add(pkg to label)
                         }
@@ -5477,12 +5619,11 @@ open class MaxHzActivity : AppBarActivity() {
                     val existing = targetPackages.map { it.first }.toSet()
                     for (info in installed) {
                         if (!info.enabled) continue
+                        if ((info.flags and ApplicationInfo.FLAG_HAS_CODE) == 0) continue
                         val pkg = info.packageName ?: continue
                         if (pkg == packageName) continue
                         if (existing.contains(pkg)) continue
-                        val isUser = (info.flags and ApplicationInfo.FLAG_SYSTEM) == 0 ||
-                            (info.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
-                        if (isUser) {
+                        if (!isSystemApp(info)) {
                             val label = info.loadLabel(packageManager)?.toString()?.takeIf { it.isNotBlank() } ?: pkg
                             targetPackages.add(pkg to label)
                         }
@@ -5545,6 +5686,7 @@ open class MaxHzActivity : AppBarActivity() {
                 .show()
 
             var successCount = 0
+            val succeededPkgs = mutableListOf<String>()
             val total = appList.size
 
             withContext(Dispatchers.IO) {
@@ -5557,22 +5699,31 @@ open class MaxHzActivity : AppBarActivity() {
                     if (isCancelled) break
                     val (pkg, label) = appList[i]
                     val currentStep = i + 1
-                    val progressPercent = (currentStep * 100) / total
+                    val startPercent = (i * 100) / total
 
                     withContext(Dispatchers.Main) {
                         if (progressDialog.isShowing && !isCancelled) {
-                            progressBar.progress = progressPercent
-                            statusTextView.text = "正在预编译 [$currentStep/$total] ($progressPercent%)"
+                            progressBar.progress = startPercent
+                            statusTextView.text = "正在预编译 [$currentStep/$total] ($startPercent%)"
                             currentAppTextView.text = "正在优化：$label\n($pkg)"
                         }
                     }
 
                     val res = MaxHzShell.execRaw(
-                        "cmd package compile -m speed-profile \"$pkg\"",
-                        timeoutMs = 25000
+                        "cmd package compile -m speed-profile -f \"$pkg\"",
+                        timeoutMs = 35000
                     )
-                    if (res.code == 0) {
+                    val combinedOutput = "${res.out}\n${res.err}".trim()
+                    if (res.code == 0 && !combinedOutput.contains("Failure", ignoreCase = true)) {
                         successCount++
+                        succeededPkgs.add(pkg)
+                    }
+
+                    val donePercent = (currentStep * 100) / total
+                    withContext(Dispatchers.Main) {
+                        if (progressDialog.isShowing && !isCancelled) {
+                            progressBar.progress = donePercent
+                        }
                     }
                 }
             }
@@ -5581,18 +5732,28 @@ open class MaxHzActivity : AppBarActivity() {
                 runCatching { progressDialog.dismiss() }
             }
 
+            if (succeededPkgs.isNotEmpty()) {
+                MaxHzPrefs.recordMDexoptCompiled(this@MaxHzActivity, succeededPkgs, "speed-profile")
+            }
+
             if (isCancelled) {
                 Toast.makeText(
                     this@MaxHzActivity,
                     "已停止预编译（已完成加速 $successCount 个应用）",
                     Toast.LENGTH_LONG
                 ).show()
+            } else if (successCount == 0) {
+                MaterialAlertDialogBuilder(this@MaxHzActivity)
+                    .setTitle("❌ 预编译未生效")
+                    .setMessage("未能完成应用预编译，请确认 Shizuku 服务运行正常后重试。")
+                    .setPositiveButton("确定", null)
+                    .show()
             } else {
                 MaxHzPrefs.setMDexoptEnabled(this@MaxHzActivity, true)
                 onCompleteState()
                 MaterialAlertDialogBuilder(this@MaxHzActivity)
                     .setTitle("🎉 预编译已完成")
-                    .setMessage("已成功为 $successCount 个应用生成本地机器码！\n应用冷启动与界面响应速度已显著提升。")
+                    .setMessage("已成功为 $successCount / $total 个应用生成本地机器码！\n应用冷启动与界面响应速度已显著提升。")
                     .setPositiveButton("确定", null)
                     .show()
             }
@@ -7806,7 +7967,7 @@ open class MaxHzActivity : AppBarActivity() {
                 if (selected) {
                     if (isDark) 0xFF277AF7.toInt() else 0xFF3482FF.toInt()
                 } else {
-                    themeColors.surfaceContainerHigh
+                    if (isDark) 0xFF282C37.toInt() else 0xFFE6EAF2.toInt()
                 }
             )
             strokeWidth = 0

@@ -623,7 +623,35 @@ object MaxHzPrefs {
 
     fun mDexoptEnabled(context: Context) = prefs(context).getBoolean(KEY_M_DEXOPT_ENABLED, false)
     fun setMDexoptEnabled(context: Context, enabled: Boolean) {
-        prefs(context).edit().putBoolean(KEY_M_DEXOPT_ENABLED, enabled).apply()
+        val editor = prefs(context).edit().putBoolean(KEY_M_DEXOPT_ENABLED, enabled)
+        if (!enabled) {
+            editor.remove("m_dexopt_compiled_map")
+        }
+        editor.apply()
+    }
+
+    fun mDexoptCompiledMap(context: Context): Map<String, String> {
+        val raw = prefs(context).getString("m_dexopt_compiled_map", "").orEmpty()
+        if (raw.isBlank()) return emptyMap()
+        return raw.split(";")
+            .mapNotNull { entry ->
+                val parts = entry.split("=", limit = 2)
+                if (parts.size == 2 && parts[0].isNotBlank() && parts[1].isNotBlank()) {
+                    parts[0].trim() to parts[1].trim()
+                } else null
+            }
+            .toMap()
+    }
+
+    fun recordMDexoptCompiled(context: Context, packages: Collection<String>, mode: String) {
+        val mutable = mDexoptCompiledMap(context).toMutableMap()
+        if (mode == "reset") {
+            packages.forEach { mutable.remove(it) }
+        } else {
+            packages.forEach { mutable[it] = mode }
+        }
+        val serialized = mutable.entries.joinToString(";") { "${it.key}=${it.value}" }
+        prefs(context).edit().putString("m_dexopt_compiled_map", serialized).apply()
     }
 
     fun gameAutoPerformanceEnabled(context: Context) = prefs(context).getBoolean(KEY_GAME_AUTO_PERFORMANCE_ENABLED, false)
