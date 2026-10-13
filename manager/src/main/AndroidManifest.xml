@@ -243,6 +243,11 @@
             android:enabled="true"
             android:exported="false" />
         <service
+            android:name=".maxhz.AotCompileService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+        <service
             android:name=".service.WatchdogService"
             android:enabled="true"
             android:exported="false"

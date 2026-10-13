@@ -50,8 +50,41 @@ jobs:
           files: |
             releases/Shizuku-Sam-v13.8.6.apk
 
+      - name: Publish Release v13.8.7 (Plan A UI Refactor & Background AOT Precompile Service)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v13.8.7
+          name: "Shizuku Sam v13.8.7 — 应用预编译方案 A 落地 & 后台前台服务实时进度保活"
+          body: |
+            ### Shizuku Sam v13.8.7
+
+            #### 🎨 方案 A 界面重构与文案优化（消除概念认知混淆）
+            - **功能按钮直观重命名**：
+              - `自选应用编译`（原「指定应用预编译」）：支持在应用列表自主挑选，自由选择「热点极速」、「全量深度」或「重置缓存」。
+              - `优化系统与桌面`（原「核心应用预编译」）：针对系统桌面（Launcher）、SystemUI、系统设置、图库及核心组件执行热点极速优化，桌面滑动与手势即刻丝滑。
+              - `全部应用极速优化`（原「全量应用预编译」）：对手机内所有已安装应用批量执行热点极速优化，告别应用冷启动卡顿。
+              - `清除编译缓存`：清除所有预编译缓存，恢复系统默认初始状态。
+            - **卡片说明彻底重写**：清晰拆解「编译深度」（⚡ 热点极速 `speed-profile` vs 🔥 深度全量 `speed`）与「优化范围」（系统桌面组件 vs 全机应用 vs 自选特定应用），消除“全量”词义重叠与“核心”黑盒猜谜。
+
+            #### ⚡ 后台预编译前台服务（AotCompileService）与防杀保活
+            - **全新前台服务 (`AotCompileService.kt`)**：
+              - 注册 `foregroundServiceType="dataSync"`，并在后台运行期间全程持有 CPU `PARTIAL_WAKE_LOCK`（带 1 小时安全超时自动释放机制），锁屏或退到后台也能保障 `dex2oat` 完整执行不被系统休眠冻结或终止。
+            - **通知栏 / 状态栏变动指示**：
+              - 标题与进度：`全部应用极速优化 [当前第几个/总数] (百分比)`，并伴随持续变动的原生进度条与百分比指示。
+              - 副文本与秒级变动：`正在优化：应用名称 · 已耗时 Xs`，内部协程每秒实时刷新变动，让用户明确感知正在进行。
+              - 通知附带「取消编译」动作按钮，点击通知主体可直接返回 App 并恢复前台进度弹窗。
+              - 任务完成时，通知栏推送总结通知（如：`🎉 全部应用极速优化已完成 · 已完成 45/45 个应用 · 总耗时 1分28秒`）。
+            - **预编译弹窗新增「转到后台」按钮**：
+              - 弹窗底部提供「转到后台」按钮，点击后提示 `⚡ 已转入后台继续编译，可在通知栏查看变动进度与耗时` 并关闭弹窗，任务在后台无缝持续执行。
+              - 弹窗中亦有当前应用已耗时、总耗时、已成功数等实时数据。
+            - **双向无缝切回与恢复**：
+              - 当任务在后台运行中时，进入页面会在卡片上看到动态提示条：`⚡ 后台正在优化中：[N/Total] (X%) · 点击查看实时进度`。
+              - 无论是点击该提示条、点击通知栏通知，还是再次点击「自选应用编译」/「优化系统与桌面」/「全部应用极速优化」，都会直接重新弹出实时进度弹窗，无缝接续当前编译状态。
+          files: |
+            releases/Shizuku-Sam-v13.8.7.apk
+
       - name: Publish Future Version Tag Release
-        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2' && github.ref_name != 'v13.8.3' && github.ref_name != 'v13.8.4' && github.ref_name != 'v13.8.5' && github.ref_name != 'v13.8.6'
+        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2' && github.ref_name != 'v13.8.3' && github.ref_name != 'v13.8.4' && github.ref_name != 'v13.8.5' && github.ref_name != 'v13.8.6' && github.ref_name != 'v13.8.7'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}

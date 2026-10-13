@@ -84,6 +84,7 @@ import com.google.android.material.card.MaterialCardView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.materialswitch.MaterialSwitch
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -729,8 +730,23 @@ open class MaxHzActivity : AppBarActivity() {
         return super.onOptionsItemSelected(item)
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        checkOpenAotProgressFromIntent(intent)
+    }
+
+    private fun checkOpenAotProgressFromIntent(intent: Intent?) {
+        if (intent?.getBooleanExtra("extra_open_aot_progress", false) == true) {
+            intent.removeExtra("extra_open_aot_progress")
+            if (AotCompileService.isRunning) {
+                showAotLiveProgressDialog()
+            }
+        }
+    }
+
     override fun onResume() {
         super.onResume()
+        checkOpenAotProgressFromIntent(intent)
         val fpsStateChanged = syncFpsMonitorOverlayPermission()
         syncStatusChangeLogs()
         syncBackgroundErrorLog()
@@ -4918,28 +4934,91 @@ open class MaxHzActivity : AppBarActivity() {
         val aotBadge = statusBadge(enabledState(MaxHzPrefs.mDexoptEnabled(this@MaxHzActivity)))
         parent.addSpacedView(featureCard(
             "ART 机器码预编译加速",
-            "【底层原理】App 安装包内的代码默认为 Dex 字节码，未预编译时每次打开与滑动都需边运行边翻译，容易冷启动慢或掉帧；AOT 预编译会提前将其翻译为 ARM64 原生机器码（.odex），让 CPU 直接全速执行。\n" +
-                "• 热点极速（speed-profile，默认推荐）：仅编译日常高频调用的 10%~20% 核心启动与滑动代码，单应用仅需 1~5 秒、仅占 10~30MB 空间，即可获得约 90% 的流畅度提升（下方「核心应用预编译」与「全量应用预编译」均采用此极速模式）。\n" +
-                "• 全量编译（speed）：强制把应用内 100% 的所有类与字节码全部编译为机器码，单个大型应用需 15~60 秒、占用 100~400MB 空间，适合在「指定应用预编译」中为最重度使用的 3~5 个主力应用（如微信、大型游戏）单独开启。",
+            "【底层原理】App 安装包默认以 Dex 字节码运行，冷启动与滑动时需实时翻译解释，容易产生掉帧或启动迟滞；ART 预编译提前将其转换为 CPU 可直接执行的原生机器码（.odex），让执行效率翻倍。\n" +
+                "• ⚡ 热点极速（speed-profile，推荐）：仅编译日常高频调用的 10%~20% 核心启动与滑动路径。单应用仅需 1~3 秒、几乎不占额外空间，即可获得约 90% 流畅度提升。\n" +
+                "• 🔥 深度全量（speed）：将应用内 100% 所有代码和 SDK 强制完整编译。单应用约需 15~60 秒、占用 100~400MB 空间，适合在「自选应用编译」中为 3~5 个主力重度 App（如微信、大作游戏）单独开启。\n" +
+                "【功能说明】\n" +
+                "• 自选应用编译：自主勾选目标应用，可自由切换热点极速、深度全量或重置缓存。\n" +
+                "• 优化系统与桌面：对系统桌面 Launcher、SystemUI 及核心系统组件执行热点极速优化，桌面滑动与手势即刻丝滑。\n" +
+                "• 全部应用极速优化：对手机所有已安装应用批量执行热点极速优化，告别应用冷启动卡顿。\n" +
+                "💡 支持转入后台运行：执行过程中点击「转到后台」可在状态栏与通知栏实时查看变动进度，持有 CPU 锁防杀保活。",
             headerBadges(aotBadge)
         ) {
+            val resumeBanner = TextView(this@MaxHzActivity).apply {
+                textSize = 12.5f
+                setTextColor(themeColors.primary)
+                setTypeface(typeface, android.graphics.Typeface.BOLD)
+                setPadding(dp(12), dp(8), dp(12), dp(8))
+                background = GradientDrawable().apply {
+                    cornerRadius = dp(10).toFloat()
+                    setColor(if (isDarkMode()) 0x2610B981 else 0x1F10B981)
+                }
+                visibility = if (AotCompileService.isRunning) View.VISIBLE else View.GONE
+                setOnClickListener {
+                    showAotLiveProgressDialog {
+                        updateStatusText(aotBadge, enabledState(true))
+                    }
+                }
+            }
+            addView(resumeBanner, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = dp(12) })
+
+            lifecycleScope.launch {
+                AotCompileService.stateFlow.collect { st ->
+                    if (st.isRunning) {
+                        val pct = if (st.total > 0) (st.currentStep * 100) / st.total else 0
+                        resumeBanner.text = "⚡ 后台正在优化中：[${st.currentStep}/${st.total}] ($pct%) · 点击查看实时进度"
+                        resumeBanner.visibility = View.VISIBLE
+                    } else {
+                        resumeBanner.visibility = View.GONE
+                    }
+                }
+            }
+
             addSpacedView(horizontalActions(
-                button("指定应用预编译") {
-                    showAotSpecificAppsPickerDialog {
-                        updateStatusText(aotBadge, enabledState(true))
+                button("自选应用编译") {
+                    if (AotCompileService.isRunning) {
+                        Toast.makeText(this@MaxHzActivity, "当前已有优化任务在后台运行中，已为您打开进度", Toast.LENGTH_SHORT).show()
+                        showAotLiveProgressDialog {
+                            updateStatusText(aotBadge, enabledState(true))
+                        }
+                    } else {
+                        showAotSpecificAppsPickerDialog {
+                            updateStatusText(aotBadge, enabledState(true))
+                        }
                     }
                 },
-                button("核心应用预编译") {
-                    runAotCompilationWithProgress("核心应用预编译", isFull = false) {
-                        updateStatusText(aotBadge, enabledState(true))
+                button("优化系统与桌面") {
+                    if (AotCompileService.isRunning) {
+                        Toast.makeText(this@MaxHzActivity, "当前已有优化任务在后台运行中，已为您打开进度", Toast.LENGTH_SHORT).show()
+                        showAotLiveProgressDialog {
+                            updateStatusText(aotBadge, enabledState(true))
+                        }
+                    } else {
+                        runAotCompilationWithProgress("优化系统与桌面", isFull = false) {
+                            updateStatusText(aotBadge, enabledState(true))
+                        }
                     }
                 },
-                button("全量应用预编译") {
-                    runAotCompilationWithProgress("全量应用预编译", isFull = true) {
-                        updateStatusText(aotBadge, enabledState(true))
+                button("全部应用极速优化") {
+                    if (AotCompileService.isRunning) {
+                        Toast.makeText(this@MaxHzActivity, "当前已有优化任务在后台运行中，已为您打开进度", Toast.LENGTH_SHORT).show()
+                        showAotLiveProgressDialog {
+                            updateStatusText(aotBadge, enabledState(true))
+                        }
+                    } else {
+                        runAotCompilationWithProgress("全部应用极速优化", isFull = true) {
+                            updateStatusText(aotBadge, enabledState(true))
+                        }
                     }
                 },
                 button("清除编译缓存") {
+                    if (AotCompileService.isRunning) {
+                        Toast.makeText(this@MaxHzActivity, "后台正在执行优化，请先等待完成或在进度弹窗中取消", Toast.LENGTH_SHORT).show()
+                        return@button
+                    }
                     val progressDialog = showActionProgressDialog("清除编译缓存", "正在恢复初始状态，请稍候...")
                     lifecycleScope.launch {
                         val result = withContext(Dispatchers.IO) {
@@ -4976,7 +5055,7 @@ open class MaxHzActivity : AppBarActivity() {
         }
 
         val loadingDialog = MaterialAlertDialogBuilder(this)
-            .setTitle("指定应用 ART 预编译")
+            .setTitle("自选应用 ART 预编译")
             .setView(emptyText("正在加载已安装应用列表，请稍候..."))
             .setNegativeButton("取消", null)
             .show()
@@ -5344,7 +5423,7 @@ open class MaxHzActivity : AppBarActivity() {
             }
 
             val pickerDialog = MaterialAlertDialogBuilder(this@MaxHzActivity)
-                .setTitle("指定应用 ART 预编译加速")
+                .setTitle("自选应用 ART 预编译加速")
                 .setView(rootView)
                 .setNegativeButton("取消", null)
                 .setPositiveButton("开始执行", null)
@@ -5366,6 +5445,8 @@ open class MaxHzActivity : AppBarActivity() {
         }
     }
 
+    private var aotLiveProgressDialog: androidx.appcompat.app.AlertDialog? = null
+
     private fun runSelectedAppsAotWithProgress(
         appList: List<Pair<String, String>>,
         compileMode: String,
@@ -5378,215 +5459,13 @@ open class MaxHzActivity : AppBarActivity() {
         }
         val isReset = compileMode == "reset"
         val modeTitle = when (compileMode) {
-            "speed" -> "指定应用全量深度编译 (speed)"
-            "speed-profile" -> "指定应用热点极速编译 (speed-profile)"
-            else -> "重置指定应用编译缓存 (--reset)"
+            "speed" -> "自选应用全量深度编译"
+            "speed-profile" -> "自选应用热点极速优化"
+            else -> "重置自选应用编译缓存"
         }
-        var isCancelled = false
-        val isDark = isDarkMode()
-        val progressBar = ProgressBar(this@MaxHzActivity, null, android.R.attr.progressBarStyleHorizontal).apply {
-            isIndeterminate = appList.size == 1
-            max = 100
-            progress = 0
-            progressTintList = ColorStateList.valueOf(themeColors.primary)
-            indeterminateTintList = ColorStateList.valueOf(themeColors.primary)
-            progressBackgroundTintList = ColorStateList.valueOf(if (isDark) 0x33FFFFFF.toInt() else 0x1A000000.toInt())
-        }
-        val statusTextView = TextView(this@MaxHzActivity).apply {
-            text = "正在准备处理 [1/${appList.size}]..."
-            textSize = 15f
-            setTextColor(themeColors.onSurface)
-            setTypeface(typeface, android.graphics.Typeface.BOLD)
-        }
-        val currentAppTextView = TextView(this@MaxHzActivity).apply {
-            text = "正在调用系统 dex2oat 编译器..."
-            textSize = 13f
-            setTextColor(themeColors.onSurfaceVariant)
-            setLineSpacing(0f, 1.2f)
-        }
-
-        val contentLayout = LinearLayout(this@MaxHzActivity).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(24), dp(16), dp(24), dp(16))
-            addView(statusTextView)
-            addView(progressBar, LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(10)
-            ).apply {
-                topMargin = dp(14)
-                bottomMargin = dp(12)
-            })
-            addView(currentAppTextView)
-        }
-
-        val progressDialog = MaterialAlertDialogBuilder(this@MaxHzActivity)
-            .setTitle(modeTitle)
-            .setView(contentLayout)
-            .setCancelable(false)
-            .setNegativeButton("取消") { d, _ ->
-                isCancelled = true
-                d.dismiss()
-            }
-            .show()
-
-        lifecycleScope.launch {
-            var successCount = 0
-            val total = appList.size
-            val succeededPkgs = mutableListOf<String>()
-            val succeededSummary = mutableListOf<String>()
-            val failedSummary = mutableListOf<String>()
-            val batchStartMs = android.os.SystemClock.elapsedRealtime()
-
-            withContext(Dispatchers.IO) {
-                for (i in 0 until total) {
-                    if (isCancelled) break
-                    val (pkg, label) = appList[i]
-                    val currentStep = i + 1
-                    val startPercent = (i * 100) / total
-                    val hint = if (compileMode == "speed") "\n（全量编译 100% 字节码，大型应用约需 15~60 秒）" else ""
-
-                    withContext(Dispatchers.Main) {
-                        if (progressDialog.isShowing && !isCancelled) {
-                            if (total > 1) {
-                                progressBar.isIndeterminate = false
-                                progressBar.progress = startPercent
-                            }
-                            statusTextView.text = if (isReset) {
-                                "正在重置 [$currentStep/$total] ($startPercent%)"
-                            } else {
-                                "正在编译 [$currentStep/$total] ($startPercent%)"
-                            }
-                            currentAppTextView.text = "当前应用：$label\n($pkg)$hint"
-                        }
-                    }
-
-                    val appStartMs = android.os.SystemClock.elapsedRealtime()
-                    val tickerJob = launch(Dispatchers.Main) {
-                        while (true) {
-                            delay(1000L)
-                            if (!progressDialog.isShowing || isCancelled) break
-                            val sec = (android.os.SystemClock.elapsedRealtime() - appStartMs) / 1000L
-                            if (sec >= 2L) {
-                                currentAppTextView.text = "当前应用：$label（已耗时 ${sec}s...）\n($pkg)$hint"
-                            }
-                        }
-                    }
-
-                    val cmd = when (compileMode) {
-                        "speed" -> "cmd package compile -m speed --split \"\" -f \"$pkg\" 2>/dev/null || cmd package compile -m speed -f \"$pkg\""
-                        "speed-profile" -> "cmd package compile -m speed-profile --split \"\" -f \"$pkg\" 2>/dev/null || cmd package compile -m speed-profile \"$pkg\""
-                        else -> "cmd package compile --reset \"$pkg\""
-                    }
-                    val res = MaxHzShell.execRaw(
-                        cmd,
-                        timeoutMs = if (compileMode == "speed") 360_000L else 180_000L
-                    )
-                    tickerJob.cancel()
-                    val elapsedSec = ((android.os.SystemClock.elapsedRealtime() - appStartMs) / 100L) / 10.0
-                    val combinedOutput = "${res.out}\n${res.err}".trim()
-                    val isOk = res.code == 0 &&
-                        !combinedOutput.contains("Failure", ignoreCase = true) &&
-                        !combinedOutput.contains("Error", ignoreCase = true)
-
-                    if (isOk) {
-                        successCount++
-                        succeededPkgs.add(pkg)
-                        succeededSummary.add("• $label（耗时 ${elapsedSec}s）")
-                    } else {
-                        val reason = when {
-                            res.code == -1 && compileMode == "speed" ->
-                                "编译超时（全量编译体积过大，建议改用「热点极速」模式）"
-                            res.code == -1 ->
-                                "编译超时（内部动态插件过多或后台特权通道未响应）"
-                            combinedOutput.isNotBlank() ->
-                                combinedOutput.lineSequence().firstOrNull()?.take(80) ?: "退出码 ${res.code}"
-                            else ->
-                                "系统拒绝编译或无独立字节码（退出码 ${res.code}）"
-                        }
-                        failedSummary.add("• $label：$reason")
-                    }
-
-                    val donePercent = (currentStep * 100) / total
-                    withContext(Dispatchers.Main) {
-                        if (progressDialog.isShowing && !isCancelled && total > 1) {
-                            progressBar.progress = donePercent
-                        }
-                    }
-                }
-            }
-
-            if (progressDialog.isShowing) {
-                runCatching { progressDialog.dismiss() }
-            }
-
-            if (succeededPkgs.isNotEmpty()) {
-                MaxHzPrefs.recordMDexoptCompiled(this@MaxHzActivity, succeededPkgs, compileMode)
-            }
-
-            val totalElapsedSec = ((android.os.SystemClock.elapsedRealtime() - batchStartMs) / 100L) / 10.0
-
-            if (isCancelled) {
-                Toast.makeText(
-                    this@MaxHzActivity,
-                    "已停止操作（已完成 $successCount / $total 个应用）",
-                    Toast.LENGTH_LONG
-                ).show()
-            } else if (isReset) {
-                val msg = buildString {
-                    append("已成功重置 $successCount / $total 个指定应用的编译缓存（总耗时 ${totalElapsedSec}s）。")
-                    if (succeededSummary.isNotEmpty()) {
-                        append("\n\n").append(succeededSummary.take(8).joinToString("\n"))
-                    }
-                    if (failedSummary.isNotEmpty()) {
-                        append("\n\n未成功项：\n").append(failedSummary.take(5).joinToString("\n"))
-                    }
-                }
-                MaterialAlertDialogBuilder(this@MaxHzActivity)
-                    .setTitle(if (successCount > 0) "✅ 编译缓存已重置" else "⚠️ 重置未生效")
-                    .setMessage(msg)
-                    .setPositiveButton("确定", null)
-                    .show()
-            } else if (successCount == 0) {
-                val msg = buildString {
-                    append("所选 $total 个应用均未完成编译：\n\n")
-                    append(failedSummary.take(6).joinToString("\n"))
-                    if (compileMode == "speed") {
-                        append("\n\n💡 提示：若大型应用在「全量编译 (speed)」下耗时过长，建议改选「热点极速 (speed-profile)」，仅需数秒即可完成提速。")
-                    } else {
-                        append("\n\n💡 提示：请确认 Shizuku 服务处于正常运行状态后重试。")
-                    }
-                }
-                MaterialAlertDialogBuilder(this@MaxHzActivity)
-                    .setTitle("❌ 指定应用预编译未成功")
-                    .setMessage(msg)
-                    .setPositiveButton("确定", null)
-                    .show()
-            } else {
-                MaxHzPrefs.setMDexoptEnabled(this@MaxHzActivity, true)
-                onCompleteState()
-                val modeDesc = if (compileMode == "speed") "全量机器码 (speed)" else "热点机器码 (speed-profile)"
-                val titleText = if (successCount == total) {
-                    "🎉 指定应用预编译已完成"
-                } else {
-                    "⚠️ 指定应用预编译部分完成 ($successCount / $total)"
-                }
-                val msg = buildString {
-                    append("已成功为 $successCount / $total 个应用完成 [$modeDesc] 编译（总耗时 ${totalElapsedSec}s）：\n\n")
-                    append(succeededSummary.take(10).joinToString("\n"))
-                    if (succeededSummary.size > 10) {
-                        append("\n…等共 ${succeededSummary.size} 个应用")
-                    }
-                    if (failedSummary.isNotEmpty()) {
-                        append("\n\n未成功项：\n").append(failedSummary.take(5).joinToString("\n"))
-                    }
-                }
-                MaterialAlertDialogBuilder(this@MaxHzActivity)
-                    .setTitle(titleText)
-                    .setMessage(msg)
-                    .setPositiveButton("确定", null)
-                    .show()
-            }
-        }
+        val actualMode = if (isReset) "--reset" else compileMode
+        AotCompileService.start(this@MaxHzActivity, modeTitle, actualMode, appList)
+        showAotLiveProgressDialog(onCompleteState)
     }
 
     private fun runAotCompilationWithProgress(
@@ -5663,124 +5542,179 @@ open class MaxHzActivity : AppBarActivity() {
                 return@launch
             }
 
-            var isCancelled = false
-            val isDark = isDarkMode()
-            val progressBar = ProgressBar(this@MaxHzActivity, null, android.R.attr.progressBarStyleHorizontal).apply {
-                isIndeterminate = false
-                max = 100
-                progress = 0
-                progressTintList = ColorStateList.valueOf(themeColors.primary)
-                progressBackgroundTintList = ColorStateList.valueOf(if (isDark) 0x33FFFFFF.toInt() else 0x1A000000.toInt())
-            }
-            val statusTextView = TextView(this@MaxHzActivity).apply {
-                text = "准备开始预编译 [0/${appList.size}] (0%)"
-                textSize = 15f
-                setTextColor(themeColors.onSurface)
-                setTypeface(typeface, android.graphics.Typeface.BOLD)
-            }
-            val currentAppTextView = TextView(this@MaxHzActivity).apply {
-                text = "正在初始化编译环境..."
-                textSize = 13f
-                setTextColor(themeColors.onSurfaceVariant)
-            }
+            AotCompileService.start(this@MaxHzActivity, title, "speed-profile", appList)
+            showAotLiveProgressDialog(onCompleteState)
+        }
+    }
 
-            val contentLayout = LinearLayout(this@MaxHzActivity).apply {
-                orientation = LinearLayout.VERTICAL
-                setPadding(dp(24), dp(16), dp(24), dp(16))
-                addView(statusTextView)
-                addView(progressBar, LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    dp(10)
-                ).apply {
-                    topMargin = dp(14)
-                    bottomMargin = dp(12)
-                })
-                addView(currentAppTextView)
-            }
+    private fun showAotLiveProgressDialog(onCompleteState: (() -> Unit)? = null) {
+        if (aotLiveProgressDialog?.isShowing == true) return
+        val isDark = isDarkMode()
 
-            val progressDialog = MaterialAlertDialogBuilder(this@MaxHzActivity)
-                .setTitle(title)
-                .setView(contentLayout)
-                .setCancelable(false)
-                .setNegativeButton("取消") { d, _ ->
-                    isCancelled = true
-                    d.dismiss()
+        val progressBar = ProgressBar(this@MaxHzActivity, null, android.R.attr.progressBarStyleHorizontal).apply {
+            isIndeterminate = false
+            max = 100
+            progress = 0
+            progressTintList = ColorStateList.valueOf(themeColors.primary)
+            indeterminateTintList = ColorStateList.valueOf(themeColors.primary)
+            progressBackgroundTintList = ColorStateList.valueOf(if (isDark) 0x33FFFFFF.toInt() else 0x1A000000.toInt())
+        }
+        val statusTextView = TextView(this@MaxHzActivity).apply {
+            text = "正在初始化预编译..."
+            textSize = 15f
+            setTextColor(themeColors.onSurface)
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+        }
+        val currentAppTextView = TextView(this@MaxHzActivity).apply {
+            text = "正在连接特权编译器..."
+            textSize = 13f
+            setTextColor(themeColors.onSurfaceVariant)
+            setLineSpacing(0f, 1.25f)
+        }
+
+        val contentLayout = LinearLayout(this@MaxHzActivity).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(24), dp(16), dp(24), dp(16))
+            addView(statusTextView)
+            addView(progressBar, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(10)
+            ).apply {
+                topMargin = dp(14)
+                bottomMargin = dp(12)
+            })
+            addView(currentAppTextView)
+        }
+
+        val initialTitle = AotCompileService.stateFlow.value.title.ifBlank { "应用预编译加速" }
+
+        val dialog = MaterialAlertDialogBuilder(this@MaxHzActivity)
+            .setTitle(initialTitle)
+            .setView(contentLayout)
+            .setCancelable(false)
+            .setPositiveButton("转到后台") { d, _ ->
+                d.dismiss()
+                Toast.makeText(this@MaxHzActivity, "⚡ 已转入后台继续编译，可在通知栏查看变动进度与耗时", Toast.LENGTH_LONG).show()
+            }
+            .setNegativeButton("取消编译") { d, _ ->
+                AotCompileService.cancel(this@MaxHzActivity)
+                d.dismiss()
+                Toast.makeText(this@MaxHzActivity, "正在停止预编译...", Toast.LENGTH_SHORT).show()
+            }
+            .create()
+
+        aotLiveProgressDialog = dialog
+        dialog.show()
+
+        var observeJob: Job? = null
+        observeJob = lifecycleScope.launch {
+            AotCompileService.stateFlow.collect { state ->
+                if (!dialog.isShowing) {
+                    observeJob?.cancel()
+                    return@collect
                 }
-                .show()
 
-            var successCount = 0
-            val succeededPkgs = mutableListOf<String>()
-            val total = appList.size
+                if (state.title.isNotBlank()) {
+                    dialog.setTitle(state.title)
+                }
 
-            withContext(Dispatchers.IO) {
-                MaxHzShell.execRaw(
-                    "pm trim-caches 10000000M >/dev/null 2>&1 || true",
-                    timeoutMs = 5000
-                )
+                val currentStep = state.currentStep
+                val total = state.total
+                val percent = if (total > 0) (currentStep * 100) / total else 0
 
-                for (i in 0 until total) {
-                    if (isCancelled) break
-                    val (pkg, label) = appList[i]
-                    val currentStep = i + 1
-                    val startPercent = (i * 100) / total
+                if (total <= 1 && currentStep == 0) {
+                    progressBar.isIndeterminate = true
+                } else {
+                    progressBar.isIndeterminate = false
+                    progressBar.progress = percent
+                }
 
-                    withContext(Dispatchers.Main) {
-                        if (progressDialog.isShowing && !isCancelled) {
-                            progressBar.progress = startPercent
-                            statusTextView.text = "正在预编译 [$currentStep/$total] ($startPercent%)"
-                            currentAppTextView.text = "正在优化：$label\n($pkg)"
-                        }
+                val actionWord = if (state.compileMode == "--reset" || state.compileMode == "reset") "重置" else "优化"
+                statusTextView.text = if (total > 0) {
+                    "正在$actionWord [$currentStep/$total] ($percent%)"
+                } else {
+                    "正在准备环境..."
+                }
+
+                val label = state.currentLabel.ifBlank { "准备中..." }
+                val pkg = state.currentPkg
+                val currentSec = state.currentElapsedSec
+                val totalSec = state.totalElapsedSec
+                val timeInfo = if (currentSec > 0) "已耗时 ${currentSec}s" else "正在处理..."
+                val totalTimeInfo = if (totalSec < 60) "${totalSec}秒" else "${totalSec / 60}分${totalSec % 60}秒"
+
+                currentAppTextView.text = buildString {
+                    append("当前应用：$label（$timeInfo）")
+                    if (pkg.isNotBlank()) {
+                        append("\n包名：$pkg")
                     }
-
-                    val res = MaxHzShell.execRaw(
-                        "cmd package compile -m speed-profile --split \"\" -f \"$pkg\" 2>/dev/null || cmd package compile -m speed-profile \"$pkg\"",
-                        timeoutMs = 120_000L
-                    )
-                    val combinedOutput = "${res.out}\n${res.err}".trim()
-                    if (res.code == 0 && !combinedOutput.contains("Failure", ignoreCase = true)) {
-                        successCount++
-                        succeededPkgs.add(pkg)
-                    }
-
-                    val donePercent = (currentStep * 100) / total
-                    withContext(Dispatchers.Main) {
-                        if (progressDialog.isShowing && !isCancelled) {
-                            progressBar.progress = donePercent
-                        }
+                    append("\n总耗时：$totalTimeInfo · 成功已完成 ${state.successCount} 个")
+                    if (state.compileMode == "speed") {
+                        append("\n🔥 全量深度编译中，大型应用耗时较长，请耐心等待")
                     }
                 }
-            }
 
-            if (progressDialog.isShowing) {
-                runCatching { progressDialog.dismiss() }
-            }
-
-            if (succeededPkgs.isNotEmpty()) {
-                MaxHzPrefs.recordMDexoptCompiled(this@MaxHzActivity, succeededPkgs, "speed-profile")
-            }
-
-            if (isCancelled) {
-                Toast.makeText(
-                    this@MaxHzActivity,
-                    "已停止预编译（已完成加速 $successCount 个应用）",
-                    Toast.LENGTH_LONG
-                ).show()
-            } else if (successCount == 0) {
-                MaterialAlertDialogBuilder(this@MaxHzActivity)
-                    .setTitle("❌ 预编译未生效")
-                    .setMessage("未能完成应用预编译，请确认 Shizuku 服务运行正常后重试。")
-                    .setPositiveButton("确定", null)
-                    .show()
-            } else {
-                MaxHzPrefs.setMDexoptEnabled(this@MaxHzActivity, true)
-                onCompleteState()
-                MaterialAlertDialogBuilder(this@MaxHzActivity)
-                    .setTitle("🎉 预编译已完成")
-                    .setMessage("已成功为 $successCount / $total 个应用生成本地机器码！\n应用冷启动与界面响应速度已显著提升。")
-                    .setPositiveButton("确定", null)
-                    .show()
+                if (!state.isRunning) {
+                    dialog.dismiss()
+                    observeJob?.cancel()
+                    if (state.isCompleted) {
+                        MaxHzPrefs.setMDexoptEnabled(this@MaxHzActivity, true)
+                        onCompleteState?.invoke()
+                        showAotCompletionSummaryDialog(state)
+                    } else if (state.isCancelled) {
+                        Toast.makeText(
+                            this@MaxHzActivity,
+                            "已停止预编译（已完成 ${state.successCount} / ${state.total} 个应用）",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
             }
         }
+
+        dialog.setOnDismissListener {
+            observeJob?.cancel()
+            if (aotLiveProgressDialog === dialog) {
+                aotLiveProgressDialog = null
+            }
+        }
+    }
+
+    private fun showAotCompletionSummaryDialog(state: AotCompileService.TaskState) {
+        val isReset = state.compileMode == "reset" || state.compileMode == "--reset"
+        val totalSec = state.totalElapsedSec
+        val timeStr = if (totalSec < 60) "${totalSec}秒" else "${totalSec / 60}分${totalSec % 60}秒"
+        val titleText = when {
+            isReset -> if (state.successCount > 0) "✅ 编译缓存已重置" else "⚠️ 重置未生效"
+            state.successCount == state.total -> "🎉 ${state.title}已完成"
+            state.successCount > 0 -> "⚠️ ${state.title}部分完成 (${state.successCount} / ${state.total})"
+            else -> "❌ ${state.title}未成功"
+        }
+
+        val msg = buildString {
+            if (isReset) {
+                append("已成功重置 ${state.successCount} / ${state.total} 个应用的编译缓存（总耗时 $timeStr）。")
+            } else if (state.successCount == 0) {
+                append("所选 ${state.total} 个应用均未能完成预编译：\n\n")
+            } else {
+                append("已成功为 ${state.successCount} / ${state.total} 个应用完成预编译加速（总耗时 $timeStr）！\n冷启动与界面响应速度已显著提升。\n\n")
+            }
+            if (state.succeededSummary.isNotEmpty()) {
+                append("已完成项：\n").append(state.succeededSummary.take(10).joinToString("\n"))
+                if (state.succeededSummary.size > 10) {
+                    append("\n…等共 ${state.succeededSummary.size} 个应用")
+                }
+            }
+            if (state.failedSummary.isNotEmpty()) {
+                append("\n\n未完成项：\n").append(state.failedSummary.take(5).joinToString("\n"))
+            }
+        }
+
+        MaterialAlertDialogBuilder(this@MaxHzActivity)
+            .setTitle(titleText)
+            .setMessage(msg)
+            .setPositiveButton("确定", null)
+            .show()
     }
 
     private fun hardenScreenOffKeepAlive(): MaxHzShell.Result {
