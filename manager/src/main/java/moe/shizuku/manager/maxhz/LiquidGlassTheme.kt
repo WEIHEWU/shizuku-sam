@@ -850,8 +850,9 @@ half4 main(float2 coord) {
     fun badgeKind(statusText: String): BadgeKind = when {
         statusText.contains("已启用") || statusText.contains("正常") || statusText.contains("运行中") ||
             statusText.contains("满血") || statusText.contains("已锁定") || statusText.contains("极速") -> BadgeKind.SUCCESS
-        statusText.contains("异常") || statusText.contains("关闭") || statusText.contains("失败") ||
+        statusText.contains("异常") || statusText.contains("失败") ||
             statusText.contains("需") -> BadgeKind.WARNING
+        statusText.contains("关闭") || statusText.contains("未") -> BadgeKind.MUTED
         else -> BadgeKind.INFO
     }
 
@@ -860,6 +861,7 @@ half4 main(float2 coord) {
     fun badgeFill(kind: BadgeKind, isDark: Boolean): Int = when (kind) {
         BadgeKind.SUCCESS -> if (isDark) 0xFF34C759.toInt() else 0xFF1E9E48.toInt()
         BadgeKind.WARNING -> if (isDark) 0xFFFF9500.toInt() else 0xFFD97A05.toInt()
+        BadgeKind.MUTED -> if (isDark) 0x22FFFFFF.toInt() else 0x14000000.toInt()
         // 由主题强调色派生，不再写死 0xFF007AFF / 0xFF93C5FD
         BadgeKind.INFO -> if (isDark) accent else shade(accent, 0.12f)
     }
@@ -877,7 +879,7 @@ half4 main(float2 coord) {
     }
 
     enum class BadgeKind {
-        SUCCESS, WARNING, INFO
+        SUCCESS, WARNING, INFO, MUTED
     }
 
     // ==================================================================
@@ -1393,6 +1395,7 @@ half4 main(float2 coord) {
             strokePaint.color = when (kind) {
                 BadgeKind.SUCCESS -> if (isDark) 0xFF86EFAC.toInt() else 0xFFB7F0C8.toInt()
                 BadgeKind.WARNING -> if (isDark) 0xFFFDE68A.toInt() else 0xFFFBD9A0.toInt()
+                BadgeKind.MUTED -> if (isDark) 0x26FFFFFF.toInt() else 0x1A000000.toInt()
                 // 由主题强调色派生，不再写死 0xFF007AFF / 0xFF93C5FD
                 BadgeKind.INFO -> if (isDark) lighten(accent, 0.55f) else lighten(accent, 0.62f)
             }

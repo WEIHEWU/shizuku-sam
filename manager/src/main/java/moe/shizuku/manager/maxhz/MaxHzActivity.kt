@@ -1932,7 +1932,7 @@ open class MaxHzActivity : AppBarActivity() {
             addView(LinearLayout(this@MaxHzActivity).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
-                setPadding(dp(18), dp(14), dp(14), dp(6))
+                setPadding(dp(16), dp(8), dp(14), dp(3))
                 addView(TextView(this@MaxHzActivity).apply {
                     text = groupLabel
                     textSize = 13f
@@ -1946,7 +1946,7 @@ open class MaxHzActivity : AppBarActivity() {
                 applyLiquidGlassCardStyle(this, CARD_RADIUS_DP)
                 addView(LinearLayout(this@MaxHzActivity).apply {
                     orientation = LinearLayout.VERTICAL
-                    setPadding(0, dp(4), 0, dp(4))
+                    setPadding(0, dp(2), 0, dp(2))
                     items.forEach { item ->
                         addView(entryRow(item, groupSubs))
                     }
@@ -1960,7 +1960,7 @@ open class MaxHzActivity : AppBarActivity() {
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(16), dp(12), dp(16), dp(12))
+            setPadding(dp(16), dp(8), dp(16), dp(8))
             val icon = featureIconContainer(item.title)
             addView(icon, LinearLayout.LayoutParams(dp(36), dp(36)).apply {
                 rightMargin = dp(14)
@@ -3761,11 +3761,11 @@ open class MaxHzActivity : AppBarActivity() {
                 })
             }, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(44)
-            ).apply { bottomMargin = dp(10) })
+                dp(40)
+            ).apply { bottomMargin = dp(6) })
             filterContainer = LinearLayout(this@MaxHzActivity).apply {
                 orientation = LinearLayout.HORIZONTAL
-                setPadding(0, 0, 0, dp(10))
+                setPadding(0, 0, 0, dp(6))
             }
             addView(filterContainer)
             updateFilterButtons()
@@ -3789,7 +3789,7 @@ open class MaxHzActivity : AppBarActivity() {
             ), dp(2))
             addSpacedView(groupCard {
                 addView(listContainer)
-            }, dp(12))
+            }, dp(6))
             addSpacedView(resultView, dp(8))
             lifecycleScope.launch {
                 val result = withContext(Dispatchers.IO) { MaxHzController.readDozeWhitelistPackages() }
@@ -6412,7 +6412,7 @@ open class MaxHzActivity : AppBarActivity() {
                         addView(it, LinearLayout.LayoutParams(
                             LinearLayout.LayoutParams.WRAP_CONTENT,
                             LinearLayout.LayoutParams.WRAP_CONTENT
-                        ).apply { topMargin = dp(10) })
+                        ).apply { topMargin = dp(6) })
                     }
                 }
                 addView(headerContainer)
@@ -6421,7 +6421,7 @@ open class MaxHzActivity : AppBarActivity() {
                     textSize = 13.5f
                     setTextColor(themeColors.onSurfaceVariant)
                     includeFontPadding = false
-                    setPadding(0, dp(6), 0, dp(10))
+                    setPadding(0, dp(4), 0, dp(6))
                 }
                 addView(subTextView)
                 bindOptionBSubtitle(this, subTextView)
@@ -6836,6 +6836,7 @@ open class MaxHzActivity : AppBarActivity() {
         val preferred = when (kind) {
             LiquidGlassTheme.BadgeKind.SUCCESS -> if (isDark) 0xFF34D399.toInt() else 0xFF059669.toInt()
             LiquidGlassTheme.BadgeKind.WARNING -> if (isDark) 0xFFFBBF24.toInt() else 0xFFD97706.toInt()
+            LiquidGlassTheme.BadgeKind.MUTED -> themeColors.onSurfaceVariant
             else -> themeColors.primary
         }
         view.setTextColor(LiquidGlassTheme.badgeText(kind, isDark, preferred))
@@ -8095,8 +8096,10 @@ open class MaxHzActivity : AppBarActivity() {
         }
     }
 
-    private fun button(text: String, onClick: () -> Unit): TextView {
-        val role = buttonRoleFor(text)
+    private fun button(text: String, onClick: () -> Unit): TextView =
+        button(text, ButtonRole.SECONDARY, onClick)
+
+    private fun button(text: String, role: ButtonRole, onClick: () -> Unit): TextView {
         val isDark = isDarkMode()
         val isPrimary = role == ButtonRole.PRIMARY
         val isDanger = role == ButtonRole.DANGER
@@ -8113,8 +8116,8 @@ open class MaxHzActivity : AppBarActivity() {
             minimumWidth = 0
             insetTop = 0
             insetBottom = 0
-            val radiusPx = dp(14).toFloat()
-            cornerRadius = dp(14)
+            val radiusPx = dp(BUTTON_RADIUS_DP).toFloat()
+            cornerRadius = dp(BUTTON_RADIUS_DP)
             setPadding(dp(8), dp(4), dp(8), dp(4))
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
@@ -8160,22 +8163,7 @@ open class MaxHzActivity : AppBarActivity() {
     }
 
     private fun buttonRoleFor(text: String): ButtonRole {
-        return when {
-            text.contains("删除") ||
-                text.contains("清空") ||
-                text.contains("清除") ||
-                text.contains("恢复护栏") -> ButtonRole.DANGER
-
-            text.contains("指定应用") ||
-                text.contains("应用护栏") ||
-                text.contains("应用设置") ||
-                text.contains("开启 FPS") ||
-                text.contains("开始扫描") ||
-                text == "保存" ||
-                text == "应用" -> ButtonRole.PRIMARY
-
-            else -> ButtonRole.SECONDARY
-        }
+        return ButtonRole.SECONDARY
     }
 
     private fun switchRow(text: String, checked: Boolean, onChanged: (Boolean) -> Unit): MaterialSwitch {
@@ -8207,10 +8195,11 @@ open class MaxHzActivity : AppBarActivity() {
 
     private fun divider(): View {
         return View(this).apply {
-            setBackgroundColor(Color.TRANSPARENT)
+            val isDark = isDarkMode()
+            setBackgroundColor(if (isDark) 0x14FFFFFF.toInt() else 0x0A000000.toInt())
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(4)
+                dp(1)
             )
         }
     }
@@ -8220,7 +8209,7 @@ open class MaxHzActivity : AppBarActivity() {
             this.text = text
             textSize = 13f
             setTextColor(themeColors.onSurfaceVariant)
-            setPadding(0, dp(12), 0, dp(12))
+            setPadding(0, dp(8), 0, dp(8))
             setLineSpacing(0f, 1.25f)
         }
     }
@@ -8228,7 +8217,8 @@ open class MaxHzActivity : AppBarActivity() {
     private fun twoLineListRow(title: String, summary: String): View {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(0, dp(11), 0, dp(11))
+            minimumHeight = dp(44)
+            setPadding(0, dp(5), 0, dp(5))
             val shortRight = summary.lineSequence().firstOrNull()?.substringBefore('(')?.substringBefore('（')?.trim().orEmpty()
             addView(LinearLayout(this@MaxHzActivity).apply {
                 orientation = LinearLayout.HORIZONTAL
@@ -8256,11 +8246,11 @@ open class MaxHzActivity : AppBarActivity() {
             })
             val subView = TextView(this@MaxHzActivity).apply {
                 text = summary
-                textSize = 13f
+                textSize = 12f
                 setTextColor(themeColors.onSurfaceVariant)
                 includeFontPadding = false
-                setPadding(0, dp(3), 0, 0)
-                setLineSpacing(0f, 1.2f)
+                setPadding(0, dp(2), 0, 0)
+                setLineSpacing(0f, 1.15f)
             }
             addView(subView)
             bindOptionBSubtitle(this, subView)
@@ -8279,13 +8269,14 @@ open class MaxHzActivity : AppBarActivity() {
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, dp(11), 0, dp(11))
+            minimumHeight = dp(44)
+            setPadding(0, dp(4), 0, dp(4))
             installClickFeedback(this)
             addView(LinearLayout(this@MaxHzActivity).apply {
                 orientation = LinearLayout.VERTICAL
                 addView(TextView(this@MaxHzActivity).apply {
                     text = title
-                    textSize = 15.5f
+                    textSize = 15f
                     setTextColor(themeColors.onSurface)
                     setTypeface(typeface, android.graphics.Typeface.BOLD)
                     includeFontPadding = false
@@ -8294,11 +8285,11 @@ open class MaxHzActivity : AppBarActivity() {
                 })
                 summaryView = TextView(this@MaxHzActivity).apply {
                     text = summary
-                    textSize = 13f
+                    textSize = 12f
                     setTextColor(themeColors.onSurfaceVariant)
                     includeFontPadding = false
-                    setPadding(0, dp(3), 0, 0)
-                    setLineSpacing(0f, 1.2f)
+                    setPadding(0, dp(2), 0, 0)
+                    setLineSpacing(0f, 1.15f)
                 }
                 addView(summaryView)
             }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
@@ -8310,6 +8301,8 @@ open class MaxHzActivity : AppBarActivity() {
             toggle = MaterialSwitch(this@MaxHzActivity).apply {
                 showText = false
                 isChecked = checked
+                minHeight = 0
+                minimumHeight = 0
                 LiquidGlassTheme.styleIosSwitch(this, isDarkMode())
                 setOnCheckedChangeListener { _, isChecked ->
                     if (programmatic) return@setOnCheckedChangeListener
@@ -8349,7 +8342,8 @@ open class MaxHzActivity : AppBarActivity() {
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, dp(10), 0, dp(10))
+            minimumHeight = dp(44)
+            setPadding(0, dp(5), 0, dp(5))
             val textArea = LinearLayout(this@MaxHzActivity).apply {
                 orientation = LinearLayout.VERTICAL
                 installClickFeedback(this)
