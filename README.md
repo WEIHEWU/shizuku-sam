@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <a href="./README.md">简体中文</a> | <a href="./README.en.md">English</a> | <a href="https://github.com/WEIHEWU/shizuku-sam/releases/latest"><b>⬇️ 下载最新正式版 (v13.8.11)</b></a>
+  <a href="./README.md">简体中文</a> | <a href="./README.en.md">English</a> | <a href="https://github.com/WEIHEWU/shizuku-sam/releases/latest"><b>⬇️ 下载最新正式版 (v13.8.18)</b></a>
 </p>
 
 ---
@@ -15,7 +15,22 @@
 
 **Shizuku Sam** 将原生 **Shizuku 特权服务** 与专为三星 Galaxy（One UI）定制的 **系统调度与硬件增强、后台与深度休眠、分应用刷新率规则** 整合为一体。
 
-全应用（一级页面、二级页面、三级页面及所有弹窗）全面统一采用 **Miuix (`top.yukonga.miuix.kmp`) 界面组件体系**、**底部三栏毛玻璃悬浮导航（`Shizuku` · `性能硬件` · `应用规则`）**、**One UI 9 统一模态架构（二级/三级菜单 100% 弹窗浮层化 + 弹窗内平滑推入导航，主仪表盘与底部 Dock 永驻不闪烁）** 以及 **按需展开说明交互（默认单行极简主标题 + 长按单行展开/收起说明 + 顶部 `显示说明 / 隐藏说明` 胶囊开关）**。以下所有卡片名称、开关文案、按钮与二级页面均与当前 `v13.8.11` 真实界面逐字对应，并全面百分之百深度适配 **Samsung One UI 9 / Android 17**。
+全应用（一级页面、二级页面、三级页面及所有弹窗）全面统一采用 **Miuix (`top.yukonga.miuix.kmp`) 界面组件体系**、**底部三栏毛玻璃悬浮导航（`Shizuku` · `性能硬件` · `应用规则`）**、**One UI 9 统一模态架构（二级/三级菜单 100% 弹窗浮层化 + 弹窗内平滑推入导航，主仪表盘与底部 Dock 永驻不闪烁）** 以及 **按需展开说明交互（默认单行极简主标题 + 长按单行展开/收起说明 + 顶部 `显示说明 / 隐藏说明` 胶囊开关）**。以下所有卡片名称、开关文案、按钮与二级页面均与当前 `v13.8.18` 真实界面逐字对应，并全面百分之百深度适配 **Samsung One UI 9 / Android 17**。
+
+---
+
+## 🚀 最新版本亮点 (`v13.8.18`)
+
+1. **全应用弹窗系统级 Monet 动态取色 100% 深度统一**：
+   - 全应用一级主界面、二级模态浮层、三级/四级/五级弹窗（包括应用挑选器、确认弹窗、AOT 预编译、白名单冲突警示、运行报告等）全面接入 `DialogThemeHelper` 与 `surfaceContainerHigh` 动态取色规范；
+   - 统一 24dp 大圆角、晶莹描边边框与屏幕垂直/水平严格居中，彻底消除色调割裂，动态壁纸主题自适应永不失效。
+2. **全局字体与文本自适应排版优化**：
+   - 进游戏模式多选项按钮自动检测中文字长，长文本自动切换为 2 列流式排版，结合 `TextViewCompat` 动态字号缩放（10sp~13sp），彻底根除文本挤压、折行与截断；
+   - 应用选择器筛选标签（全部 / 用户应用 / 系统应用）与列表标题、副标题全量自适应缩放，完整展示应用名称与包名。
+3. **极速待机（Quick Doze）自适应伸缩**：
+   - 彻底移除“关”状态下预留的多余空白与死空间，折叠时高度自动紧凑自适应，点击或开启说明时顺滑展开。
+4. **全局按钮色彩逻辑统一**：
+   - 移除所有硬编码关键词颜色分叉，所有激活选中态 100% 统一为全局 Monet 主色（`themeColors.primary` + `themeColors.onPrimary`）。
 
 ---
 
@@ -137,7 +152,7 @@
 
 ### 直接下载安装包
 前往 **[GitHub Releases](https://github.com/WEIHEWU/shizuku-sam/releases/latest)** 下载最新签名正式版 APK：
-- 最新版本：**[`Shizuku-Sam-v13.8.11.apk`](https://github.com/WEIHEWU/shizuku-sam/releases/download/v13.8.11/Shizuku-Sam-v13.8.11.apk)**（仓库 [`releases/`](./releases/) 目录下亦同步存档）
+- 最新版本：**[`Shizuku-Sam-v13.8.18.apk`](https://github.com/WEIHEWU/shizuku-sam/releases/download/v13.8.18/Shizuku-Sam-v13.8.18.apk)**（仓库 [`releases/`](./releases/) 目录下亦同步存档）
 
 ### 本地编译
 - **JDK**：Java 21
