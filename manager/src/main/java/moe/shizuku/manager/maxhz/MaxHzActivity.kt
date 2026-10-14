@@ -3,6 +3,7 @@ package moe.shizuku.manager.maxhz
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -1456,46 +1457,21 @@ open class MaxHzActivity : AppBarActivity() {
     }
 
     protected fun unifiedDialogCardBackground(isDark: Boolean): GradientDrawable {
-        val isBlack = isShizukuBlackTheme()
-        val useSystem = ThemeHelper.isUsingSystemColor()
-        val bgColor = if (isDark) {
-            if (isBlack) 0xFF000000.toInt()
-            else if (useSystem) resolveColor(com.google.android.material.R.attr.colorSurfaceContainerHigh, 0xFF181B22.toInt())
-            else 0xFF181B22.toInt()
-        } else {
-            if (useSystem) resolveColor(com.google.android.material.R.attr.colorSurfaceContainerHigh, 0xFFFFFFFF.toInt())
-            else 0xFFFFFFFF.toInt()
-        }
-        val strokeColor = if (isDark) {
-            if (isBlack) 0x26FFFFFF.toInt()
-            else if (useSystem) resolveColor(com.google.android.material.R.attr.colorOutlineVariant, 0x224E5766.toInt())
-            else 0x224E5766.toInt()
-        } else {
-            if (useSystem) resolveColor(com.google.android.material.R.attr.colorOutlineVariant, 0x12000000.toInt())
-            else 0x12000000.toInt()
-        }
-        return GradientDrawable().apply {
-            cornerRadius = dp(24).toFloat()
-            setColor(bgColor)
-            setStroke(dp(1), strokeColor)
-        }
+        return moe.shizuku.manager.utils.DialogThemeHelper.createDialogBackground(this)
     }
 
     protected fun applyUnifiedDialogWindowStyle(dialog: android.app.Dialog, customWidth: Int? = null, transparentBg: Boolean = false) {
-        dialog.window?.let { window ->
-            val isDark = isDarkMode()
-            if (transparentBg) {
-                window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-            } else {
-                window.setBackgroundDrawable(unifiedDialogCardBackground(isDark))
-            }
-            val dm = resources.displayMetrics
-            val w = customWidth ?: minOf((dm.widthPixels * 0.92f).toInt(), dp(520))
-            window.setLayout(w, ViewGroup.LayoutParams.WRAP_CONTENT)
-            window.setDimAmount(0.55f)
-            window.setGravity(Gravity.CENTER)
-            window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        moe.shizuku.manager.utils.DialogThemeHelper.applyUnifiedDialogWindowStyle(dialog, customWidth)
+        if (transparentBg) {
+            dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
         }
+    }
+
+    protected fun MaterialAlertDialogBuilder.showUnified(customWidth: Int? = null): androidx.appcompat.app.AlertDialog {
+        val dialog = this.create()
+        dialog.show()
+        applyUnifiedDialogWindowStyle(dialog, customWidth)
+        return dialog
     }
 
     protected fun showDetailModalDialog(screen: DetailScreen) {
@@ -3224,87 +3200,89 @@ open class MaxHzActivity : AppBarActivity() {
             // 主开关卡片（仿 Galaxy MaxHz 顶部"关/开"大开关）
             val topDescView = TextView(this@MaxHzActivity).apply {
                 text = "熄屏时快速进入 doze 模式，以改善待机耗电。\n设备解锁时 doze 模式自动停用。"
-                textSize = 13f
+                textSize = 12.5f
                 setTextColor(themeColors.onSurfaceVariant)
-                setPadding(dp(16), dp(10), dp(16), dp(4))
-                setLineSpacing(0f, 1.35f)
+                setLineSpacing(0f, 1.25f)
+                includeFontPadding = false
+                visibility = if (detailSubtitlesExpanded) View.VISIBLE else View.GONE
             }
             addView(MaterialCardView(this@MaxHzActivity).apply {
                 applyLiquidGlassCardStyle(this, CARD_RADIUS_DP)
                 addView(LinearLayout(this@MaxHzActivity).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    gravity = Gravity.CENTER_VERTICAL
+                    orientation = LinearLayout.VERTICAL
                     setPadding(dp(16), dp(8), dp(16), dp(8))
-                    masterStateText = TextView(this@MaxHzActivity).apply {
-                        text = if (MaxHzPrefs.quickDozeEnabled(this@MaxHzActivity)) "开" else "关"
-                        textSize = 16f
-                        setTypeface(typeface, android.graphics.Typeface.BOLD)
-                        setTextColor(themeColors.onSurface)
-                    }
-                    addView(masterStateText, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-                    masterSwitch = MaterialSwitch(this@MaxHzActivity).apply {
-                        isChecked = MaxHzPrefs.quickDozeEnabled(this@MaxHzActivity)
-                        LiquidGlassTheme.styleIosSwitch(this, isDarkMode())
-                        setOnCheckedChangeListener { _, isChecked ->
-                            if (suppressMasterSwitch) return@setOnCheckedChangeListener
-                            masterStateText.text = if (isChecked) "开" else "关"
-                            if (isChecked) {
-                                runCommand(
-                                    resultView,
-                                    "开启快速待机",
-                                    "启用系统 Doze 并写入更快进入待机的参数；不修改 App Doze 白名单。",
-                                    onResult = { result ->
-                                        if (result.code != 0) {
-                                            suppressMasterSwitch = true
-                                            masterSwitch.isChecked = false
-                                            suppressMasterSwitch = false
-                                            masterStateText.text = "关"
+                    addView(LinearLayout(this@MaxHzActivity).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        gravity = Gravity.CENTER_VERTICAL
+                        masterStateText = TextView(this@MaxHzActivity).apply {
+                            text = if (MaxHzPrefs.quickDozeEnabled(this@MaxHzActivity)) "开" else "关"
+                            textSize = 16f
+                            setTypeface(typeface, android.graphics.Typeface.BOLD)
+                            setTextColor(themeColors.onSurface)
+                        }
+                        addView(masterStateText, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                        masterSwitch = MaterialSwitch(this@MaxHzActivity).apply {
+                            isChecked = MaxHzPrefs.quickDozeEnabled(this@MaxHzActivity)
+                            LiquidGlassTheme.styleIosSwitch(this, isDarkMode())
+                            setOnCheckedChangeListener { _, isChecked ->
+                                if (suppressMasterSwitch) return@setOnCheckedChangeListener
+                                masterStateText.text = if (isChecked) "开" else "关"
+                                if (isChecked) {
+                                    runCommand(
+                                        resultView,
+                                        "开启快速待机",
+                                        "启用系统 Doze 并写入更快进入待机的参数；不修改 App Doze 白名单。",
+                                        onResult = { result ->
+                                            if (result.code != 0) {
+                                                suppressMasterSwitch = true
+                                                masterSwitch.isChecked = false
+                                                suppressMasterSwitch = false
+                                                masterStateText.text = "关"
+                                            }
                                         }
-                                    }
-                                ) { applyQuickDozeResult() }
-                            } else {
-                                runCommand(
-                                    resultView,
-                                    "恢复快速待机",
-                                    "清理本功能写入的 Doze 参数，让系统默认待机策略接管。",
-                                    onResult = { result ->
-                                        if (result.code != 0) {
-                                            suppressMasterSwitch = true
-                                            masterSwitch.isChecked = true
-                                            suppressMasterSwitch = false
-                                            masterStateText.text = "开"
+                                    ) { applyQuickDozeResult() }
+                                } else {
+                                    runCommand(
+                                        resultView,
+                                        "恢复快速待机",
+                                        "清理本功能写入的 Doze 参数，让系统默认待机策略接管。",
+                                        onResult = { result ->
+                                            if (result.code != 0) {
+                                                suppressMasterSwitch = true
+                                                masterSwitch.isChecked = true
+                                                suppressMasterSwitch = false
+                                                masterStateText.text = "开"
+                                            }
                                         }
-                                    }
-                                ) {
-                                    MaxHzController.restoreQuickDoze().also {
-                                        if (it.code == 0) {
-                                            MaxHzPrefs.setQuickDozeEnabled(this@MaxHzActivity, false)
-                                            updateMaxHzServiceState()
+                                    ) {
+                                        MaxHzController.restoreQuickDoze().also {
+                                            if (it.code == 0) {
+                                                MaxHzPrefs.setQuickDozeEnabled(this@MaxHzActivity, false)
+                                                updateMaxHzServiceState()
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
-                    }
-                    addView(masterSwitch)
+                        addView(masterSwitch)
+                    })
+                    addSpacedView(topDescView, dp(4))
                 })
                 bindOptionBSubtitle(this, topDescView)
             })
-
-            // 功能说明（默认隐藏，长按主开关卡片或点顶部“显示说明”展开）
-            addView(topDescView)
 
             // 维护设置卡片：无需维护开关 + 初始维护窗口间隔
             addSpacedView(MaterialCardView(this@MaxHzActivity).apply {
                 applyLiquidGlassCardStyle(this, CARD_RADIUS_DP)
                 addView(LinearLayout(this@MaxHzActivity).apply {
                     orientation = LinearLayout.VERTICAL
-                    setPadding(dp(16), dp(6), dp(16), dp(12))
+                    setPadding(dp(16), dp(6), dp(16), dp(10))
                     // 无需维护
                     addView(LinearLayout(this@MaxHzActivity).apply {
                         orientation = LinearLayout.HORIZONTAL
                         gravity = Gravity.CENTER_VERTICAL
-                        setPadding(0, dp(8), 0, dp(8))
+                        setPadding(0, dp(4), 0, dp(4))
                         val noMaintSub = TextView(this@MaxHzActivity).apply {
                             text = "节省最多的电池"
                             textSize = 12.5f
@@ -3706,7 +3684,7 @@ open class MaxHzActivity : AppBarActivity() {
                         releasePrefs().edit().putBoolean(KEY_SYSTEM_APP_FILTER_CONFIRMED, true).apply()
                         applyFilter(filter)
                     }
-                    .show()
+                    .showUnified()
             } else {
                 applyFilter(filter)
             }
@@ -4180,7 +4158,7 @@ open class MaxHzActivity : AppBarActivity() {
                                         guardSwitch?.isChecked = false
                                         suppressSwitchListener = false
                                     }
-                                    .show()
+                                    .showUnified()
                             } else {
                                 MaterialAlertDialogBuilder(this@MaxHzActivity)
                                     .setTitle("护栏名单目前为空")
@@ -4230,7 +4208,7 @@ open class MaxHzActivity : AppBarActivity() {
                                         guardSwitch?.isChecked = false
                                         suppressSwitchListener = false
                                     }
-                                    .show()
+                                    .showUnified()
                             }
                             return@switchRow
                         }
@@ -4257,7 +4235,7 @@ open class MaxHzActivity : AppBarActivity() {
                                     guardSwitch?.isChecked = false
                                     suppressSwitchListener = false
                                 }
-                                .show()
+                                .showUnified()
                         }
                     } else {
                         restoreNightWakeupGuardFromUi()
@@ -4421,7 +4399,7 @@ open class MaxHzActivity : AppBarActivity() {
                                 updateSuggestions()
                                 Toast.makeText(this@MaxHzActivity, "护栏名单已清空并恢复", Toast.LENGTH_SHORT).show()
                             }
-                            .show()
+                            .showUnified()
                     })
                 }
                 addSpacedView(horizontalActions(*actionButtons.toTypedArray()), dp(6))
@@ -5220,7 +5198,7 @@ open class MaxHzActivity : AppBarActivity() {
                                     MaxHzController.applyScreenOnAdaptive()
                                 }
                             }
-                            .show()
+                            .showUnified()
                     },
                     button("清空所有规则") {
                         val target = resultView ?: return@button
@@ -5245,7 +5223,7 @@ open class MaxHzActivity : AppBarActivity() {
                                     }
                                 }
                             }
-                            .show()
+                            .showUnified()
                     }
                 ), dp(8))
             }, gap)
@@ -5401,7 +5379,7 @@ open class MaxHzActivity : AppBarActivity() {
             .setTitle("自选应用 ART 预编译")
             .setView(emptyText("正在加载已安装应用列表，请稍候..."))
             .setNegativeButton("取消", null)
-            .show()
+            .showUnified()
 
         lifecycleScope.launch {
             val allApps = withContext(Dispatchers.IO) {
@@ -5921,7 +5899,7 @@ open class MaxHzActivity : AppBarActivity() {
                 .setView(rootView)
                 .setNegativeButton("取消", null)
                 .setPositiveButton("开始执行", null)
-                .show()
+                .showUnified()
 
             pickerDialog?.getButton(android.content.DialogInterface.BUTTON_POSITIVE)?.setOnClickListener {
                 if (selectedPackages.isEmpty()) {
@@ -5977,7 +5955,7 @@ open class MaxHzActivity : AppBarActivity() {
             .setTitle(title)
             .setMessage("正在统计待优化的应用列表，请稍候...")
             .setCancelable(false)
-            .show()
+            .showUnified()
 
         lifecycleScope.launch {
             val appList = withContext(Dispatchers.IO) {
@@ -6101,6 +6079,7 @@ open class MaxHzActivity : AppBarActivity() {
 
         aotLiveProgressDialog = dialog
         dialog.show()
+        applyUnifiedDialogWindowStyle(dialog)
 
         var observeJob: Job? = null
         observeJob = lifecycleScope.launch {
@@ -6210,7 +6189,7 @@ open class MaxHzActivity : AppBarActivity() {
             .setTitle(titleText)
             .setMessage(msg)
             .setPositiveButton("确定", null)
-            .show()
+            .showUnified()
     }
 
     private fun hardenScreenOffKeepAlive(): MaxHzShell.Result {
@@ -6436,7 +6415,7 @@ open class MaxHzActivity : AppBarActivity() {
             .setTitle("需要 Root 权限")
             .setMessage("“$featureName”需要直接向底层硬件内核驱动或电源管理芯片写入控制指令，必须具备已授权的 Root 权限（如 KernelSU / Magisk / APatch）。\n\n当前设备未检测到 Root 授权，已自动禁用该功能以确保系统稳定与安全。")
             .setPositiveButton("我知道了", null)
-            .show()
+            .showUnified()
     }
 
     private fun toggleCard(
@@ -6652,7 +6631,7 @@ open class MaxHzActivity : AppBarActivity() {
             .setTitle(title)
             .setView(layout)
             .setCancelable(false)
-            .show()
+            .showUnified()
     }
 
     private fun singleActionCard(
@@ -7572,7 +7551,7 @@ open class MaxHzActivity : AppBarActivity() {
                 textSize = 14f
                 setTextColor(themeColors.onSurface)
                 includeFontPadding = false
-                maxLines = 1
+                maxLines = 2
                 ellipsize = TextUtils.TruncateAt.END
             })
             if (showSubtitle) {
@@ -7582,7 +7561,7 @@ open class MaxHzActivity : AppBarActivity() {
                     setTextColor(themeColors.onSurfaceVariant)
                     includeFontPadding = false
                     setPadding(0, dp(3), 0, 0)
-                    maxLines = 1
+                    maxLines = 2
                     ellipsize = TextUtils.TruncateAt.END
                 })
             }
@@ -7643,7 +7622,7 @@ open class MaxHzActivity : AppBarActivity() {
                         releasePrefs().edit().putBoolean(KEY_SYSTEM_APP_FILTER_CONFIRMED, true).apply()
                         applyFilter(filter)
                     }
-                    .show()
+                    .showUnified()
             } else {
                 applyFilter(filter)
             }
@@ -7766,7 +7745,7 @@ open class MaxHzActivity : AppBarActivity() {
             .setTitle(R.string.rules_select_app_hint)
             .setView(emptyText("正在加载应用列表..."))
             .setNegativeButton("取消", null)
-            .show()
+            .showUnified()
         lifecycleScope.launch {
             val apps = withContext(Dispatchers.IO) { loadRefreshRateTargetApps() }
             if (!loadingDialog.isShowing) return@launch
@@ -7782,7 +7761,7 @@ open class MaxHzActivity : AppBarActivity() {
                     onSelected(app.packageName, app.label)
                     dialog.dismiss()
                 })
-                .show()
+                .showUnified()
                 .also {
                     it.setOnDismissListener {
                         ensureMaxHzContentVisible()
@@ -7796,7 +7775,7 @@ open class MaxHzActivity : AppBarActivity() {
             .setTitle("添加游戏")
             .setView(emptyText("正在加载应用列表..."))
             .setNegativeButton("取消", null)
-            .show()
+            .showUnified()
         lifecycleScope.launch {
             try {
                 val apps = withContext(Dispatchers.IO) { loadGameAutoTargetApps() }
@@ -7816,7 +7795,7 @@ open class MaxHzActivity : AppBarActivity() {
                         onSelected(app)
                         dialog.dismiss()
                     })
-                    .show()
+                    .showUnified()
                     .also {
                         it.setOnDismissListener {
                             ensureMaxHzContentVisible()
@@ -7834,7 +7813,7 @@ open class MaxHzActivity : AppBarActivity() {
             .setTitle("添加到待机护栏")
             .setView(emptyText("正在加载应用列表..."))
             .setNegativeButton("取消", null)
-            .show()
+            .showUnified()
         lifecycleScope.launch {
             val apps = withContext(Dispatchers.IO) { loadNightWakeupGuardTargetApps() }
             if (!loadingDialog.isShowing) return@launch
@@ -7853,7 +7832,7 @@ open class MaxHzActivity : AppBarActivity() {
                     onSelected(app)
                     dialog.dismiss()
                 })
-                .show()
+                .showUnified()
         }
     }
 
@@ -7983,11 +7962,13 @@ open class MaxHzActivity : AppBarActivity() {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(0, 0, 0, 0)
+            val maxTextLen = views.maxOfOrNull { (it as? TextView)?.text?.toString()?.replace(" ✓", "")?.length ?: 0 } ?: 0
             val columns = when {
-                isLargeFontMode() -> if (views.size == 3) 3 else 1
+                isLargeFontMode() -> if (views.size == 3 && maxTextLen <= 4) 3 else 1
                 views.size == 1 -> 1
-                views.size == 3 -> 3
-                views.size == 6 -> 3
+                views.size == 3 && maxTextLen <= 5 -> 3
+                views.size == 3 -> 2
+                views.size == 6 && maxTextLen <= 4 -> 3
                 views.size == 4 -> 2
                 else -> 2
             }
@@ -8118,28 +8099,21 @@ open class MaxHzActivity : AppBarActivity() {
             insetBottom = 0
             val radiusPx = dp(BUTTON_RADIUS_DP).toFloat()
             cornerRadius = dp(BUTTON_RADIUS_DP)
-            setPadding(dp(8), dp(4), dp(8), dp(4))
+            setPadding(dp(6), dp(4), dp(6), dp(4))
+            isSingleLine = true
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
             textSize = 13f
+            TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(this, 10, 13, 1, TypedValue.COMPLEX_UNIT_SP)
             setLineSpacing(0f, 1.05f)
             strokeWidth = 0
             backgroundTintList = null
             if (isSelected) {
-                val selectedBg = when {
-                    text.contains("省电") -> 0xFF10B981.toInt()
-                    text.contains("性能") || text.contains("满血") || text.contains("游戏") -> if (isDark) 0xFF277AF7.toInt() else 0xFF3482FF.toInt()
-                    else -> if (isDark) 0xFF162946.toInt() else 0xFFEBF3FF.toInt()
-                }
-                val textColor = when {
-                    text.contains("省电") || text.contains("性能") || text.contains("满血") || text.contains("游戏") -> 0xFFFFFFFF.toInt()
-                    else -> if (isDark) 0xFF277AF7.toInt() else 0xFF3482FF.toInt()
-                }
                 background = GradientDrawable().apply {
                     cornerRadius = radiusPx
-                    setColor(selectedBg)
+                    setColor(themeColors.primary)
                 }
-                setTextColor(textColor)
+                setTextColor(themeColors.onPrimary)
             } else {
                 background = LiquidGlassTheme.createButtonDrawable(
                     cornerRadiusPx = radiusPx,
@@ -8149,8 +8123,8 @@ open class MaxHzActivity : AppBarActivity() {
                 )
                 val textColor = when {
                     isDanger -> if (isDark) 0xFFFCA5A5.toInt() else 0xFFDC2626.toInt()
-                    isPrimary -> 0xFFFFFFFF.toInt()
-                    else -> if (isDark) 0xFFECEFF4.toInt() else 0xFF1A1C1E.toInt()
+                    isPrimary -> themeColors.onPrimary
+                    else -> themeColors.onSurface
                 }
                 setTextColor(textColor)
             }
@@ -8393,31 +8367,33 @@ open class MaxHzActivity : AppBarActivity() {
         return MaterialButton(this).apply {
             this.text = text
             gravity = Gravity.CENTER
-            textSize = 13f
+            textSize = 12f
             includeFontPadding = false
-            minHeight = dp(36)
-            minimumHeight = dp(36)
+            minHeight = dp(34)
+            minimumHeight = dp(34)
             minWidth = 0
             minimumWidth = 0
             insetTop = 0
             insetBottom = 0
             cornerRadius = dp(12)
-            setPadding(dp(12), dp(6), dp(12), dp(6))
-            maxLines = 2
-            ellipsize = TextUtils.TruncateAt.END
+            setPadding(dp(6), dp(4), dp(6), dp(4))
+            isSingleLine = true
+            maxLines = 1
+            ellipsize = null
             setTypeface(typeface, android.graphics.Typeface.BOLD)
+            TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(this, 10, 12, 1, TypedValue.COMPLEX_UNIT_SP)
             setTextColor(
                 if (selected) {
-                    0xFFFFFFFF.toInt()
+                    themeColors.onPrimary
                 } else {
                     themeColors.onSurfaceVariant
                 }
             )
             backgroundTintList = ColorStateList.valueOf(
                 if (selected) {
-                    if (isDark) 0xFF277AF7.toInt() else 0xFF3482FF.toInt()
+                    themeColors.primary
                 } else {
-                    if (isDark) 0xFF282C37.toInt() else 0xFFE6EAF2.toInt()
+                    resolveColor(com.google.android.material.R.attr.colorSurfaceContainerHigh, if (isDark) 0xFF282C37.toInt() else 0xFFE6EAF2.toInt())
                 }
             )
             strokeWidth = 0
@@ -9112,7 +9088,7 @@ open class MaxHzActivity : AppBarActivity() {
                         }
                     }
                 }
-                .show()
+                .showUnified()
         }
 
         MaterialAlertDialogBuilder(this)
@@ -9121,7 +9097,7 @@ open class MaxHzActivity : AppBarActivity() {
             .setItems(actions.map { it.first }.toTypedArray()) { _, which ->
                 actions[which].second()
             }
-            .show()
+            .showUnified()
     }
 
     private fun parseNightRestrictionItems(raw: String): List<NightRestrictionItem> {
@@ -9693,7 +9669,7 @@ open class MaxHzActivity : AppBarActivity() {
                         skipSystemRelatedWarning = true
                     )
                 }
-                .show()
+                .showUnified()
             return
         }
 
@@ -9735,7 +9711,7 @@ open class MaxHzActivity : AppBarActivity() {
                 .setPositiveButton("仍然加入护栏") { _, _ ->
                     addPackage("已加入待机省电护栏：$appName。该应用原本受系统后台保护，应用护栏后可能影响通知、同步或后台任务。")
                 }
-                .show()
+                .showUnified()
         }
     }
 
@@ -9951,9 +9927,9 @@ open class MaxHzActivity : AppBarActivity() {
                     .setTitle("高级详情")
                     .setMessage(cleanNightScanAdvancedReport(advancedReport))
                     .setPositiveButton("知道了", null)
-                    .show()
+                    .showUnified()
             }
-            .show()
+            .showUnified()
     }
 
     private fun nightScanUserReport(suggestions: List<MaxHzPrefs.NightWakeupSuggestion>): String {
@@ -10848,7 +10824,7 @@ open class MaxHzActivity : AppBarActivity() {
                                 Toast.makeText(this@MaxHzActivity, "游戏名单已清空", Toast.LENGTH_SHORT).show()
                                 renderDetail()
                             }
-                            .show()
+                            .showUnified()
                     })
                 }
                 addSpacedView(horizontalActions(*actionButtons.toTypedArray()), dp(6))
@@ -11097,7 +11073,7 @@ open class MaxHzActivity : AppBarActivity() {
             .setTitle(title)
             .setMessage(message)
             .setPositiveButton("知道了", null)
-            .show()
+            .showUnified()
     }
 
     private fun dailySaverConflictConfirmation(): ConfirmationPrompt? {
@@ -11342,7 +11318,7 @@ open class MaxHzActivity : AppBarActivity() {
             .setPositiveButton(confirmation.positiveText) { _, _ ->
                 runCommand(target, label, explanation, onFinished = onFinished, block = block)
             }
-            .show()
+            .showUnified()
     }
 
     private fun formatCommandMessage(text: String): String {

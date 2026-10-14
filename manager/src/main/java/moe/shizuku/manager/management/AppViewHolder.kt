@@ -92,6 +92,7 @@ class AppViewHolder(private val binding: AppListItemBinding) : BaseViewHolder<Pa
                 }
                 try {
                     dialog.show()
+                    moe.shizuku.manager.utils.DialogThemeHelper.applyUnifiedDialogWindowStyle(dialog)
                 } catch (ignored: Throwable) {
                 }
             }

@@ -11,10 +11,14 @@ class WadbNotEnabledDialogFragment :DialogFragment() {
 
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
         val context = requireContext()
-        return MaterialAlertDialogBuilder(context)
+        val dialog = MaterialAlertDialogBuilder(context)
                 .setMessage(R.string.dialog_wireless_adb_not_enabled)
                 .setPositiveButton(android.R.string.ok, null)
                 .create()
+        dialog.setOnShowListener {
+            moe.shizuku.manager.utils.DialogThemeHelper.applyUnifiedDialogWindowStyle(dialog)
+        }
+        return dialog
     }
 
     fun show(fragmentManager: FragmentManager) {

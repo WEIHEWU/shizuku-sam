@@ -27,6 +27,7 @@ class WadbEnableUsbDebuggingDialogFragment : DialogFragment() {
     }
 
     private fun onDialogShow(dialog: AlertDialog) {
+        moe.shizuku.manager.utils.DialogThemeHelper.applyUnifiedDialogWindowStyle(dialog)
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
             dismissAllowingStateLoss()
             val intent = Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).apply {

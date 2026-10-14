@@ -1584,7 +1584,7 @@ abstract class HomeActivity : MaxHzActivity() {
                                             try { Shizuku.exit() } catch (_: Throwable) {}
                                         }
                                         .setNegativeButton(android.R.string.cancel, null)
-                                        .show()
+                                        .showUnified()
                                 }
                             }
                             val restartBtn = MaterialButton(this@HomeActivity).apply {
