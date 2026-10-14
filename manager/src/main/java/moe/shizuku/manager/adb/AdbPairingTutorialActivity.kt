@@ -13,6 +13,7 @@ import android.graphics.drawable.ColorDrawable
 import android.os.Build
 import android.os.Bundle
 import android.view.Gravity
+import android.view.ViewGroup
 import androidx.activity.result.contract.ActivityResultContracts
 import android.provider.Settings
 import android.util.Log
@@ -102,12 +103,13 @@ class AdbPairingTutorialActivity : AppActivity() {
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
+        val dm = resources.displayMetrics
+        val dialogWidth = minOf((dm.widthPixels * 0.92f).toInt(), (520 * dm.density).toInt())
+        val maxHeightDp = (dm.heightPixels * 0.82f / dm.density).dp
+
         window?.let { win ->
             win.setBackgroundDrawable(ColorDrawable(AndroidColor.TRANSPARENT))
-            val dm = resources.displayMetrics
-            val dialogWidth = minOf((dm.widthPixels * 0.92f).toInt(), (520 * dm.density).toInt())
-            val dialogHeight = (dm.heightPixels * 0.82f).toInt()
-            win.setLayout(dialogWidth, dialogHeight)
+            win.setLayout(dialogWidth, ViewGroup.LayoutParams.WRAP_CONTENT)
             win.setDimAmount(0.55f)
             win.setGravity(Gravity.CENTER)
         }
@@ -151,7 +153,8 @@ class AdbPairingTutorialActivity : AppActivity() {
             GlassAppTheme(isDark = isDark) {
                 Box(
                     modifier = Modifier
-                        .fillMaxSize()
+                        .fillMaxWidth()
+                        .heightIn(max = maxHeightDp)
                         .clip(RoundedCornerShape(24.dp))
                         .background(dialogBgColor)
                         .border(1.dp, dialogStrokeColor, RoundedCornerShape(24.dp))

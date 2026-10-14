@@ -299,7 +299,7 @@ open class MaxHzActivity : AppBarActivity() {
     protected val dockSelectedTabState = mutableIntStateOf(0)
 
     protected val density by lazy { resources.displayMetrics.density }
-    protected val gap by lazy { dp(12) }
+    protected val gap by lazy { dp(10) }
     protected val themeColors by lazy { loadThemeColors() }
 
     protected enum class Page {
@@ -1440,7 +1440,7 @@ open class MaxHzActivity : AppBarActivity() {
         }
     }
 
-    private fun modalHeaderButtonBackground(isDark: Boolean, radiusDp: Int): Drawable {
+    protected fun modalHeaderButtonBackground(isDark: Boolean, radiusDp: Int): Drawable {
         val normal = GradientDrawable().apply {
             cornerRadius = dp(radiusDp).toFloat()
             setColor(if (isDark) 0x14FFFFFF.toInt() else 0x0A000000.toInt())
@@ -1509,9 +1509,6 @@ open class MaxHzActivity : AppBarActivity() {
             background = unifiedDialogCardBackground(isDark)
             clipToOutline = true
             elevation = dp(16).toFloat()
-            layoutTransition = android.animation.LayoutTransition().apply {
-                enableTransitionType(android.animation.LayoutTransition.CHANGING)
-            }
         }
         modalRootView = root
 
@@ -1598,17 +1595,33 @@ open class MaxHzActivity : AppBarActivity() {
         root.addView(divider)
 
         // 滚动视口 + 内容承载容器（动态自适应高度，最大不超过屏幕 82%，杜绝大面积空白）
-        val maxH = (resources.displayMetrics.heightPixels * 0.82f).toInt()
+        // 滚动视口 + 内容承载容器（动态自适应高度，按内容紧凑自适应，最高不超过屏幕 80%，杜绝大面积留白）
+        val maxH = (resources.displayMetrics.heightPixels * 0.80f).toInt()
         val scrollView = object : NestedScrollView(this@MaxHzActivity) {
             override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-                val customHeightSpec = View.MeasureSpec.makeMeasureSpec(maxH, View.MeasureSpec.AT_MOST)
-                super.onMeasure(widthMeasureSpec, customHeightSpec)
+                val availableWidth = View.MeasureSpec.getSize(widthMeasureSpec)
+                val wSpec = View.MeasureSpec.makeMeasureSpec(availableWidth, View.MeasureSpec.EXACTLY)
+
+                val child = if (childCount > 0) getChildAt(0) else null
+                val childWSpec = View.MeasureSpec.makeMeasureSpec(
+                    maxOf(0, availableWidth - paddingLeft - paddingRight),
+                    View.MeasureSpec.EXACTLY
+                )
+                val childHSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+                child?.measure(childWSpec, childHSpec)
+
+                val naturalHeight = (child?.measuredHeight ?: 0) + paddingTop + paddingBottom
+                val desiredHeight = minOf(naturalHeight, maxH)
+
+                val exactHSpec = View.MeasureSpec.makeMeasureSpec(desiredHeight, View.MeasureSpec.EXACTLY)
+                super.onMeasure(wSpec, exactHSpec)
+                setMeasuredDimension(resolveSize(availableWidth, widthMeasureSpec), desiredHeight)
             }
         }.apply {
             layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
             isFillViewport = false
             overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
-            setPadding(dp(14), dp(4), dp(14), dp(10))
+            setPadding(dp(14), dp(4), dp(14), dp(8))
             clipToPadding = false
         }
         modalScrollView = scrollView
@@ -1631,6 +1644,7 @@ open class MaxHzActivity : AppBarActivity() {
             .getOrElse { error ->
                 errorCard("页面加载异常", error.message ?: error.javaClass.simpleName)
             }
+        screenView.layoutParams = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
         contentContainer.addView(screenView)
 
         if (detailSubtitles.isNotEmpty()) {
@@ -1640,7 +1654,7 @@ open class MaxHzActivity : AppBarActivity() {
             pillContainer.visibility = View.GONE
         }
 
-        val dialog = android.app.Dialog(this).apply {
+        val dialog = android.app.Dialog(this, R.style.ThemeOverlay_App_MaterialAlertDialog).apply {
             requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
             setContentView(root)
             setCanceledOnTouchOutside(true)
@@ -1671,8 +1685,8 @@ open class MaxHzActivity : AppBarActivity() {
             onDetailModalDismissed()
         }
 
+        applyUnifiedDialogWindowStyle(dialog, dialogWidth, transparentBg = true)
         dialog.show()
-
         applyUnifiedDialogWindowStyle(dialog, dialogWidth, transparentBg = true)
 
         detailModalDialog = dialog
@@ -1713,6 +1727,7 @@ open class MaxHzActivity : AppBarActivity() {
         }
 
         val oldView = if (container.childCount > 0) container.getChildAt(0) else null
+        newView.layoutParams = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
         if (oldView == null) {
             container.addView(newView)
             if (isPush) {
@@ -3442,7 +3457,7 @@ open class MaxHzActivity : AppBarActivity() {
                     addView(LinearLayout(this@MaxHzActivity).apply {
                         orientation = LinearLayout.VERTICAL
                         installClickFeedback(this)
-                        setPadding(0, dp(12), 0, dp(12))
+                        setPadding(0, dp(8), 0, dp(8))
                         addView(TextView(this@MaxHzActivity).apply {
                             text = "检查当前待机状态"
                             textSize = 15.5f
@@ -3474,7 +3489,7 @@ open class MaxHzActivity : AppBarActivity() {
                     addView(LinearLayout(this@MaxHzActivity).apply {
                         orientation = LinearLayout.VERTICAL
                         installClickFeedback(this)
-                        setPadding(0, dp(12), 0, dp(12))
+                        setPadding(0, dp(8), 0, dp(8))
                         addView(TextView(this@MaxHzActivity).apply {
                             text = "待机异常唤醒排查"
                             textSize = 15.5f
@@ -3502,7 +3517,7 @@ open class MaxHzActivity : AppBarActivity() {
                     addView(LinearLayout(this@MaxHzActivity).apply {
                         orientation = LinearLayout.VERTICAL
                         installClickFeedback(this)
-                        setPadding(0, dp(12), 0, dp(12))
+                        setPadding(0, dp(8), 0, dp(8))
                         addView(TextView(this@MaxHzActivity).apply {
                             text = "后台保护名单"
                             textSize = 15.5f
@@ -3529,7 +3544,7 @@ open class MaxHzActivity : AppBarActivity() {
                     addView(LinearLayout(this@MaxHzActivity).apply {
                         orientation = LinearLayout.VERTICAL
                         installClickFeedback(this)
-                        setPadding(0, dp(12), 0, dp(12))
+                        setPadding(0, dp(8), 0, dp(8))
                         addView(TextView(this@MaxHzActivity).apply {
                             text = "最近待机记录"
                             textSize = 15.5f
@@ -3556,7 +3571,7 @@ open class MaxHzActivity : AppBarActivity() {
                     addView(LinearLayout(this@MaxHzActivity).apply {
                         orientation = LinearLayout.VERTICAL
                         installClickFeedback(this)
-                        setPadding(0, dp(12), 0, dp(12))
+                        setPadding(0, dp(8), 0, dp(8))
                         addView(TextView(this@MaxHzActivity).apply {
                             text = "管理电池使用量"
                             textSize = 15.5f
@@ -5362,7 +5377,7 @@ open class MaxHzActivity : AppBarActivity() {
                         }
                     }
                 }
-            ), dp(16))
+            ), dp(10))
         }, gap)
 
         parent.addSpacedView(singleActionCard(
@@ -6689,7 +6704,7 @@ open class MaxHzActivity : AppBarActivity() {
                         }
                     }
                 }
-            ), dp(16))
+            ), dp(10))
         }
     }
 
@@ -6792,7 +6807,7 @@ open class MaxHzActivity : AppBarActivity() {
                         }
                     }
                 }
-            ), dp(16))
+            ), dp(10))
         }
     }
 
@@ -11857,7 +11872,7 @@ open class MaxHzActivity : AppBarActivity() {
         )
     }
 
-    private fun installClickFeedback(view: View, foregroundRipple: Boolean = true) {
+    protected fun installClickFeedback(view: View, foregroundRipple: Boolean = true) {
         view.isClickable = true
         view.isFocusable = true
         if (foregroundRipple) {
@@ -12189,7 +12204,7 @@ open class MaxHzActivity : AppBarActivity() {
         private const val COMMAND_BUTTON_TAG = "maxhz_command_button"
         private const val SLOW_COMMAND_NOTICE_MS = 2000L
         private const val BUTTON_RADIUS_DP = 22
-        private const val BUTTON_SPACING_DP = 12
+        private const val BUTTON_SPACING_DP = 10
         private const val DASHBOARD_TILE_HEIGHT_DP = 64
         private const val DASHBOARD_TILE_SPACING_DP = 8
         private const val DASHBOARD_ACTION_HEIGHT_DP = 40
@@ -12204,8 +12219,8 @@ open class MaxHzActivity : AppBarActivity() {
         private const val INPUT_LABEL_GAP_DP = 4
         private const val INPUT_FIELD_HEIGHT_DP = 44
         const val CARD_RADIUS_DP = 20
-        private const val CARD_PADDING_DP = 16
-        private const val CARD_SECTION_SPACING_DP = 12
+        private const val CARD_PADDING_DP = 14
+        private const val CARD_SECTION_SPACING_DP = 10
         private const val BATTERY_PROTECTION_RESULT_KEY = "battery_protection"
         private const val BACKGROUND_ERROR_RESULT_KEY = "background_error"
         private const val GAME_AUTO_RUNTIME_RESULT_KEY = "game_auto_runtime"

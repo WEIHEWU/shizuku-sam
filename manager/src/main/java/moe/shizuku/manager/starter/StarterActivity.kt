@@ -11,6 +11,7 @@ import android.provider.Settings
 import android.util.Log
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.ViewGroup
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -132,12 +133,13 @@ class StarterActivity : AppActivity() {
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
+        val dm = resources.displayMetrics
+        val dialogWidth = minOf((dm.widthPixels * 0.92f).toInt(), (520 * dm.density).toInt())
+        val maxHeightDp = (dm.heightPixels * 0.82f / dm.density).dp
+
         window?.let { win ->
             win.setBackgroundDrawable(ColorDrawable(AndroidColor.TRANSPARENT))
-            val dm = resources.displayMetrics
-            val dialogWidth = minOf((dm.widthPixels * 0.92f).toInt(), (520 * dm.density).toInt())
-            val dialogHeight = (dm.heightPixels * 0.82f).toInt()
-            win.setLayout(dialogWidth, dialogHeight)
+            win.setLayout(dialogWidth, ViewGroup.LayoutParams.WRAP_CONTENT)
             win.setDimAmount(0.55f)
             win.setGravity(Gravity.CENTER)
         }
@@ -215,7 +217,8 @@ class StarterActivity : AppActivity() {
             GlassAppTheme(isDark = isDark) {
                 Box(
                     modifier = Modifier
-                        .fillMaxSize()
+                        .fillMaxWidth()
+                        .heightIn(max = maxHeightDp)
                         .clip(RoundedCornerShape(24.dp))
                         .background(dialogBgColor)
                         .border(1.dp, dialogStrokeColor, RoundedCornerShape(24.dp))

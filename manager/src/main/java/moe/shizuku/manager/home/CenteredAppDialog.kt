@@ -84,11 +84,11 @@ fun CenteredAppDialog(
                     .clip(RoundedCornerShape(24.dp))
                     .background(dialogBgColor)
                     .border(1.dp, dialogStrokeColor, RoundedCornerShape(24.dp))
-                    .padding(horizontal = 22.dp, vertical = 20.dp)
+                    .padding(horizontal = 20.dp, vertical = 18.dp)
             ) {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     if (title != null) {
                         Text(

@@ -1053,26 +1053,156 @@ abstract class HomeActivity : MaxHzActivity() {
     }
 
     private fun handleOpenLaboratoryClick() {
-        val options = arrayOf(
-            getString(R.string.geek_lab_opt_unlock_restricted),
-            getString(R.string.geek_lab_opt_process_manager),
-            getString(R.string.geek_lab_opt_system_diagnostics)
-        )
-        val dialog = MaterialAlertDialogBuilder(this)
-            .setTitle(R.string.geek_lab_dialog_title)
-            .setItems(options) { _, which ->
-                when (which) {
-                    0 -> handleUnlockRestrictedSettings()
-                    1 -> pushDetail(getString(R.string.detail_title_doze_whitelist)) { dozeWhitelistSection() }
-                    2 -> handleSystemDiagnostics()
+        val isDark = isDarkMode()
+        val dm = resources.displayMetrics
+        val dialogWidth = minOf((dm.widthPixels * 0.92f).toInt(), dp(500))
+
+        var dialog: android.app.Dialog? = null
+
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = android.view.ViewGroup.LayoutParams(android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT)
+            background = unifiedDialogCardBackground(isDark)
+            clipToOutline = true
+            elevation = dp(16).toFloat()
+            setPadding(dp(20), dp(18), dp(20), dp(18))
+        }
+
+        // Title Row
+        val titleRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            addView(TextView(this@HomeActivity).apply {
+                text = getString(R.string.geek_lab_dialog_title)
+                textSize = 18f
+                setTypeface(typeface, android.graphics.Typeface.BOLD)
+                setTextColor(themeColors.onSurface)
+                includeFontPadding = false
+            }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+
+            val closeBtn = TextView(this@HomeActivity).apply {
+                text = "✕"
+                textSize = 13.5f
+                setTypeface(typeface, android.graphics.Typeface.BOLD)
+                setTextColor(themeColors.onSurfaceVariant)
+                gravity = Gravity.CENTER
+                layoutParams = LinearLayout.LayoutParams(dp(32), dp(32))
+                background = modalHeaderButtonBackground(isDark, 16)
+                isClickable = true
+                isFocusable = true
+                setOnClickListener {
+                    it.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
+                    dialog?.dismiss()
                 }
             }
-            .setNegativeButton(R.string.dialog_close, null)
-            .create()
+            addView(closeBtn)
+        }
+        root.addView(titleRow)
+
+        // Divider
+        val divider = View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(android.view.ViewGroup.LayoutParams.MATCH_PARENT, dp(1)).apply {
+                topMargin = dp(12)
+                bottomMargin = dp(12)
+            }
+            setBackgroundColor(if (isDark) 0x1FFFFFFF.toInt() else 0x12000000.toInt())
+        }
+        root.addView(divider)
+
+        // Options List (Compact, beautiful, tightly wrapped)
+        data class LabOption(val emoji: String, val title: String, val desc: String, val action: () -> Unit)
+        val items = listOf(
+            LabOption("🔓", getString(R.string.geek_lab_opt_unlock_restricted), "免除受限设置安全限制与无障碍权限保护") {
+                dialog?.dismiss()
+                handleUnlockRestrictedSettings()
+            },
+            LabOption("⚡", getString(R.string.geek_lab_opt_process_manager), "管理应用 Doze 待机与后台保活白名单") {
+                dialog?.dismiss()
+                pushDetail(getString(R.string.detail_title_doze_whitelist)) { dozeWhitelistSection() }
+            },
+            LabOption("🩺", getString(R.string.geek_lab_opt_system_diagnostics), "检测特权环境、SELinux 状态与系统参数") {
+                dialog?.dismiss()
+                handleSystemDiagnostics()
+            }
+        )
+
+        items.forEachIndexed { index, item ->
+            val emoji = item.emoji
+            val title = item.title
+            val desc = item.desc
+            val action = item.action
+            val itemView = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    if (index > 0) topMargin = dp(8)
+                }
+                setPadding(dp(14), dp(10), dp(14), dp(10))
+                background = GradientDrawable().apply {
+                    cornerRadius = dp(14).toFloat()
+                    setColor(themeColors.surfaceContainerHigh)
+                }
+                isClickable = true
+                isFocusable = true
+                installClickFeedback(this)
+                setOnClickListener {
+                    it.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
+                    action()
+                }
+
+                // Emoji / Icon container
+                addView(TextView(this@HomeActivity).apply {
+                    text = emoji
+                    textSize = 17f
+                    gravity = Gravity.CENTER
+                }, LinearLayout.LayoutParams(dp(36), dp(36)).apply { rightMargin = dp(12) })
+
+                // Text Container
+                addView(LinearLayout(this@HomeActivity).apply {
+                    orientation = LinearLayout.VERTICAL
+                    addView(TextView(this@HomeActivity).apply {
+                        text = title
+                        textSize = 14.5f
+                        setTypeface(typeface, android.graphics.Typeface.BOLD)
+                        setTextColor(themeColors.onSurface)
+                        includeFontPadding = false
+                    })
+                    addView(TextView(this@HomeActivity).apply {
+                        text = desc
+                        textSize = 11.5f
+                        setTextColor(themeColors.onSurfaceVariant)
+                        includeFontPadding = false
+                        setPadding(0, dp(2), 0, 0)
+                    })
+                }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+
+                // Chevron
+                addView(TextView(this@HomeActivity).apply {
+                    text = "›"
+                    textSize = 18f
+                    setTextColor(themeColors.onSurfaceVariant)
+                    setTypeface(typeface, android.graphics.Typeface.BOLD)
+                })
+            }
+            root.addView(itemView)
+        }
+
+        dialog = android.app.Dialog(this, R.style.ThemeOverlay_App_MaterialAlertDialog).apply {
+            requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+            setContentView(root)
+            setCanceledOnTouchOutside(true)
+        }
+        dialog.window?.let { win ->
+            win.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
+            win.setLayout(dialogWidth, android.view.ViewGroup.LayoutParams.WRAP_CONTENT)
+            win.setDimAmount(0.55f)
+            win.setGravity(Gravity.CENTER)
+            win.setWindowAnimations(android.R.style.Animation_Dialog)
+        }
         dialog.show()
-        val isDark = isDarkMode()
-        dialog.window?.setBackgroundDrawable(unifiedDialogCardBackground(isDark))
-        applyUnifiedDialogWindowStyle(dialog)
     }
 
     private fun handleUnlockRestrictedSettings() {
