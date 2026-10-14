@@ -442,6 +442,7 @@ fun ShizukuHomeScreen(
                 TextButton(
                     text = stringResource(android.R.string.cancel),
                     onClick = { showStopConfirmDialog = false },
+                    insideMargin = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
                     modifier = Modifier.weight(1f)
                 )
                 TextButton(
@@ -451,6 +452,7 @@ fun ShizukuHomeScreen(
                         actions.onConfirmStopService()
                     },
                     colors = ButtonDefaults.textButtonColorsPrimary(),
+                    insideMargin = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -841,6 +843,7 @@ private fun MiuixBatteryProtectionDialog(
                     text = "取消",
                     enabled = !isWorking,
                     onClick = onDismiss,
+                    insideMargin = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
                     modifier = Modifier.weight(1f)
                 )
                 TextButton(
@@ -855,6 +858,7 @@ private fun MiuixBatteryProtectionDialog(
                             if (ok) onDismiss()
                         }
                     },
+                    insideMargin = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
                     modifier = Modifier.weight(1f)
                 )
                 TextButton(
@@ -874,7 +878,8 @@ private fun MiuixBatteryProtectionDialog(
                             if (ok) onDismiss()
                         }
                     },
-                    modifier = Modifier.weight(1.2f)
+                    insideMargin = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
+                    modifier = Modifier.weight(1f)
                 )
             }
         }
@@ -969,12 +974,14 @@ private fun MiuixBatteryInfoDialog(
                             isRefreshing = false
                         }
                     },
+                    insideMargin = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
                     modifier = Modifier.weight(1f)
                 )
                 TextButton(
                     text = "关闭",
                     onClick = onDismiss,
                     colors = ButtonDefaults.textButtonColorsPrimary(),
+                    insideMargin = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
                     modifier = Modifier.weight(1f)
                 )
             }

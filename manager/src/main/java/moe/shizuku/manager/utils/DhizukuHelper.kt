@@ -295,20 +295,20 @@ object DhizukuHelper {
                 if (diag.hasBlockers) {
                     val sb = StringBuilder()
                     sb.append("Android 系统底层规定：配置设备所有者时，系统要求手机内不能存在任何已登录账户或副用户/分身。\n\n")
-                    sb.append("🔍 【当前底层扫描到的阻碍残留项】：\n")
+                    sb.append("【当前底层扫描到的阻碍残留项】：\n")
                     if (diag.accounts.isNotEmpty()) {
-                        sb.append("\n📱 未退出账户 (共 ${diag.accounts.size} 个)：\n")
+                        sb.append("\n未退出账户 (共 ${diag.accounts.size} 个)：\n")
                         diag.accounts.forEach { acc ->
                             sb.append("• $acc\n")
                         }
                     }
                     if (diag.secondaryUsers.isNotEmpty()) {
-                        sb.append("\n👥 未清除的分身/副用户 (共 ${diag.secondaryUsers.size} 个)：\n")
+                        sb.append("\n未清除的分身/副用户 (共 ${diag.secondaryUsers.size} 个)：\n")
                         diag.secondaryUsers.forEach { (_, desc) ->
                             sb.append("• $desc\n")
                         }
                     }
-                    sb.append("\n💡 提示：退出上述项目后即可成功激活！激活后可立即登录回所有账号并重新开启分身，特权永久生效。")
+                    sb.append("\n提示：退出上述项目后即可成功激活！激活后可立即登录回所有账号并重新开启分身，特权永久生效。")
 
                     val hasDualMessenger = diag.secondaryUsers.any { it.first == "95" }
 
@@ -378,7 +378,7 @@ object DhizukuHelper {
 
                 if (success) {
                     MaterialAlertDialogBuilder(activity)
-                        .setTitle("🎉 激活成功")
+                        .setTitle("激活成功")
                         .setMessage("设备所有者特权已成功激活！\n\n您现在可以立刻前往系统设置把刚才退出的所有账号（包括三星账户、Google 邮箱等）全部登录回来，也可以重新开启应用双开与安全文件夹。此特权永久有效，重启手机无需再次配置或连接电脑。")
                         .setPositiveButton(android.R.string.ok) { _, _ ->
                             onStatusChanged?.invoke()
@@ -539,7 +539,7 @@ object DhizukuHelper {
         val statusBadge = TextView(activity).apply {
             text = when {
                 isPriv -> "✓ " + activity.getString(R.string.dhizuku_status_active)
-                isOnlyAdmin -> "⚠️ 仅普通设备管理器 (非设备所有者 · 无特权)"
+                isOnlyAdmin -> "仅普通设备管理器 (非设备所有者 · 无特权)"
                 else -> "○ " + activity.getString(R.string.dhizuku_status_inactive)
             }
             textSize = 13f
@@ -582,7 +582,7 @@ object DhizukuHelper {
             // Card: Deactivation / Stop Admin Button
             val cancelCard = createCard().apply {
                 val title = TextView(activity).apply {
-                    text = "🚫 停用 / 撤销设备所有者特权"
+                    text = "停用 / 撤销设备所有者特权"
                     textSize = 13.5f
                     setTypeface(typeface, Typeface.BOLD)
                     setTextColor(if (isDark) 0xFFF87171.toInt() else 0xFFDC2626.toInt())
@@ -641,7 +641,7 @@ object DhizukuHelper {
                 })
 
                 val cancelTip = TextView(activity).apply {
-                    text = "✅ 随时可撤销：点击上方红色按钮即可退出设备所有者特权；电脑端亦可通过上方 ADB 广播指令随时强制撤销。"
+                    text = "随时可撤销：点击上方红色按钮即可退出设备所有者特权；电脑端亦可通过上方 ADB 广播指令随时强制撤销。"
                     textSize = 11.5f
                     setTextColor(if (isDark) 0x88FFFFFF.toInt() else 0x88000000.toInt())
                     setPadding(0, dp(8), 0, 0)
@@ -665,7 +665,7 @@ object DhizukuHelper {
             if (MaxHzShell.isReady()) {
                 val directCard = createCard().apply {
                     val title = TextView(activity).apply {
-                        text = "⚡ 手机端一键就地激活 (免连电脑)"
+                        text = "手机端一键就地激活 (免连电脑)"
                         textSize = 14f
                         setTypeface(typeface, Typeface.BOLD)
                         setTextColor(if (isDark) 0xFF34D399.toInt() else 0xFF059669.toInt())
@@ -684,7 +684,7 @@ object DhizukuHelper {
                     })
 
                     val directBtn = MaterialButton(activity).apply {
-                        text = "✨ 手机端就地激活设备所有者"
+                        text = "手机端就地激活设备所有者"
                         textSize = 13f
                         setTextColor(Color.WHITE)
                         background = LiquidGlassTheme.createButtonDrawable(dp(12).toFloat(), isDark, isPrimary = true)
@@ -743,7 +743,7 @@ object DhizukuHelper {
             // Card 1: ADB PC Activation (Official Device Owner)
             val adbCard = createCard().apply {
                 val title = TextView(activity).apply {
-                    text = "💻 电脑 ADB 激活 (官方标准 · 免 Root)"
+                    text = "电脑 ADB 激活 (官方标准 · 免 Root)"
                     textSize = 14f
                     setTypeface(typeface, Typeface.BOLD)
                     setTextColor(if (isDark) 0xFF38BDF8.toInt() else 0xFF0284C7.toInt())
@@ -789,7 +789,7 @@ object DhizukuHelper {
                 addView(copyBtn, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(40)))
 
                 val compareNote = TextView(activity).apply {
-                    text = "💡 提示：本应用支持随时在应用内一键停用设备所有者特权，恢复为普通模式，绝无残留。"
+                    text = "提示：本应用支持随时在应用内一键停用设备所有者特权，恢复为普通模式，绝无残留。"
                     textSize = 11f
                     setTextColor(if (isDark) 0x88FFFFFF.toInt() else 0x88000000.toInt())
                     setPadding(0, dp(8), 0, 0)
@@ -803,7 +803,7 @@ object DhizukuHelper {
             // Card 2: QR Provisioning (Factory Reset / Out-of-the-Box)
             val qrCard = createCard().apply {
                 val title = TextView(activity).apply {
-                    text = "📦 扫码开箱配置 (出厂 / 新机模式)"
+                    text = "扫码开箱配置 (出厂 / 新机模式)"
                     textSize = 14f
                     setTypeface(typeface, Typeface.BOLD)
                     setTextColor(if (isDark) 0xFFA78BFA.toInt() else 0xFF7C3AED.toInt())
@@ -826,7 +826,7 @@ object DhizukuHelper {
             // Card: How to Deactivate / Cancel FAQ
             val howToCancelCard = createCard().apply {
                 val title = TextView(activity).apply {
-                    text = "❓ 启用后如何停用 / 撤销？"
+                    text = "启用后如何停用 / 撤销？"
                     textSize = 13.5f
                     setTypeface(typeface, Typeface.BOLD)
                     setTextColor(if (isDark) 0xFF34D399.toInt() else 0xFF059669.toInt())

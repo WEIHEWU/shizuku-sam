@@ -170,16 +170,16 @@
     <string name="dhizuku_remove_confirm">確定要停用裝置擁有者權限嗎？\n\n停用後將恢復為普通模式，手機所有系統設定保持原樣。</string>
     <string name="dhizuku_status_active">已啟用 (系統裝置擁有者 · 抗重啟)</string>
     <string name="dhizuku_status_inactive">未啟用 (需電腦 ADB 配置一次 · 抗重啟)</string>
-    <string name="dhizuku_app_store_faq_title">⚠️ 為什麼應用商店消失了？</string>
+    <string name="dhizuku_app_store_faq_title">為什麼應用商店消失了？</string>
     <string name="dhizuku_app_store_faq_content">1. 移除帳號影響：Google Play 或品牌商店在無帳號狀態下，系統啟動器桌面會自動隱藏圖示。\n2. 系統企業政策：部分系統在偵測到裝置擁有者後，會自動隱藏內建消費級商店。\n\n如何恢復：\n• 方法 1（推薦）：前往【系統設定 -> 帳號】重新登入帳號，商店圖示通常會自動恢復。\n• 方法 2：點擊下方【一鍵恢復應用商店】按鈕解除隱藏。\n• 方法 3：電腦端執行 adb shell pm enable &amp; unhide 指令。</string>
-    <string name="dhizuku_restore_stores_btn">✨ 一鍵恢復應用商店</string>
-    <string name="dhizuku_remove_owner_btn">🚫 停用 / 移除裝置擁有者</string>
+    <string name="dhizuku_restore_stores_btn">一鍵恢復應用商店</string>
+    <string name="dhizuku_remove_owner_btn">停用 / 移除裝置擁有者</string>
     <string name="dhizuku_remove_cmd_title">電腦 ADB 解除/停用指令：</string>
     <string name="dhizuku_copy_remove_cmd">複製解除指令</string>
-    <string name="dhizuku_method_admin_title">⚠️ 僅開啟了普通裝置管理員 (非裝置擁有者)</string>
+    <string name="dhizuku_method_admin_title">僅開啟了普通裝置管理員 (非裝置擁有者)</string>
     <string name="dhizuku_method_admin_desc">您在系統設定中開啟的僅為「普通裝置管理員」：Android 安全機制禁止其執行 Shell 指令與底層調優。如需特權，請透過電腦 ADB 啟用裝置擁有者，或使用主頁的「ADB 啟動」/「Root 啟動」。</string>
     <string name="dhizuku_method_admin_btn">關閉普通裝置管理員</string>
-    <string name="dhizuku_disable_admin_btn">🚫 停用 / 移除普通裝置管理員</string>
+    <string name="dhizuku_disable_admin_btn">停用 / 移除普通裝置管理員</string>
     <string name="dhizuku_admin_active_desc">偵測到當前僅開啟了普通裝置管理員。受 Android 安全機制限制，普通裝置管理員無法執行 Shell 指令與調優功能，需透過電腦 ADB 配置裝置擁有者，或使用主頁的 ADB 啟動 / Root 啟動。</string>
 
     <!-- Navigation Dock Tabs -->
@@ -371,7 +371,7 @@
     <string name="rules_card_accessibility_subtitle">基於無障礙服務即時檢測前台使用中的應用並即時切換對應規則</string>
     <string name="rules_badge_service_running">服務運作中</string>
     <string name="rules_btn_enable_accessibility">前往開啟無障礙</string>
-    <string name="rules_warning_accessibility">⚠️ 無障礙即時切換服務未開啟，分應用規則無法在前台自動切換生效。</string>
+    <string name="rules_warning_accessibility">無障礙即時切換服務未開啟，分應用規則無法在前台自動切換生效。</string>
     <string name="rules_compat_policy_tip_title">為什麼抖音等串流媒體鎖定 60Hz？</string>
     <string name="rules_compat_policy_tip_desc">Android 系統內建了應用程式相容性限頻策略，預設將抖音、B站等串流媒體強制鎖定在 60Hz。三星設備請前往「開發人員選項」滑至最底部點擊「更多設定」，開啟「Disable app compatibility policies（停用應用程式相容性策略）」即可徹底解鎖 120Hz 高刷。</string>
     <string name="rules_btn_open_dev_options">前往開發人員選項</string>

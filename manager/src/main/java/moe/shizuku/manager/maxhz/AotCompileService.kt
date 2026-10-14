@@ -427,11 +427,11 @@ class AotCompileService : Service() {
         val nm = getSystemService(NotificationManager::class.java) ?: return
         val timeStr = if (totalSec < 60) "${totalSec}秒" else "${totalSec / 60}分${totalSec % 60}秒"
         val notifTitle = if (isReset) {
-            "✅ 预编译缓存已重置"
+            "预编译缓存已重置"
         } else if (successCount == total) {
-            "🎉 ${title}已完成"
+            "${title}已完成"
         } else {
-            "⚠️ ${title}部分完成"
+            "${title}部分完成"
         }
         val notifText = "已完成 $successCount / $total 个应用 · 总耗时 $timeStr"
 

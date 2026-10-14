@@ -5,6 +5,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -88,25 +90,50 @@ fun CenteredAppDialog(
             ) {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     if (title != null) {
-                        Text(
-                            text = title,
-                            fontSize = 18.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isDark) Color(0xFFECEFF4) else Color(0xFF1A1C1E),
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = title,
+                                fontSize = 17.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isDark) Color(0xFFECEFF4) else Color(0xFF1A1C1E),
+                                modifier = Modifier.weight(1f)
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isDark) Color(0x26FFFFFF) else Color(0x14000000))
+                                    .clickable { onDismissRequest() },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "✕",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isDark) Color(0xFF949BA8) else Color(0xFF6B7280)
+                                )
+                            }
+                        }
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(1.dp)
+                                .background(if (isDark) Color(0x1FFFFFFF) else Color(0x12000000))
                         )
                     }
                     if (summary != null) {
                         Text(
                             text = summary,
-                            fontSize = 13.sp,
+                            fontSize = 12.5.sp,
                             color = if (isDark) Color(0xFF949BA8) else Color(0xFF6B7280),
-                            lineHeight = 18.sp,
-                            textAlign = TextAlign.Center,
+                            lineHeight = 17.sp,
                             modifier = Modifier.fillMaxWidth()
                         )
                     }

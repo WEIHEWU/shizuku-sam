@@ -237,16 +237,16 @@ With %1$s, in any terminal app, you can connect to and interact with the shell r
     <string name="dhizuku_remove_confirm">Are you sure you want to deactivate Device Owner? The app will revert to normal mode and system settings will remain intact.</string>
     <string name="dhizuku_status_active">Activated (Device Owner · Reboot-proof)</string>
     <string name="dhizuku_status_inactive">Inactive (Configure once via PC ADB · Reboot-proof)</string>
-    <string name="dhizuku_app_store_faq_title">⚠️ Why did the App Store disappear?</string>
+    <string name="dhizuku_app_store_faq_title">Why did the App Store disappear?</string>
     <string name="dhizuku_app_store_faq_content">1. Account removal side-effect: In a zero-account state, Google Play or brand app stores automatically hide their launcher icons.\n2. OEM Enterprise Policy: ROMs like Xiaomi HyperOS, OPPO, or Samsung Knox may hide consumer app stores when Device Owner is detected.\n\nHow to restore:\n• Method 1 (Recommended): Re-login to your account (Google/Mi/Samsung) in Settings -> Accounts. The store icon will reappear.\n• Method 2: Tap the Restore App Stores button below to unhide automatically.\n• Method 3: Run adb shell pm enable &amp; unhide from your PC.</string>
-    <string name="dhizuku_restore_stores_btn">✨ Restore App Stores</string>
-    <string name="dhizuku_remove_owner_btn">🚫 Deactivate / Remove Device Owner</string>
+    <string name="dhizuku_restore_stores_btn">Restore App Stores</string>
+    <string name="dhizuku_remove_owner_btn">Deactivate / Remove Device Owner</string>
     <string name="dhizuku_remove_cmd_title">PC ADB Deactivation Command:</string>
     <string name="dhizuku_copy_remove_cmd">Copy Deactivation Command</string>
-    <string name="dhizuku_method_admin_title">⚠️ Standard Device Admin Only (Not Device Owner)</string>
+    <string name="dhizuku_method_admin_title">Standard Device Admin Only (Not Device Owner)</string>
     <string name="dhizuku_method_admin_desc">Only Standard Device Admin was granted in system settings. Android security forbids Shell execution for Device Admin. Please activate Device Owner via PC ADB or use ADB / Root Start on the Home screen.</string>
     <string name="dhizuku_method_admin_btn">Disable Device Admin</string>
-    <string name="dhizuku_disable_admin_btn">🚫 Deactivate / Remove Device Admin</string>
+    <string name="dhizuku_disable_admin_btn">Deactivate / Remove Device Admin</string>
     <string name="dhizuku_admin_active_desc">Detected standard Device Admin only. Under Android security policy, standard Device Admin cannot execute Shell commands. Please configure Device Owner via PC ADB or use ADB/Root Start on Home.</string>
 
     <!-- Navigation Dock Tabs -->
@@ -439,8 +439,8 @@ With %1$s, in any terminal app, you can connect to and interact with the shell r
     <string name="rules_badge_service_running">Service Running</string>
     <string name="rules_badge_service_disabled">Service Disabled</string>
     <string name="rules_btn_enable_accessibility">Enable Accessibility</string>
-    <string name="rules_warning_accessibility">⚠️ Accessibility service is not enabled. Rules will not switch automatically.</string>
-    <string name="rules_warning_accessibility_locked">⚠️ App-specific refresh rate rules strictly require the Accessibility Service to detect foreground apps. This feature is disabled until the service is turned on.</string>
+    <string name="rules_warning_accessibility">Accessibility service is not enabled. Rules will not switch automatically.</string>
+    <string name="rules_warning_accessibility_locked">App-specific refresh rate rules strictly require the Accessibility Service to detect foreground apps. This feature is disabled until the service is turned on.</string>
     <string name="rules_toast_accessibility_required">Accessibility Service must be enabled to use per-app rules</string>
     <string name="rules_rule_status_paused">Paused (Service Off)</string>
     <string name="rules_compat_policy_tip_title">Why Some Apps (e.g. TikTok) Lock at 60Hz?</string>

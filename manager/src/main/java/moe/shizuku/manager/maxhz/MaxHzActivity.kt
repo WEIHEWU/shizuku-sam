@@ -4424,9 +4424,9 @@ open class MaxHzActivity : AppBarActivity() {
                             .show()
                     })
                 }
-                addSpacedView(horizontalActions(*actionButtons.toTypedArray()), dp(10))
+                addSpacedView(horizontalActions(*actionButtons.toTypedArray()), dp(6))
 
-                addSpacedView(listContainer, dp(12))
+                addSpacedView(listContainer, dp(8))
             }, gap)
 
             // 卡片 4：运行机制与保护机制（与游戏模式卡片 4 结构对齐）
@@ -4937,7 +4937,7 @@ open class MaxHzActivity : AppBarActivity() {
             orientation = LinearLayout.VERTICAL
         }
         val appRuleWarning = TextView(this).apply {
-            text = "⚠️ 每 App 规则需要无障碍服务。\n当前无障碍未开启，规则不会自动切换。\n👉 点击此处立即前往开启无障碍服务"
+            text = "每 App 规则需要无障碍服务。\n当前无障碍未开启，规则不会自动切换。\n点击此处立即前往开启无障碍服务"
             textSize = 12.5f
             setTextColor(themeColors.onWarningContainer)
             setPadding(dp(12), dp(10), dp(12), dp(10))
@@ -5063,7 +5063,7 @@ open class MaxHzActivity : AppBarActivity() {
                 })
 
                 addSpacedView(TextView(this@MaxHzActivity).apply {
-                    text = "💡 档位建议：视频建议 60Hz 避免抖动；电子书 24/30Hz 极致省电；游戏建议自适应最高Hz。需要开启无障碍即时切换服务以精准感知前台应用。"
+                    text = "档位建议：视频建议 60Hz 避免抖动；电子书 24/30Hz 极致省电；游戏建议自适应最高Hz。需要开启无障碍即时切换服务以精准感知前台应用。"
                     textSize = 12.5f
                     setTextColor(themeColors.onSurfaceVariant)
                     setLineSpacing(0f, 1.25f)
@@ -5278,13 +5278,13 @@ open class MaxHzActivity : AppBarActivity() {
         parent.addSpacedView(featureCard(
             "ART 机器码预编译加速",
             "【底层原理】App 安装包默认以 Dex 字节码运行，冷启动与滑动时需实时翻译解释，容易产生掉帧或启动迟滞；ART 预编译提前将其转换为 CPU 可直接执行的原生机器码（.odex），让执行效率翻倍。\n" +
-                "• ⚡ 热点极速（speed-profile，推荐）：仅编译日常高频调用的 10%~20% 核心启动与滑动路径。单应用仅需 1~3 秒、几乎不占额外空间，即可获得约 90% 流畅度提升。\n" +
-                "• 🔥 深度全量（speed）：将应用内 100% 所有代码和 SDK 强制完整编译。单应用约需 15~60 秒、占用 100~400MB 空间，适合在「自选应用编译」中为 3~5 个主力重度 App（如微信、大作游戏）单独开启。\n" +
+                "• 热点极速（speed-profile，推荐）：仅编译日常高频调用的 10%~20% 核心启动与滑动路径。单应用仅需 1~3 秒、几乎不占额外空间，即可获得约 90% 流畅度提升。\n" +
+                "• 深度全量（speed）：将应用内 100% 所有代码和 SDK 强制完整编译。单应用约需 15~60 秒、占用 100~400MB 空间，适合在「自选应用编译」中为 3~5 个主力重度 App（如微信、大作游戏）单独开启。\n" +
                 "【功能说明】\n" +
                 "• 自选应用编译：自主勾选目标应用，可自由切换热点极速、深度全量或重置缓存。\n" +
                 "• 优化系统与桌面：对系统桌面 Launcher、SystemUI 及核心系统组件执行热点极速优化，桌面滑动与手势即刻丝滑。\n" +
                 "• 全部应用极速优化：对手机所有已安装应用批量执行热点极速优化，告别应用冷启动卡顿。\n" +
-                "💡 支持转入后台运行：执行过程中点击「转到后台」可在状态栏与通知栏实时查看变动进度，持有 CPU 锁防杀保活。",
+                "支持转入后台运行：执行过程中点击「转到后台」可在状态栏与通知栏实时查看变动进度，持有 CPU 锁防杀保活。",
             headerBadges(aotBadge)
         ) {
             val resumeBanner = TextView(this@MaxHzActivity).apply {
@@ -5306,13 +5306,13 @@ open class MaxHzActivity : AppBarActivity() {
             addView(resumeBanner, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { bottomMargin = dp(12) })
+            ).apply { bottomMargin = dp(8) })
 
             lifecycleScope.launch {
                 AotCompileService.stateFlow.collect { st ->
                     if (st.isRunning) {
                         val pct = if (st.total > 0) (st.currentStep * 100) / st.total else 0
-                        resumeBanner.text = "⚡ 后台正在优化中：[${st.currentStep}/${st.total}] ($pct%) · 点击查看实时进度"
+                        resumeBanner.text = "后台正在优化中：[${st.currentStep}/${st.total}] ($pct%) · 点击查看实时进度"
                         resumeBanner.visibility = View.VISIBLE
                     } else {
                         resumeBanner.visibility = View.GONE
@@ -5371,14 +5371,14 @@ open class MaxHzActivity : AppBarActivity() {
                         if (result.code == 0) {
                             MaxHzPrefs.setMDexoptEnabled(this@MaxHzActivity, false)
                             updateStatusText(aotBadge, enabledState(false))
-                            Toast.makeText(this@MaxHzActivity, "✅ 清除编译缓存已生效", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this@MaxHzActivity, "清除编译缓存已生效", Toast.LENGTH_SHORT).show()
                         } else {
-                            Toast.makeText(this@MaxHzActivity, "❌ 操作失败：${commandFailureReason(result)}", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this@MaxHzActivity, "操作失败：${commandFailureReason(result)}", Toast.LENGTH_SHORT).show()
                         }
                     }
                 }
-            ), dp(10))
-        }, gap)
+            ), dp(6))
+        }, dp(8))
 
         parent.addSpacedView(singleActionCard(
             "应用缓存与空载进程清理",
@@ -5518,9 +5518,9 @@ open class MaxHzActivity : AppBarActivity() {
                     emptyHintView.visibility = View.VISIBLE
                     listView.visibility = View.GONE
                     emptyHintView.text = when {
-                        searchQuery.isNotBlank() -> "🔍 未找到匹配的应用"
-                        currentTab == AotPickerTab.COMPILED -> "暂无已编译应用\n请先在「⚡ 未编译」中勾选应用进行加速优化"
-                        else -> "🎉 所有应用均已完成编译加速"
+                        searchQuery.isNotBlank() -> "未找到匹配的应用"
+                        currentTab == AotPickerTab.COMPILED -> "暂无已编译应用\n请先在「未编译」中勾选应用进行加速优化"
+                        else -> "所有应用均已完成编译加速"
                     }
                 } else {
                     emptyHintView.visibility = View.GONE
@@ -5581,9 +5581,9 @@ open class MaxHzActivity : AppBarActivity() {
                     )
                 }
                 modeDescView.text = when (compileMode) {
-                    "speed-profile" -> "⚡ 热点极速（默认推荐 · speed-profile）：仅编译日常高频调用的 10%~20% 核心代码。耗时仅 1~3 秒、占 10~30MB 空间，即可获得约 90% 流畅度提升，兼顾速度与空间。"
-                    "speed" -> "🔥 全量编译（深度拉满 · speed）：将应用内 100% 所有类与组件全部编译为原生机器码。大型应用耗时 15~60 秒、占 100~400MB 空间，适合重度主力应用或游戏。"
-                    else -> "🧹 重置缓存（--reset）：清除所选应用生成的本地机器码（.odex）编译缓存，释放存储空间并恢复系统初始运行状态。"
+                    "speed-profile" -> "热点极速（默认推荐 · speed-profile）：仅编译日常高频调用的 10%~20% 核心代码。耗时仅 1~3 秒、占 10~30MB 空间，即可获得约 90% 流畅度提升，兼顾速度与空间。"
+                    "speed" -> "全量编译（深度拉满 · speed）：将应用内 100% 所有类与组件全部编译为原生机器码。大型应用耗时 15~60 秒、占 100~400MB 空间，适合重度主力应用或游戏。"
+                    else -> "重置缓存（--reset）：清除所选应用生成的本地机器码（.odex）编译缓存，释放存储空间并恢复系统初始运行状态。"
                 }
             }
 
@@ -5593,8 +5593,8 @@ open class MaxHzActivity : AppBarActivity() {
                 val compiledCount = allApps.count { compiledMap.containsKey(it.packageName) }
 
                 val tabs = listOf(
-                    AotPickerTab.UNCOMPILED to "⚡ 未编译 ($uncompiledCount)",
-                    AotPickerTab.COMPILED to "✅ 已编译 ($compiledCount)"
+                    AotPickerTab.UNCOMPILED to "未编译 ($uncompiledCount)",
+                    AotPickerTab.COMPILED to "已编译 ($compiledCount)"
                 )
 
                 tabs.forEachIndexed { idx, (tab, title) ->
@@ -6090,7 +6090,7 @@ open class MaxHzActivity : AppBarActivity() {
             .setCancelable(false)
             .setPositiveButton("转到后台") { d, _ ->
                 d.dismiss()
-                Toast.makeText(this@MaxHzActivity, "⚡ 已转入后台继续编译，可在通知栏查看变动进度与耗时", Toast.LENGTH_LONG).show()
+                Toast.makeText(this@MaxHzActivity, "已转入后台继续编译，可在通知栏查看变动进度与耗时", Toast.LENGTH_LONG).show()
             }
             .setNegativeButton("取消编译") { d, _ ->
                 AotCompileService.cancel(this@MaxHzActivity)
@@ -6146,7 +6146,7 @@ open class MaxHzActivity : AppBarActivity() {
                     }
                     append("\n总耗时：$totalTimeInfo · 成功已完成 ${state.successCount} 个")
                     if (state.compileMode == "speed") {
-                        append("\n🔥 全量深度编译中，大型应用耗时较长，请耐心等待")
+                        append("\n全量深度编译中，大型应用耗时较长，请耐心等待")
                     }
                 }
 
@@ -6181,10 +6181,10 @@ open class MaxHzActivity : AppBarActivity() {
         val totalSec = state.totalElapsedSec
         val timeStr = if (totalSec < 60) "${totalSec}秒" else "${totalSec / 60}分${totalSec % 60}秒"
         val titleText = when {
-            isReset -> if (state.successCount > 0) "✅ 编译缓存已重置" else "⚠️ 重置未生效"
-            state.successCount == state.total -> "🎉 ${state.title}已完成"
-            state.successCount > 0 -> "⚠️ ${state.title}部分完成 (${state.successCount} / ${state.total})"
-            else -> "❌ ${state.title}未成功"
+            isReset -> if (state.successCount > 0) "编译缓存已重置" else "重置未生效"
+            state.successCount == state.total -> "${state.title}已完成"
+            state.successCount > 0 -> "${state.title}部分完成 (${state.successCount} / ${state.total})"
+            else -> "${state.title}未成功"
         }
 
         val msg = buildString {
@@ -6455,9 +6455,9 @@ open class MaxHzActivity : AppBarActivity() {
         val hasRoot = MaxHzShell.isRootAvailable()
         val isBlocked = requireRoot && !hasRoot
         val displaySubtitle = if (isBlocked) {
-            "$subtitle\n⚠️ 需 Root 权限 (未检测到 Root 授权，已自动禁用)"
+            "$subtitle\n需 Root 权限 (未检测到 Root 授权，已自动禁用)"
         } else if (requireRoot) {
-            "$subtitle\n👑 需 Root 权限 (已获得 Root 硬件直通)"
+            "$subtitle\n需 Root 权限 (已获得 Root 硬件直通)"
         } else {
             subtitle
         }
@@ -6584,9 +6584,9 @@ open class MaxHzActivity : AppBarActivity() {
         val hasRoot = MaxHzShell.isRootAvailable()
         val isBlocked = requireRoot && !hasRoot
         val displaySubtitle = if (isBlocked) {
-            "$subtitle\n⚠️ 需 Root 权限 (未检测到 Root 授权，已自动禁用)"
+            "$subtitle\n需 Root 权限 (未检测到 Root 授权，已自动禁用)"
         } else if (requireRoot) {
-            "$subtitle\n👑 需 Root 权限 (已获得 Root 硬件直通)"
+            "$subtitle\n需 Root 权限 (已获得 Root 硬件直通)"
         } else {
             subtitle
         }
@@ -6669,9 +6669,9 @@ open class MaxHzActivity : AppBarActivity() {
         val hasRoot = MaxHzShell.isRootAvailable()
         val isBlocked = requireRoot && !hasRoot
         val displaySubtitle = if (isBlocked) {
-            "$subtitle\n⚠️ 需 Root 权限 (未检测到 Root 授权，已自动禁用)"
+            "$subtitle\n需 Root 权限 (未检测到 Root 授权，已自动禁用)"
         } else if (requireRoot) {
-            "$subtitle\n👑 需 Root 权限 (已获得 Root 硬件直通)"
+            "$subtitle\n需 Root 权限 (已获得 Root 硬件直通)"
         } else {
             subtitle
         }
@@ -6698,9 +6698,9 @@ open class MaxHzActivity : AppBarActivity() {
                         if (result.code == 0) {
                             updateStatusText(stateView, stateProvider?.invoke().orEmpty())
                             if (refreshServiceAfter) runCatching { updateMaxHzServiceState() }
-                            Toast.makeText(this@MaxHzActivity, "✅ $actionLabel 已生效", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this@MaxHzActivity, "$actionLabel 已生效", Toast.LENGTH_SHORT).show()
                         } else {
-                            Toast.makeText(this@MaxHzActivity, "❌ 操作失败：${commandFailureReason(result)}", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this@MaxHzActivity, "操作失败：${commandFailureReason(result)}", Toast.LENGTH_SHORT).show()
                         }
                     }
                 }
@@ -6731,9 +6731,9 @@ open class MaxHzActivity : AppBarActivity() {
         val hasRoot = MaxHzShell.isRootAvailable()
         val isBlocked = requireRoot && !hasRoot
         val displaySubtitle = if (isBlocked) {
-            "$subtitle\n⚠️ 需 Root 权限 (未检测到 Root 授权，已自动禁用)"
+            "$subtitle\n需 Root 权限 (未检测到 Root 授权，已自动禁用)"
         } else if (requireRoot) {
-            "$subtitle\n👑 需 Root 权限 (已获得 Root 硬件直通)"
+            "$subtitle\n需 Root 权限 (已获得 Root 硬件直通)"
         } else {
             subtitle
         }
@@ -6759,9 +6759,9 @@ open class MaxHzActivity : AppBarActivity() {
                         }
                         if (result.code == 0) {
                             updateStatusText(stateView, stateProvider?.invoke().orEmpty())
-                            Toast.makeText(this@MaxHzActivity, "✅ $firstLabel 已生效", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this@MaxHzActivity, "$firstLabel 已生效", Toast.LENGTH_SHORT).show()
                         } else {
-                            Toast.makeText(this@MaxHzActivity, "❌ 操作失败：${commandFailureReason(result)}", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this@MaxHzActivity, "操作失败：${commandFailureReason(result)}", Toast.LENGTH_SHORT).show()
                         }
                     }
                 },
@@ -6780,9 +6780,9 @@ open class MaxHzActivity : AppBarActivity() {
                         }
                         if (result.code == 0) {
                             updateStatusText(stateView, stateProvider?.invoke().orEmpty())
-                            Toast.makeText(this@MaxHzActivity, "✅ $secondLabel 已生效", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this@MaxHzActivity, "$secondLabel 已生效", Toast.LENGTH_SHORT).show()
                         } else {
-                            Toast.makeText(this@MaxHzActivity, "❌ 操作失败：${commandFailureReason(result)}", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this@MaxHzActivity, "操作失败：${commandFailureReason(result)}", Toast.LENGTH_SHORT).show()
                         }
                     }
                 },
@@ -6801,13 +6801,13 @@ open class MaxHzActivity : AppBarActivity() {
                         }
                         if (result.code == 0) {
                             updateStatusText(stateView, stateProvider?.invoke().orEmpty())
-                            Toast.makeText(this@MaxHzActivity, "✅ $restoreLabel 已生效", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this@MaxHzActivity, "$restoreLabel 已生效", Toast.LENGTH_SHORT).show()
                         } else {
-                            Toast.makeText(this@MaxHzActivity, "❌ 操作失败：${commandFailureReason(result)}", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this@MaxHzActivity, "操作失败：${commandFailureReason(result)}", Toast.LENGTH_SHORT).show()
                         }
                     }
                 }
-            ), dp(10))
+            ), dp(6))
         }
     }
 
@@ -7108,7 +7108,7 @@ open class MaxHzActivity : AppBarActivity() {
         }
         if (label == "读取电池状态" && result.code != 0) {
             return buildString {
-                append("⚠️ 无法读取电池状态\n\n")
+                append("无法读取电池状态\n\n")
                 append("• 请检查 Shizuku 授权状态后重试。")
             }
         }
@@ -7117,7 +7117,7 @@ open class MaxHzActivity : AppBarActivity() {
         }
         return buildString {
             if (result.code == 0) {
-                append("✅ ").append(label).append("已开启\n\n")
+                append(label).append("已开启\n\n")
                 val cleanOutput = formatCommandMessage(result.out)
                 if (cleanOutput.isNotBlank() && !cleanOutput.contains("没有返回需要展示的详细信息")) {
                     append(cleanOutput).append("\n\n")
@@ -7127,9 +7127,9 @@ open class MaxHzActivity : AppBarActivity() {
                 if (outcome.changes.isNotBlank()) {
                     append("• 系统状态：").append(outcome.changes).append("\n\n")
                 }
-                append("💡 状态：已成功由系统底层生效接管。")
+                append("状态：已成功由系统底层生效接管。")
             } else {
-                append("❌ ").append(label).append("未完成\n\n")
+                append(label).append("未完成\n\n")
                 append("• 失败原因：").append(commandFailureReason(result)).append('\n')
                 append("• 建议操作：").append(commandNextStep(label, result))
                 if (result.err.isNotBlank()) {
@@ -7169,24 +7169,24 @@ open class MaxHzActivity : AppBarActivity() {
         }
         return buildString {
             if (result.code != 0) {
-                append("❌ 系统残留检测未完成\n\n")
+                append("系统残留检测未完成\n\n")
                 append("• 失败原因：").append(commandFailureReason(result)).append('\n')
                 append("• 建议操作：请确认 Shizuku 授权状态。")
             } else if (residueItems.isEmpty()) {
-                append("✅ 未发现明显系统残留\n\n")
+                append("未发现明显系统残留\n\n")
                 append("• 系统状态：所有核心系统参数均处于干净、标准出厂状态。\n")
                 if (systemSaverOn) {
                     append("• 提示：系统省电模式当前已开启（属于手机当前开关状态，非异常残留）。\n")
                 }
-                append("\n💡 建议：无需处理。")
+                append("\n建议：无需处理。")
             } else {
-                append("🔍 发现 ").append(residueItems.size).append(" 项系统自定义配置\n\n")
+                append("发现 ").append(residueItems.size).append(" 项系统自定义配置\n\n")
                 append("• 当前影响：").append(firstImpact).append('\n')
                 if (residueItems.isNotEmpty()) {
                     append("• 检测清单：\n")
                     residueItems.forEach { append("  - ").append(it).append('\n') }
                 }
-                append("\n💡 建议：").append(
+                append("\n建议：").append(
                     if (nightGuardCount > 0) {
                         "如相关 App 需恢复全速后台，可进入待机异常唤醒排查恢复；若正常使用无需处理。"
                     } else {
@@ -7267,13 +7267,13 @@ open class MaxHzActivity : AppBarActivity() {
     private fun buildBatteryProtectionResultText(result: MaxHzShell.Result, changes: String, elapsedMs: Long? = null): String {
         return buildString {
             if (result.code == 0) {
-                append("✅ 电池保护设置已生效\n\n")
+                append("电池保护设置已生效\n\n")
                 if (changes.isNotBlank()) {
                     append("• 系统状态：").append(changes).append("\n\n")
                 }
-                append("💡 状态：已由三星电池服务生效接管。")
+                append("状态：已由三星电池服务生效接管。")
             } else {
-                append("❌ 电池保护设置未生效\n\n")
+                append("电池保护设置未生效\n\n")
                 append("• 失败原因：").append(batteryProtectionFailureReason(result)).append('\n')
                 append("• 建议操作：请确认 Shizuku 正在运行，并已授权本应用。")
             }
@@ -7983,8 +7983,11 @@ open class MaxHzActivity : AppBarActivity() {
             orientation = LinearLayout.VERTICAL
             setPadding(0, 0, 0, 0)
             val columns = when {
-                isLargeFontMode() -> 1
+                isLargeFontMode() -> if (views.size == 3) 3 else 1
                 views.size == 1 -> 1
+                views.size == 3 -> 3
+                views.size == 6 -> 3
+                views.size == 4 -> 2
                 else -> 2
             }
             views.toList().chunked(columns).forEachIndexed { rowIndex, rowViews ->
@@ -8059,7 +8062,7 @@ open class MaxHzActivity : AppBarActivity() {
     private fun groupTitle(title: String, subtitle: String): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(4), dp(8), dp(4), dp(4))
+            setPadding(dp(4), dp(6), dp(4), dp(2))
             val headerRow = LinearLayout(this@MaxHzActivity).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
@@ -8112,11 +8115,11 @@ open class MaxHzActivity : AppBarActivity() {
             insetBottom = 0
             val radiusPx = dp(14).toFloat()
             cornerRadius = dp(14)
-            setPadding(dp(18), dp(6), dp(18), dp(6))
-            maxLines = 2
+            setPadding(dp(8), dp(4), dp(8), dp(4))
+            maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
-            textSize = 14f
-            setLineSpacing(0f, 1.08f)
+            textSize = 13f
+            setLineSpacing(0f, 1.05f)
             strokeWidth = 0
             backgroundTintList = null
             if (isSelected) {
@@ -9248,7 +9251,7 @@ open class MaxHzActivity : AppBarActivity() {
         val guarded = MaxHzPrefs.nightWakeupGuardPackages(this).toSet()
         val suggestions = nightWakeupGuardSuggestionList()
         if (suggestions.isEmpty()) {
-            container.addView(emptyText("💡 尚未进行待机诊断\n点击上方“开始扫描”自动排查前后台频繁持锁与异常唤醒应用。"))
+            container.addView(emptyText("尚未进行待机诊断\n点击上方“开始扫描”自动排查前后台频繁持锁与异常唤醒应用。"))
             return
         }
         container.addView(nightScanConclusionView(suggestions.size))
@@ -10701,7 +10704,7 @@ open class MaxHzActivity : AppBarActivity() {
 
                 if (!isAccessibilityReady) {
                     addSpacedView(TextView(this@MaxHzActivity).apply {
-                        text = "⚠️ 无障碍即时切换服务未开启，无法识别前台游戏。\n👉 点击此处立即前往开启无障碍服务"
+                        text = "无障碍即时切换服务未开启，无法识别前台游戏。\n点击此处立即前往开启无障碍服务"
                         textSize = 12.5f
                         setTextColor(themeColors.onWarningContainer)
                         setPadding(dp(12), dp(10), dp(12), dp(10))
@@ -10710,7 +10713,7 @@ open class MaxHzActivity : AppBarActivity() {
                         setOnClickListener {
                             AccessibilityHelper.openInstantSwitchSettings(this@MaxHzActivity)
                         }
-                    }, dp(10))
+                    }, dp(8))
                 }
 
                 val strategySummarySub = TextView(this@MaxHzActivity).apply {
@@ -10723,7 +10726,7 @@ open class MaxHzActivity : AppBarActivity() {
                     setTextColor(themeColors.onSurfaceVariant)
                     includeFontPadding = false
                 }
-                addSpacedView(strategySummarySub, dp(10))
+                addSpacedView(strategySummarySub, dp(8))
                 bindOptionBSubtitle(this, heroSub, strategySummarySub)
             })
 
@@ -10773,7 +10776,7 @@ open class MaxHzActivity : AppBarActivity() {
                         Toast.makeText(this@MaxHzActivity, "默认进游戏模式已设为：游戏性能模式", Toast.LENGTH_SHORT).show()
                         renderDetail()
                     }
-                ), dp(10))
+                ), dp(6))
 
                 addSpacedView(TextView(this@MaxHzActivity).apply {
                     text = "切到后台保持时间"
@@ -10781,7 +10784,7 @@ open class MaxHzActivity : AppBarActivity() {
                     setTextColor(themeColors.onSurface)
                     setTypeface(typeface, android.graphics.Typeface.BOLD)
                     includeFontPadding = false
-                }, dp(14))
+                }, dp(8))
                 addSpacedView(horizontalActions(
                     button(if (exitDelaySeconds == 30) "30 秒 ✓" else "30 秒") {
                         MaxHzPrefs.setGameAutoPerformanceExitDelaySeconds(this@MaxHzActivity, 30)
@@ -10798,7 +10801,7 @@ open class MaxHzActivity : AppBarActivity() {
                         Toast.makeText(this@MaxHzActivity, "切到后台保持时间已设为 120 秒", Toast.LENGTH_SHORT).show()
                         renderDetail()
                     }
-                ), dp(10))
+                ), dp(6))
             }, gap)
 
             // 卡片 3：游戏名单管理
@@ -10854,9 +10857,9 @@ open class MaxHzActivity : AppBarActivity() {
                             .show()
                     })
                 }
-                addSpacedView(horizontalActions(*actionButtons.toTypedArray()), dp(10))
+                addSpacedView(horizontalActions(*actionButtons.toTypedArray()), dp(6))
 
-                addSpacedView(gameAutoPackageList(packages), dp(12))
+                addSpacedView(gameAutoPackageList(packages), dp(8))
             }, gap)
 
             // 卡片 4：运行机制与特性说明
@@ -10924,7 +10927,7 @@ open class MaxHzActivity : AppBarActivity() {
                 })
             } else {
                 val tipSub = TextView(this@MaxHzActivity).apply {
-                    text = "💡 点击每款游戏右侧的模式胶囊，可单独指定该游戏进前台时切「系统默认」或「性能模式」。"
+                    text = "点击每款游戏右侧的模式胶囊，可单独指定该游戏进前台时切「系统默认」或「性能模式」。"
                     textSize = 12f
                     setTextColor(themeColors.onSurfaceVariant)
                     includeFontPadding = false
@@ -12200,11 +12203,11 @@ open class MaxHzActivity : AppBarActivity() {
     }
 
     companion object {
-        private const val BUTTON_HEIGHT_DP = 44
+        private const val BUTTON_HEIGHT_DP = 42
         private const val COMMAND_BUTTON_TAG = "maxhz_command_button"
         private const val SLOW_COMMAND_NOTICE_MS = 2000L
-        private const val BUTTON_RADIUS_DP = 22
-        private const val BUTTON_SPACING_DP = 10
+        private const val BUTTON_RADIUS_DP = 14
+        private const val BUTTON_SPACING_DP = 8
         private const val DASHBOARD_TILE_HEIGHT_DP = 64
         private const val DASHBOARD_TILE_SPACING_DP = 8
         private const val DASHBOARD_ACTION_HEIGHT_DP = 40
@@ -12218,9 +12221,9 @@ open class MaxHzActivity : AppBarActivity() {
         private const val BATTERY_INPUT_ITEM_SPACING_DP = 8
         private const val INPUT_LABEL_GAP_DP = 4
         private const val INPUT_FIELD_HEIGHT_DP = 44
-        const val CARD_RADIUS_DP = 20
-        private const val CARD_PADDING_DP = 14
-        private const val CARD_SECTION_SPACING_DP = 10
+        const val CARD_RADIUS_DP = 18
+        private const val CARD_PADDING_DP = 12
+        private const val CARD_SECTION_SPACING_DP = 8
         private const val BATTERY_PROTECTION_RESULT_KEY = "battery_protection"
         private const val BACKGROUND_ERROR_RESULT_KEY = "background_error"
         private const val GAME_AUTO_RUNTIME_RESULT_KEY = "game_auto_runtime"

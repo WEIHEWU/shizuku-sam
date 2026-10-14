@@ -2699,8 +2699,8 @@ object MaxHzController {
                 candidate_count="${'$'}((candidate_count + 1))"
                 [ "${'$'}rank" = "1" ] && top_pkg="${'$'}pkg" && top_score="${'$'}score" && top_detail="${'$'}reason"
                 if [ "${'$'}app_type" = "protected" ]; then
-                  echo "${'$'}rank. ${'$'}pkg：评估指数约 ${'$'}score；${'$'}reason；分组：${'$'}b_str；⚠️核心通讯/系统组件，建议保留以保障即时通话与消息"
-                  echo "候选|${'$'}pkg|耗电排行 #${'$'}rank，评估指数 ${'$'}score；${'$'}reason；分组：${'$'}b_str；⚠️核心应用（微信/QQ/系统），慎重压制避免影响即时通知；standby=${'$'}b_str"
+                  echo "${'$'}rank. ${'$'}pkg：评估指数约 ${'$'}score；${'$'}reason；分组：${'$'}b_str；核心通讯/系统组件，建议保留以保障即时通话与消息"
+                  echo "候选|${'$'}pkg|耗电排行 #${'$'}rank，评估指数 ${'$'}score；${'$'}reason；分组：${'$'}b_str；核心应用（微信/QQ/系统），慎重压制避免影响即时通知；standby=${'$'}b_str"
                 else
                   echo "${'$'}rank. ${'$'}pkg：熄屏约 ${'$'}score mAh；${'$'}reason；分组：${'$'}b_str；第三方异常活跃应用，建议处理"
                   echo "候选|${'$'}pkg|耗电排行 #${'$'}rank，熄屏约 ${'$'}score mAh；${'$'}reason；分组：${'$'}b_str；第三方异常活跃应用，建议处理；standby=${'$'}b_str"

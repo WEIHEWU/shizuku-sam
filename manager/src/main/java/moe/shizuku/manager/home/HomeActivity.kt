@@ -1109,25 +1109,24 @@ abstract class HomeActivity : MaxHzActivity() {
         }
         root.addView(divider)
 
-        // Options List (Compact, beautiful, tightly wrapped)
-        data class LabOption(val emoji: String, val title: String, val desc: String, val action: () -> Unit)
+        // Options List (Compact, beautiful, tightly wrapped, no emoji)
+        data class LabOption(val title: String, val desc: String, val action: () -> Unit)
         val items = listOf(
-            LabOption("🔓", getString(R.string.geek_lab_opt_unlock_restricted), "免除受限设置安全限制与无障碍权限保护") {
+            LabOption(getString(R.string.geek_lab_opt_unlock_restricted), "免除受限设置安全限制与无障碍权限保护") {
                 dialog?.dismiss()
                 handleUnlockRestrictedSettings()
             },
-            LabOption("⚡", getString(R.string.geek_lab_opt_process_manager), "管理应用 Doze 待机与后台保活白名单") {
+            LabOption(getString(R.string.geek_lab_opt_process_manager), "管理应用 Doze 待机与后台保活白名单") {
                 dialog?.dismiss()
                 pushDetail(getString(R.string.detail_title_doze_whitelist)) { dozeWhitelistSection() }
             },
-            LabOption("🩺", getString(R.string.geek_lab_opt_system_diagnostics), "检测特权环境、SELinux 状态与系统参数") {
+            LabOption(getString(R.string.geek_lab_opt_system_diagnostics), "检测特权环境、SELinux 状态与系统参数") {
                 dialog?.dismiss()
                 handleSystemDiagnostics()
             }
         )
 
         items.forEachIndexed { index, item ->
-            val emoji = item.emoji
             val title = item.title
             val desc = item.desc
             val action = item.action
@@ -1140,7 +1139,7 @@ abstract class HomeActivity : MaxHzActivity() {
                 ).apply {
                     if (index > 0) topMargin = dp(8)
                 }
-                setPadding(dp(14), dp(10), dp(14), dp(10))
+                setPadding(dp(16), dp(12), dp(14), dp(12))
                 background = GradientDrawable().apply {
                     cornerRadius = dp(14).toFloat()
                     setColor(themeColors.surfaceContainerHigh)
@@ -1152,13 +1151,6 @@ abstract class HomeActivity : MaxHzActivity() {
                     it.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
                     action()
                 }
-
-                // Emoji / Icon container
-                addView(TextView(this@HomeActivity).apply {
-                    text = emoji
-                    textSize = 17f
-                    gravity = Gravity.CENTER
-                }, LinearLayout.LayoutParams(dp(36), dp(36)).apply { rightMargin = dp(12) })
 
                 // Text Container
                 addView(LinearLayout(this@HomeActivity).apply {
@@ -1258,30 +1250,30 @@ abstract class HomeActivity : MaxHzActivity() {
                 append("【核心特权通道】\n")
                 if (isRunning) {
                     val modeName = if (isRoot) "KernelSU / Root 极速通道 (UID 0)" else "无线调试 / Shizuku 通道 (UID 2000)"
-                    append("🟢 运行状态: 已就绪 ($modeName, API v$apiVersion)\n")
+                    append("运行状态: 已就绪 ($modeName, API v$apiVersion)\n")
                 } else if (isDo) {
-                    append("🟢 运行状态: Device Owner 直通模式\n")
+                    append("运行状态: Device Owner 直通模式\n")
                 } else {
-                    append("🔴 运行状态: 未就绪 (需启动 Shizuku 或授予 Root)\n")
+                    append("运行状态: 未就绪 (需启动 Shizuku 或授予 Root)\n")
                 }
 
                 append("\n【应用即时切换无障碍】\n")
                 if (isAccInstant) {
-                    append("🟢 服务状态: 已就绪 (前台 App 毫秒级锁帧与自适应切换)\n")
+                    append("服务状态: 已就绪 (前台 App 毫秒级锁帧与自适应切换)\n")
                 } else {
-                    append("⚪ 服务状态: 未启用 (需在系统“无障碍”开启 MaxHz 即时切换)\n")
+                    append("服务状态: 未启用 (需在系统“无障碍”开启 MaxHz 即时切换)\n")
                 }
 
                 append("\n【硬件与驱动特性】\n")
                 if (bypassSupported) {
-                    append("🟢 旁路供电: 已支持 (内核 store_mode 节点直通)\n")
+                    append("旁路供电: 已支持 (内核 store_mode 节点直通)\n")
                 } else {
-                    append("⚪ 旁路供电: ").append(if (isPrivileged) "未检测到内核节点" else "需特权通道检测").append("\n")
+                    append("旁路供电: ").append(if (isPrivileged) "未检测到内核节点" else "需特权通道检测").append("\n")
                 }
 
                 append("\n【当前运行设备】\n")
-                append("📱 机型: ").append(android.os.Build.MANUFACTURER).append(" ").append(android.os.Build.MODEL).append("\n")
-                append("⚙️ 系统: Android ").append(android.os.Build.VERSION.RELEASE).append(" (API ").append(android.os.Build.VERSION.SDK_INT).append(")")
+                append("机型: ").append(android.os.Build.MANUFACTURER).append(" ").append(android.os.Build.MODEL).append("\n")
+                append("系统: Android ").append(android.os.Build.VERSION.RELEASE).append(" (API ").append(android.os.Build.VERSION.SDK_INT).append(")")
             }
 
             val dialog = MaterialAlertDialogBuilder(this@HomeActivity)
@@ -1360,9 +1352,9 @@ abstract class HomeActivity : MaxHzActivity() {
                         onClick = { handleWirelessAdbStartClick() }
                     ),
                     EntryItem(
-                        title = "✨ 免输入自动配对助手",
+                        title = "免输入自动配对助手",
                         subtitle = if (AdbPairingAccessibilityService.isEnabled(this))
-                            "✅ 助手已就绪，点击前往开发者选项配对"
+                            "助手已就绪，点击前往开发者选项配对"
                         else
                             "一键前往开启系统无障碍，弹出配对码时秒级自动配对 (免手动输码)",
                         onClick = { handleAutoPairingAssistantClick() }

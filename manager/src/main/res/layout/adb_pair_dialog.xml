@@ -22,7 +22,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="8dp"
-            android:text="✨ 嫌手动输入麻烦？一键开启免输配对助手" />
+            android:text="嫌手动输入麻烦？一键开启免输配对助手" />
 
 
 

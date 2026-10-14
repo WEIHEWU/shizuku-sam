@@ -195,16 +195,16 @@
     <string name="dhizuku_remove_confirm">确定要停用设备所有者权限吗？\n\n停用后将恢复为普通模式，手机所有系统设置保持原样。</string>
     <string name="dhizuku_status_active">已激活 (系统设备所有者 · 抗重启)</string>
     <string name="dhizuku_status_inactive">未激活 (需电脑 ADB 配置一次 · 抗重启)</string>
-    <string name="dhizuku_app_store_faq_title">⚠️ 为什么应用商店（Google Play / 小米商店等）会消失？</string>
+    <string name="dhizuku_app_store_faq_title">为什么应用商店（Google Play / 小米商店等）会消失？</string>
     <string name="dhizuku_app_store_faq_content">1. 激活前移除账户影响：Google Play 或品牌商店在无账户状态下，系统启动器桌面会自动隐藏其图标。\n2. 系统企业管控策略：小米 HyperOS、OPPO、vivo 等部分系统的企业安全机制在检测到设备所有者后，误认为进入了“企业管控模式”，自动隐藏或冻结了内置公开商店。\n\n如何恢复：\n• 方法 1（推荐）：前往【系统设置 -> 账户】重新登录你的账号（如 Google、小米、三星账号等），商店图标通常会自动恢复。\n• 方法 2：点击下方【一键恢复应用商店】按钮，Shizuku 将利用特权自动解冻并解除隐藏。\n• 方法 3：电脑端执行 adb shell pm enable &amp; unhide 指令。</string>
-    <string name="dhizuku_restore_stores_btn">✨ 一键恢复应用商店</string>
-    <string name="dhizuku_remove_owner_btn">🚫 停用 / 移除设备所有者</string>
+    <string name="dhizuku_restore_stores_btn">一键恢复应用商店</string>
+    <string name="dhizuku_remove_owner_btn">停用 / 移除设备所有者</string>
     <string name="dhizuku_remove_cmd_title">电脑 ADB 解除/停用命令：</string>
     <string name="dhizuku_copy_remove_cmd">复制解除命令</string>
-    <string name="dhizuku_method_admin_title">⚠️ 仅开启了普通设备管理器 (非设备所有者)</string>
+    <string name="dhizuku_method_admin_title">仅开启了普通设备管理器 (非设备所有者)</string>
     <string name="dhizuku_method_admin_desc">您在系统设置中开启的仅为「普通设备管理器」：Android 安全机制禁止其运行 Shell 命令与底层调优。如需特权，请通过电脑 ADB 激活设备所有者，或使用主页的「ADB 启动」/「Root 启动」。</string>
     <string name="dhizuku_method_admin_btn">关闭普通设备管理器</string>
-    <string name="dhizuku_disable_admin_btn">🚫 停用 / 移除普通设备管理器</string>
+    <string name="dhizuku_disable_admin_btn">停用 / 移除普通设备管理器</string>
     <string name="dhizuku_admin_active_desc">检测到当前仅开启了普通设备管理器。受 Android 安全机制限制，普通设备管理器无法执行 Shell 命令与调优功能，需通过电脑 ADB 配置设备所有者，或使用主页的 ADB 启动 / Root 启动。</string>
 
     <!-- Navigation Dock Tabs -->
@@ -397,8 +397,8 @@
     <string name="rules_badge_service_running">服务运行中</string>
     <string name="rules_badge_service_disabled">服务未开启 (功能锁定)</string>
     <string name="rules_btn_enable_accessibility">前往开启无障碍</string>
-    <string name="rules_warning_accessibility">⚠️ 无障碍即时切换服务未开启，分应用规则无法在前台自动切换生效。</string>
-    <string name="rules_warning_accessibility_locked">⚠️ 分应用刷新率规则强制依赖无障碍服务感知前台应用。未开启无障碍服务，此功能无法使用，请先开启服务。</string>
+    <string name="rules_warning_accessibility">无障碍即时切换服务未开启，分应用规则无法在前台自动切换生效。</string>
+    <string name="rules_warning_accessibility_locked">分应用刷新率规则强制依赖无障碍服务感知前台应用。未开启无障碍服务，此功能无法使用，请先开启服务。</string>
     <string name="rules_toast_accessibility_required">必须开启无障碍服务后方可使用分应用刷新率规则</string>
     <string name="rules_rule_status_paused">已暂停 (无障碍未开启)</string>
     <string name="rules_compat_policy_tip_title">为什么抖音等流媒体锁定 60Hz？</string>
