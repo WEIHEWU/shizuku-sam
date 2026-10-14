@@ -50,10 +50,13 @@ import android.text.Editable
 import android.text.TextWatcher
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.MenuItem
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowManager
+import androidx.core.widget.NestedScrollView
 import androidx.core.view.WindowCompat
 import android.widget.Button
 import android.widget.CheckBox
@@ -271,6 +274,14 @@ open class MaxHzActivity : AppBarActivity() {
         var savedParentScrollY: Int = 0
     )
     protected val detailStack = mutableListOf<DetailScreen>()
+    protected var detailModalDialog: androidx.appcompat.app.AlertDialog? = null
+    protected var modalRootView: View? = null
+    protected var modalBackBtn: TextView? = null
+    protected var modalTitleView: TextView? = null
+    protected var modalOptionBPillContainer: ViewGroup? = null
+    protected var modalCloseBtn: TextView? = null
+    protected var modalScrollView: NestedScrollView? = null
+    protected var modalContentContainer: FrameLayout? = null
     protected var navBar: View? = null
     protected var systemBottomInset = 0
 
@@ -827,6 +838,7 @@ open class MaxHzActivity : AppBarActivity() {
         selectedPage = page
         if (restoreScrollY == null) {
             detailStack.clear()
+            detailModalDialog?.dismiss()
         }
         supportActionBar?.title = getString(R.string.maxhz_title)
         // 底部导航统一由 Compose 玻璃 dock 承载（首页 + 三个 MaxHz tab 共用
@@ -1377,7 +1389,7 @@ open class MaxHzActivity : AppBarActivity() {
         maxHzComposeView?.let { fadeOutPage(it) }
     }
 
-    // ============ Galaxy MaxHz 式分层导航核心 ============
+    // ============ Galaxy MaxHz 式分层导航核心（One UI 9 统一模态架构） ============
 
     protected open fun pushDetail(
         title: String,
@@ -1386,73 +1398,338 @@ open class MaxHzActivity : AppBarActivity() {
         targetDiagnosticKey: String? = null,
         builder: () -> View
     ) {
-        val currentScrollY = if (::scrollView.isInitialized) scrollView.scrollY else 0
-        detailStack.add(DetailScreen(title, builder, keepScroll, skipScrollTop, targetDiagnosticKey, savedParentScrollY = currentScrollY))
-        animateContentReplacement(exitDirection = -1, enterDirection = 1) {
-            renderDetail()
+        val currentScrollY = modalScrollView?.scrollY ?: 0
+        val screen = DetailScreen(title, builder, keepScroll, skipScrollTop, targetDiagnosticKey, savedParentScrollY = currentScrollY)
+        detailStack.add(screen)
+
+        if (detailModalDialog == null || !detailModalDialog!!.isShowing) {
+            showDetailModalDialog(screen)
+        } else {
+            transitionModalToScreen(screen, isPush = true)
         }
     }
 
     protected open fun popDetail(): Boolean {
-        if (detailStack.isEmpty()) return false
-        val popped = detailStack.removeAt(detailStack.lastIndex)
-        val restoreY = popped.savedParentScrollY
-        animateContentReplacement(exitDirection = 1, enterDirection = -1) {
-            if (detailStack.isEmpty()) {
-                supportActionBar?.setDisplayHomeAsUpEnabled(false)
-                if (::glassDockOverlay.isInitialized) {
-                    glassDockOverlay.visibility = View.VISIBLE
-                }
-                renderPage(selectedPage, restoreScrollY = restoreY)
-            } else {
-                renderDetail(restoreScrollY = restoreY)
+        if (detailStack.isEmpty()) {
+            if (detailModalDialog?.isShowing == true) {
+                detailModalDialog?.dismiss()
+                return true
             }
+            return false
         }
+        if (detailStack.size > 1) {
+            detailStack.removeAt(detailStack.lastIndex)
+            val previousScreen = detailStack.last()
+            transitionModalToScreen(previousScreen, isPush = false)
+            return true
+        }
+        detailStack.clear()
+        detailModalDialog?.dismiss()
         return true
     }
 
-    private fun animateContentReplacement(exitDirection: Int, enterDirection: Int, replaceContent: () -> Unit) {
-        if (detailPageAnimating || !::pageContent.isInitialized || pageContent.childCount == 0) {
-            replaceContent()
+    protected fun dismissDetailModal() {
+        detailStack.clear()
+        detailModalDialog?.dismiss()
+    }
+
+    protected open fun onDetailModalDismissed() {
+        if (selectedPage != Page.SHIZUKU && ::scrollView.isInitialized) {
+            val y = scrollView.scrollY
+            renderPage(selectedPage, restoreScrollY = y)
+        }
+    }
+
+    private fun modalHeaderButtonBackground(isDark: Boolean, radiusDp: Int): Drawable {
+        val normal = GradientDrawable().apply {
+            cornerRadius = dp(radiusDp).toFloat()
+            setColor(if (isDark) 0x14FFFFFF.toInt() else 0x0A000000.toInt())
+        }
+        return RippleDrawable(
+            ColorStateList.valueOf(rippleColor()),
+            normal,
+            GradientDrawable().apply {
+                cornerRadius = dp(radiusDp).toFloat()
+                setColor(Color.WHITE)
+            }
+        )
+    }
+
+    protected fun showDetailModalDialog(screen: DetailScreen) {
+        val isDark = isDarkMode()
+        val dm = resources.displayMetrics
+        val dialogWidth = minOf((dm.widthPixels * 0.94f).toInt(), dp(580))
+        val dialogHeight = (dm.heightPixels * 0.85f).toInt()
+
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+            background = GradientDrawable().apply {
+                cornerRadius = dp(24).toFloat()
+                setColor(if (isDark) 0xFF191C22.toInt() else 0xFFFFFFFF.toInt())
+                setStroke(dp(1), if (isDark) 0x334E5766.toInt() else 0x1A000000.toInt())
+            }
+            clipToOutline = true
+            elevation = dp(16).toFloat()
+        }
+        modalRootView = root
+
+        // One UI 9 顶部拖拽胶囊把手
+        val handlePill = View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(36), dp(4)).apply {
+                gravity = Gravity.CENTER_HORIZONTAL
+                topMargin = dp(9)
+                bottomMargin = dp(4)
+            }
+            background = GradientDrawable().apply {
+                cornerRadius = dp(999).toFloat()
+                setColor(if (isDark) 0x558E97A8.toInt() else 0x44717885.toInt())
+            }
+        }
+        root.addView(handlePill)
+
+        // 顶部常驻标题与操作栏
+        val headerBar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(12), dp(2), dp(12), dp(6))
+        }
+
+        // 返回上一级按钮（‹）- 三级页面自动显现
+        val backBtn = TextView(this).apply {
+            text = "‹"
+            textSize = 24f
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            gravity = Gravity.CENTER
+            setTextColor(themeColors.primary)
+            visibility = if (detailStack.size > 1) View.VISIBLE else View.GONE
+            layoutParams = LinearLayout.LayoutParams(dp(36), dp(36)).apply {
+                marginEnd = dp(4)
+            }
+            background = modalHeaderButtonBackground(isDark, 18)
+            isClickable = true
+            isFocusable = true
+            setOnClickListener {
+                it.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
+                popDetail()
+            }
+        }
+        modalBackBtn = backBtn
+        headerBar.addView(backBtn)
+
+        // 页面标题
+        val titleView = TextView(this).apply {
+            text = screen.title
+            textSize = 17f
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            setTextColor(themeColors.onSurface)
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            includeFontPadding = false
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginStart = if (detailStack.size > 1) dp(2) else dp(6)
+            }
+        }
+        modalTitleView = titleView
+        headerBar.addView(titleView)
+
+        // Option B 说明胶囊容器
+        val pillContainer = FrameLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                marginEnd = dp(6)
+            }
+        }
+        modalOptionBPillContainer = pillContainer
+        headerBar.addView(pillContainer)
+
+        // 右上角关闭按钮（✕）
+        val closeBtn = TextView(this).apply {
+            text = "✕"
+            textSize = 13.5f
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            gravity = Gravity.CENTER
+            setTextColor(themeColors.onSurfaceVariant)
+            layoutParams = LinearLayout.LayoutParams(dp(34), dp(34))
+            background = modalHeaderButtonBackground(isDark, 17)
+            isClickable = true
+            isFocusable = true
+            setOnClickListener {
+                it.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
+                dismissDetailModal()
+            }
+        }
+        modalCloseBtn = closeBtn
+        headerBar.addView(closeBtn)
+
+        root.addView(headerBar)
+
+        // 极细分隔线
+        val divider = View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(1))
+            setBackgroundColor(if (isDark) 0x1FFFFFFF.toInt() else 0x12000000.toInt())
+        }
+        root.addView(divider)
+
+        // 滚动视口 + 内容承载容器
+        val scrollView = NestedScrollView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f)
+            isFillViewport = true
+            overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
+            setPadding(dp(14), dp(10), dp(14), dp(24))
+            clipToPadding = false
+        }
+        modalScrollView = scrollView
+
+        val contentContainer = FrameLayout(this).apply {
+            layoutParams = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        }
+        modalContentContainer = contentContainer
+        scrollView.addView(contentContainer)
+        root.addView(scrollView)
+
+        // 初始化内容
+        collapseAllResults()
+        lastResultView = null
+        detailSubtitles.clear()
+        detailTogglePills.clear()
+        detailSubtitlesExpanded = false
+
+        val screenView = runCatching { screen.builder() }
+            .getOrElse { error ->
+                errorCard("页面加载异常", error.message ?: error.javaClass.simpleName)
+            }
+        contentContainer.addView(screenView)
+
+        if (detailSubtitles.isNotEmpty()) {
+            pillContainer.visibility = View.VISIBLE
+            pillContainer.addView(createOptionBTogglePill())
+        } else {
+            pillContainer.visibility = View.GONE
+        }
+
+        val dialog = MaterialAlertDialogBuilder(this)
+            .setView(root)
+            .create()
+
+        dialog.setOnKeyListener { _, keyCode, event ->
+            if (keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) {
+                popDetail()
+                true
+            } else {
+                false
+            }
+        }
+
+        dialog.setOnDismissListener {
+            detailModalDialog = null
+            modalRootView = null
+            modalBackBtn = null
+            modalTitleView = null
+            modalOptionBPillContainer = null
+            modalCloseBtn = null
+            modalScrollView = null
+            modalContentContainer = null
+            detailStack.clear()
+            detailSubtitles.clear()
+            detailTogglePills.clear()
+            onDetailModalDismissed()
+        }
+
+        dialog.show()
+
+        dialog.window?.let { window ->
+            window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+            window.setLayout(dialogWidth, dialogHeight)
+            window.setDimAmount(0.55f)
+            window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        }
+
+        detailModalDialog = dialog
+
+        screen.targetDiagnosticKey?.let { key ->
+            scrollView.post { scrollToDiagnosticTarget(key) }
+        }
+    }
+
+    private fun transitionModalToScreen(screen: DetailScreen, isPush: Boolean) {
+        val container = modalContentContainer ?: return
+        val pillContainer = modalOptionBPillContainer ?: return
+        val scrollView = modalScrollView ?: return
+        val titleView = modalTitleView ?: return
+        val backBtn = modalBackBtn ?: return
+
+        titleView.text = screen.title
+        backBtn.visibility = if (detailStack.size > 1) View.VISIBLE else View.GONE
+        (titleView.layoutParams as? LinearLayout.LayoutParams)?.marginStart = if (detailStack.size > 1) dp(2) else dp(6)
+
+        collapseAllResults()
+        lastResultView = null
+        detailSubtitles.clear()
+        detailTogglePills.clear()
+        detailSubtitlesExpanded = false
+
+        val newView = runCatching { screen.builder() }
+            .getOrElse { error ->
+                errorCard("页面加载异常", error.message ?: error.javaClass.simpleName)
+            }
+
+        pillContainer.removeAllViews()
+        if (detailSubtitles.isNotEmpty()) {
+            pillContainer.visibility = View.VISIBLE
+            pillContainer.addView(createOptionBTogglePill())
+        } else {
+            pillContainer.visibility = View.GONE
+        }
+
+        val oldView = if (container.childCount > 0) container.getChildAt(0) else null
+        if (oldView == null) {
+            container.addView(newView)
+            if (isPush) {
+                if (!screen.keepScroll && !screen.skipScrollTop) scrollView.scrollTo(0, 0)
+            }
             return
         }
-        detailPageAnimating = true
-        val width = pageContent.width.takeIf { it > 0 } ?: resources.displayMetrics.widthPixels
-        pageContent.animate().cancel()
-        pageContent.animate()
-            .translationX(exitDirection * width * 0.10f)
+
+        val width = container.width.takeIf { it > 0 } ?: resources.displayMetrics.widthPixels
+        val exitDir = if (isPush) -1 else 1
+        val enterDir = if (isPush) 1 else -1
+
+        newView.alpha = 0f
+        newView.translationX = enterDir * width * 0.12f
+        container.addView(newView)
+
+        val duration = 180L
+        val interpolator = android.view.animation.DecelerateInterpolator()
+
+        oldView.animate()
+            .translationX(exitDir * width * 0.12f)
             .alpha(0f)
-            .setDuration(70L)
-            .setListener(object : AnimatorListenerAdapter() {
-                override fun onAnimationEnd(animation: Animator) {
-                    pageContent.animate().setListener(null)
-                    pageContent.translationX = enterDirection * width * 0.10f
-                    pageContent.alpha = 0f
-                    replaceContent()
-                    pageContent.animate()
-                        .translationX(0f)
-                        .alpha(1f)
-                        .setDuration(130L)
-                        .setListener(object : AnimatorListenerAdapter() {
-                            override fun onAnimationEnd(animation: Animator) {
-                                pageContent.animate().setListener(null)
-                                pageContent.translationX = 0f
-                                pageContent.alpha = 1f
-                                detailPageAnimating = false
-                            }
-
-                            override fun onAnimationCancel(animation: Animator) {
-                                detailPageAnimating = false
-                            }
-                        })
-                        .start()
-                }
-
-                override fun onAnimationCancel(animation: Animator) {
-                    detailPageAnimating = false
-                }
-            })
+            .setDuration(duration)
+            .setInterpolator(interpolator)
+            .withEndAction {
+                container.removeView(oldView)
+            }
             .start()
+
+        newView.animate()
+            .translationX(0f)
+            .alpha(1f)
+            .setDuration(duration)
+            .setInterpolator(interpolator)
+            .withEndAction {
+                screen.targetDiagnosticKey?.let { key ->
+                    scrollView.post { scrollToDiagnosticTarget(key) }
+                }
+            }
+            .start()
+
+        if (isPush) {
+            if (!screen.keepScroll && !screen.skipScrollTop) {
+                scrollView.post { scrollView.scrollTo(0, 0) }
+            }
+        } else {
+            scrollView.post { scrollView.scrollTo(0, screen.savedParentScrollY) }
+        }
     }
 
     protected val detailSubtitles = mutableListOf<View>()
@@ -1552,38 +1829,47 @@ open class MaxHzActivity : AppBarActivity() {
         }
     }
 
-    private fun renderDetail(restoreScrollY: Int? = null) {
+    protected fun renderDetail(restoreScrollY: Int? = null) {
         val screen = detailStack.lastOrNull() ?: return
-        // 详情页仍是 View 渲染：隐藏 Compose 页、恢复 ScrollView
-        showMaxHzScrollView()
-        hideMaxHzCompose()
+        if (detailModalDialog == null || !detailModalDialog!!.isShowing) {
+            showDetailModalDialog(screen)
+            return
+        }
+        val container = modalContentContainer ?: return
+        val pillContainer = modalOptionBPillContainer ?: return
+        val scrollView = modalScrollView ?: return
+        val titleView = modalTitleView ?: return
+        val backBtn = modalBackBtn ?: return
+
+        titleView.text = screen.title
+        backBtn.visibility = if (detailStack.size > 1) View.VISIBLE else View.GONE
+        (titleView.layoutParams as? LinearLayout.LayoutParams)?.marginStart = if (detailStack.size > 1) dp(2) else dp(6)
+
         collapseAllResults()
         lastResultView = null
-        supportActionBar?.title = screen.title
-        supportActionBar?.setDisplayHomeAsUpEnabled(true)
-        navBar?.visibility = View.GONE
-        if (::glassDockOverlay.isInitialized) {
-            glassDockOverlay.visibility = View.GONE
-        }
-        updateSystemBarPadding()
         detailSubtitles.clear()
         detailTogglePills.clear()
         detailSubtitlesExpanded = false
-        pageContent.removeAllViews()
-        pageContent.addView(createDetailOptionBHeader(screen.title))
-        runCatching { screen.builder() }
-            .onSuccess { pageContent.addView(it) }
-            .onFailure { error ->
-                pageContent.addView(errorCard("页面加载异常", error.message ?: error.javaClass.simpleName))
+
+        val view = runCatching { screen.builder() }
+            .getOrElse { error ->
+                errorCard("页面加载异常", error.message ?: error.javaClass.simpleName)
             }
+
+        pillContainer.removeAllViews()
+        if (detailSubtitles.isNotEmpty()) {
+            pillContainer.visibility = View.VISIBLE
+            pillContainer.addView(createOptionBTogglePill())
+        } else {
+            pillContainer.visibility = View.GONE
+        }
+
+        container.removeAllViews()
+        container.addView(view)
+
         val diagnosticKey = screen.targetDiagnosticKey
         if (diagnosticKey != null) {
-            pageContent.doOnPreDraw {
-                scrollToDiagnosticTarget(diagnosticKey)
-            }
-            scrollView.post {
-                scrollToDiagnosticTarget(diagnosticKey)
-            }
+            scrollView.post { scrollToDiagnosticTarget(diagnosticKey) }
         } else if (restoreScrollY != null) {
             scrollView.post { scrollView.scrollTo(0, restoreScrollY) }
         } else if (!screen.keepScroll && !screen.skipScrollTop) {
@@ -2378,8 +2664,9 @@ open class MaxHzActivity : AppBarActivity() {
     }
 
     private fun scrollToDiagnosticTarget(key: String) {
+        val scroller = modalScrollView ?: if (::scrollView.isInitialized) scrollView else null
         if (key == "Shizuku") {
-            scrollView.scrollTo(0, 0)
+            scroller?.scrollTo(0, 0)
             return
         }
         val target = diagnosticTargetViews[key] ?: return
@@ -2387,13 +2674,14 @@ open class MaxHzActivity : AppBarActivity() {
     }
 
     private fun scrollToDiagnosticTarget(target: View) {
-        if (!::scrollView.isInitialized) return
+        val scroller = modalScrollView ?: if (::scrollView.isInitialized) scrollView else null
+        if (scroller == null) return
         val scrollLocation = IntArray(2)
         val targetLocation = IntArray(2)
-        scrollView.getLocationInWindow(scrollLocation)
+        scroller.getLocationInWindow(scrollLocation)
         target.getLocationInWindow(targetLocation)
-        val targetY = (scrollView.scrollY + targetLocation[1] - scrollLocation[1] - dp(24)).coerceAtLeast(0)
-        scrollView.scrollTo(0, targetY)
+        val targetY = (scroller.scrollY + targetLocation[1] - scrollLocation[1] - dp(24)).coerceAtLeast(0)
+        scroller.scrollTo(0, targetY)
     }
 
     private fun diagnosticSeverity(item: DiagnosticItem): String {
@@ -4412,6 +4700,12 @@ open class MaxHzActivity : AppBarActivity() {
             .create()
 
         dialog.show()
+        dialog.window?.let { window ->
+            val dm = resources.displayMetrics
+            val width = minOf((dm.widthPixels * 0.94f).toInt(), dp(580))
+            window.setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT)
+            window.setDimAmount(0.55f)
+        }
 
         dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE)?.setOnClickListener {
             val limit = batteryLimitInput.safeInt(80).coerceIn(50, 100)
@@ -4574,6 +4868,12 @@ open class MaxHzActivity : AppBarActivity() {
         }
 
         dialog.show()
+        dialog.window?.let { window ->
+            val dm = resources.displayMetrics
+            val width = minOf((dm.widthPixels * 0.94f).toInt(), dp(580))
+            window.setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT)
+            window.setDimAmount(0.55f)
+        }
         dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_NEUTRAL)?.setOnClickListener {
             loadData()
         }

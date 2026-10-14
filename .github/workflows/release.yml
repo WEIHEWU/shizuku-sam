@@ -164,8 +164,40 @@ jobs:
           files: |
             releases/Shizuku-Sam-v13.8.10.apk
 
+      - name: "Publish Release v13.8.11 (Plan A One UI 9 Modal Sheet Architecture)"
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/v13.8.11')
+        with:
+          tag_name: v13.8.11
+          name: "Shizuku Sam v13.8.11 — 极致 One UI 9 统一模态架构（全界面 100% 弹窗化 + 弹窗内平滑推入导航）"
+          body: |
+            ### Shizuku Sam v13.8.11
+
+            #### 🌟 极致 One UI 9 统一模态架构（方案 A 全界面 100% 弹窗化）
+            - **全应用二级/三级菜单 100% 弹窗化**：
+              - 底层导航引擎 `pushDetail` 全面重构为 One UI 9 模态大浮层（Modal Sheet）；
+              - 采用 24dp 圆角卡片、微暗半透明背景蒙层（0.55f Dim）、94% 屏宽（上限 580dp 适配折叠屏与平板）及 85% 视高，高质感呈现；
+              - 顶部集成 One UI 9 标志性拖拽胶囊把手（Drag Handle Pill）与常驻吸顶标题栏。
+            - **弹窗内层平滑推入导航（优雅解决三级菜单嵌套）**：
+              - 从二级菜单进入三级菜单时，弹窗外框不动，内部内容平滑左右水平推入过渡；
+              - 标题栏自动显现「‹ 返回」按钮，点击或系统返回键平滑逐级回退；
+              - 彻底消除多层弹窗蒙层叠罗汉导致的变脏变暗与误触关闭问题。
+            - **底层主页与毛玻璃悬浮 Dock 永驻不闪烁**：
+              - 弹窗呼出时，三大 Tab 仪表盘（`Shizuku` · `性能硬件` · `应用规则`）与底部悬浮毛玻璃 Dock 自然沉底于蒙层下方；
+              - 彻底告别旧版切页隐藏 Dock 导致的页面跳动与重绘闪烁，随开随走，零上下文丢失。
+            - **常驻吸顶 Option B 说明胶囊与全弹窗视觉统一**：
+              - 弹窗顶部常驻「显示说明 / 隐藏说明」按需展开胶囊，智能识别有无说明内容；
+              - 「电池信息与健康度」、「充电上限保护」及「自选应用编译」等所有弹窗全面对齐 One UI 9 规范。
+
+            #### 🔄 核心协议与防杀体系
+            - 100% 对齐原生 Shizuku 核心协议；
+            - 延续 Android 17 / One UI 9 `ACCESS_LOCAL_NETWORK` 运行时权限主动申请与底层反射兼容层；
+            - 保留 Watchdog `specialUse` 服务、`AotCompileService` 前台服务带 WakeLock，以及 16KB 内存页面对齐。
+          files: |
+            releases/Shizuku-Sam-v13.8.11.apk
+
       - name: Publish Future Version Tag Release
-        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2' && github.ref_name != 'v13.8.3' && github.ref_name != 'v13.8.4' && github.ref_name != 'v13.8.5' && github.ref_name != 'v13.8.6' && github.ref_name != 'v13.8.7' && github.ref_name != 'v13.8.8' && github.ref_name != 'v13.8.9' && github.ref_name != 'v13.8.10'
+        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2' && github.ref_name != 'v13.8.3' && github.ref_name != 'v13.8.4' && github.ref_name != 'v13.8.5' && github.ref_name != 'v13.8.6' && github.ref_name != 'v13.8.7' && github.ref_name != 'v13.8.8' && github.ref_name != 'v13.8.9' && github.ref_name != 'v13.8.10' && github.ref_name != 'v13.8.11'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
@@ -173,3 +205,4 @@ jobs:
           generate_release_notes: true
           files: |
             releases/Shizuku-Sam-${{ github.ref_name }}.apk
+

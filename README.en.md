@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <a href="./README.md">简体中文</a> | <a href="./README.en.md">English</a> | <a href="https://github.com/WEIHEWU/shizuku-sam/releases/latest"><b>⬇️ Download Latest Release (v13.8.10)</b></a>
+  <a href="./README.md">简体中文</a> | <a href="./README.en.md">English</a> | <a href="https://github.com/WEIHEWU/shizuku-sam/releases/latest"><b>⬇️ Download Latest Release (v13.8.11)</b></a>
 </p>
 
 ---
@@ -15,7 +15,7 @@
 
 **Shizuku Sam** integrates the **Shizuku privileged service** with a purpose-built **Samsung Galaxy (One UI) system scheduler & hardware enhancer, background & deep sleep controller, and per-app refresh rate rule manager** in a single cohesive application.
 
-The entire app (Level 1, Level 2, Level 3 screens, and all dialogs) is unified under the **Miuix (`top.yukonga.miuix.kmp`) UI system**, a **3-tab Liquid Glass floating dock (`Shizuku` · `Hardware` · `App Rules`)**, and **on-demand subtitle toggles (clean single-line titles by default + long-press any row/card to toggle its explanation in place + a `显示说明 / 隐藏说明` pill button on every section/page header)**. Every section, card title, switch, and secondary screen listed below corresponds 1:1 with the actual `v13.8.10` app UI, with 100% full adaptation for **Samsung One UI 9 / Android 17**.
+The entire app (Level 1, Level 2, Level 3 screens, and all dialogs) is unified under the **Miuix (`top.yukonga.miuix.kmp`) UI system**, a **3-tab Liquid Glass floating dock (`Shizuku` · `Hardware` · `App Rules`)**, **One UI 9 Unified Modal Architecture (100% modal sheet representation for secondary and tertiary menus + in-modal smooth slide navigation, persistent home dashboard and floating dock without flicker)**, and **on-demand subtitle toggles (clean single-line titles by default + long-press any row/card to toggle its explanation in place + a `显示说明 / 隐藏说明` pill button on every section/page header)**. Every section, card title, switch, and secondary screen listed below corresponds 1:1 with the actual `v13.8.11` app UI, with 100% full adaptation for **Samsung One UI 9 / Android 17**.
 
 ---
 
@@ -133,7 +133,7 @@ The entire app (Level 1, Level 2, Level 3 screens, and all dialogs) is unified u
 
 ### Prebuilt APK
 Download the latest signed release APK from **[GitHub Releases](https://github.com/WEIHEWU/shizuku-sam/releases/latest)**:
-- Latest Release: **[`Shizuku-Sam-v13.8.10.apk`](https://github.com/WEIHEWU/shizuku-sam/releases/download/v13.8.10/Shizuku-Sam-v13.8.10.apk)** (also archived under [`releases/`](./releases/))
+- Latest Release: **[`Shizuku-Sam-v13.8.11.apk`](https://github.com/WEIHEWU/shizuku-sam/releases/download/v13.8.11/Shizuku-Sam-v13.8.11.apk)** (also archived under [`releases/`](./releases/))
 
 ### Build from Source
 - **JDK**: Java 21

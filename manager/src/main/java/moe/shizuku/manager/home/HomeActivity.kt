@@ -1647,27 +1647,20 @@ abstract class HomeActivity : MaxHzActivity() {
         targetDiagnosticKey: String?,
         builder: () -> View
     ) {
-        homeComposeView?.let {
-            it.animate().cancel()
-            it.visibility = View.GONE
-        }
-        showMaxHzScrollView()
         super.pushDetail(title, keepScroll, skipScrollTop, targetDiagnosticKey, builder)
-        supportActionBar?.setDisplayHomeAsUpEnabled(true)
-        navBar?.visibility = View.GONE
     }
 
     override fun popDetail(): Boolean {
         val popped = super.popDetail()
         if (popped) {
             syncSchemeAStates()
-            if (detailStack.isEmpty()) {
-                navBar?.visibility = View.GONE
-                supportActionBar?.setDisplayHomeAsUpEnabled(false)
-                renderPage(selectedPage)
-            }
         }
         return popped
+    }
+
+    override fun onDetailModalDismissed() {
+        super.onDetailModalDismissed()
+        syncSchemeAStates()
     }
 
     private fun installUnifiedBackNavigation() {
