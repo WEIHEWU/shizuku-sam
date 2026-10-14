@@ -3,10 +3,14 @@ package moe.shizuku.manager.starter
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
+import android.graphics.Color as AndroidColor
+import android.graphics.drawable.ColorDrawable
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.util.Log
 import android.util.TypedValue
+import android.view.Gravity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -14,6 +18,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -57,6 +62,7 @@ import moe.shizuku.manager.home.GroupHeaderWithToggle
 import moe.shizuku.manager.home.MiuixRowIcon
 import moe.shizuku.manager.home.MiuixSubPageTopBar
 import moe.shizuku.manager.home.onLongPressToggle
+import moe.shizuku.manager.home.CenteredAppDialog
 import moe.shizuku.manager.maxhz.GlassAppTheme
 import moe.shizuku.manager.service.WatchdogService
 import moe.shizuku.manager.utils.AccessibilityHelper
@@ -126,6 +132,16 @@ class StarterActivity : AppActivity() {
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
+        window?.let { win ->
+            win.setBackgroundDrawable(ColorDrawable(AndroidColor.TRANSPARENT))
+            val dm = resources.displayMetrics
+            val dialogWidth = minOf((dm.widthPixels * 0.92f).toInt(), (520 * dm.density).toInt())
+            val dialogHeight = (dm.heightPixels * 0.82f).toInt()
+            win.setLayout(dialogWidth, dialogHeight)
+            win.setDimAmount(0.55f)
+            win.setGravity(Gravity.CENTER)
+        }
+
         Shizuku.addBinderReceivedListener(binderListener)
         if (Shizuku.pingBinder()) {
             onServiceReady()
@@ -177,45 +193,71 @@ class StarterActivity : AppActivity() {
             else if (isDark) 0xFF277AF7.toInt() else 0xFF3482FF.toInt()
         }.getOrDefault(if (isDark) 0xFF277AF7.toInt() else 0xFF3482FF.toInt())
 
+        val useSystemColor = ThemeHelper.isUsingSystemColor()
+        val dialogBgColor = if (isDark) {
+            if (isBlackNight) Color(0xFF000000)
+            else if (useSystemColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) androidx.compose.material3.dynamicDarkColorScheme(this).surfaceContainerHigh
+            else Color(0xFF181B22)
+        } else {
+            if (useSystemColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) androidx.compose.material3.dynamicLightColorScheme(this).surfaceContainerHigh
+            else Color(0xFFFFFFFF)
+        }
+        val dialogStrokeColor = if (isDark) {
+            if (isBlackNight) Color(0x26FFFFFF)
+            else if (useSystemColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) androidx.compose.material3.dynamicDarkColorScheme(this).outlineVariant
+            else Color(0x224E5766)
+        } else {
+            if (useSystemColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) androidx.compose.material3.dynamicLightColorScheme(this).outlineVariant
+            else Color(0x12000000)
+        }
+
         setContent {
             GlassAppTheme(isDark = isDark) {
-                StarterMiuixScreen(
-                    isDark = isDark,
-                    isBlackNightTheme = isBlackNight,
-                    primaryColor = Color(primaryColorInt),
-                    outputText = outputTextState.value,
-                    isServiceReady = serviceReadyState.value,
-                    error = errorState.value,
-                    onDismissError = { errorState.value = null },
-                    onCloseClick = { finish() },
-                    onOpenDevOptions = {
-                        val devIntent = Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).apply {
-                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                            putExtra(":settings:fragment_args_key", "toggle_adb_wireless")
-                            if (EnvironmentUtils.isSamsung()) {
-                                addFlags(Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
-                                putExtra("android.intent.extra.WINDOW_MODE", 5)
-                                putExtra("com.samsung.android.intent.extra.LAUNCH_MODE", 4)
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(dialogBgColor)
+                        .border(1.dp, dialogStrokeColor, RoundedCornerShape(24.dp))
+                ) {
+                    StarterMiuixScreen(
+                        isDark = isDark,
+                        isBlackNightTheme = isBlackNight,
+                        primaryColor = Color(primaryColorInt),
+                        outputText = outputTextState.value,
+                        isServiceReady = serviceReadyState.value,
+                        error = errorState.value,
+                        onDismissError = { errorState.value = null },
+                        onCloseClick = { finish() },
+                        onOpenDevOptions = {
+                            val devIntent = Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).apply {
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                                putExtra(":settings:fragment_args_key", "toggle_adb_wireless")
+                                if (EnvironmentUtils.isSamsung()) {
+                                    addFlags(Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
+                                    putExtra("android.intent.extra.WINDOW_MODE", 5)
+                                    putExtra("com.samsung.android.intent.extra.LAUNCH_MODE", 4)
+                                }
                             }
+                            runCatching { startActivity(devIntent) }
+                        },
+                        onRetryPort5555 = {
+                            val retryIntent = Intent(this@StarterActivity, StarterActivity::class.java).apply {
+                                putExtra(EXTRA_IS_ROOT, false)
+                                putExtra(EXTRA_HOST, "127.0.0.1")
+                                putExtra(EXTRA_PORT, 5555)
+                            }
+                            finish()
+                            startActivity(retryIntent)
+                        },
+                        onOpenPairingTutorial = {
+                            startActivity(Intent(this@StarterActivity, AdbPairingTutorialActivity::class.java))
+                        },
+                        onOpenAccessibility = {
+                            AccessibilityHelper.openPairingAssistantSettings(this@StarterActivity)
                         }
-                        runCatching { startActivity(devIntent) }
-                    },
-                    onRetryPort5555 = {
-                        val retryIntent = Intent(this, StarterActivity::class.java).apply {
-                            putExtra(EXTRA_IS_ROOT, false)
-                            putExtra(EXTRA_HOST, "127.0.0.1")
-                            putExtra(EXTRA_PORT, 5555)
-                        }
-                        finish()
-                        startActivity(retryIntent)
-                    },
-                    onOpenPairingTutorial = {
-                        startActivity(Intent(this, AdbPairingTutorialActivity::class.java))
-                    },
-                    onOpenAccessibility = {
-                        AccessibilityHelper.openPairingAssistantSettings(this)
-                    }
-                )
+                    )
+                }
             }
         }
     }
@@ -255,7 +297,7 @@ private fun StarterMiuixScreen(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = bgColor,
+        containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) {
         LazyColumn(
@@ -263,12 +305,12 @@ private fun StarterMiuixScreen(
                 .fillMaxSize()
                 .overScrollVertical(),
             contentPadding = PaddingValues(
-                top = 54.dp,
+                top = 12.dp,
                 start = 14.dp,
                 end = 14.dp,
-                bottom = 48.dp
+                bottom = 16.dp
             ),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             item(key = "header-top") {
                 MiuixSubPageTopBar(
@@ -387,7 +429,7 @@ private fun StarterMiuixScreen(
         else -> error?.localizedMessage ?: stringResource(R.string.cannot_connect_port)
     }
 
-    WindowDialog(
+    CenteredAppDialog(
         show = showErrorDialog,
         title = dialogTitle,
         onDismissRequest = onDismissError

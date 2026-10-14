@@ -8,8 +8,11 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
+import android.graphics.Color as AndroidColor
+import android.graphics.drawable.ColorDrawable
 import android.os.Build
 import android.os.Bundle
+import android.view.Gravity
 import androidx.activity.result.contract.ActivityResultContracts
 import android.provider.Settings
 import android.util.Log
@@ -23,6 +26,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -56,6 +60,7 @@ import moe.shizuku.manager.home.HomeActivity
 import moe.shizuku.manager.home.MiuixRowIcon
 import moe.shizuku.manager.home.MiuixSubPageTopBar
 import moe.shizuku.manager.home.onLongPressToggle
+import moe.shizuku.manager.home.CenteredAppDialog
 import moe.shizuku.manager.maxhz.GlassAppTheme
 import moe.shizuku.manager.utils.AccessibilityHelper
 import rikka.compatibility.DeviceCompatibility
@@ -97,6 +102,16 @@ class AdbPairingTutorialActivity : AppActivity() {
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
+        window?.let { win ->
+            win.setBackgroundDrawable(ColorDrawable(AndroidColor.TRANSPARENT))
+            val dm = resources.displayMetrics
+            val dialogWidth = minOf((dm.widthPixels * 0.92f).toInt(), (520 * dm.density).toInt())
+            val dialogHeight = (dm.heightPixels * 0.82f).toInt()
+            win.setLayout(dialogWidth, dialogHeight)
+            win.setDimAmount(0.55f)
+            win.setGravity(Gravity.CENTER)
+        }
+
         val notifEnabled = isNotificationEnabled()
         notificationEnabledState.value = notifEnabled
         if (notifEnabled) {
@@ -114,48 +129,74 @@ class AdbPairingTutorialActivity : AppActivity() {
         val isMiui = DeviceCompatibility.isMiui()
         val isOppo = isColorOS()
 
+        val useSystemColor = ThemeHelper.isUsingSystemColor()
+        val dialogBgColor = if (isDark) {
+            if (isBlackNight) Color(0xFF000000)
+            else if (useSystemColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) androidx.compose.material3.dynamicDarkColorScheme(this).surfaceContainerHigh
+            else Color(0xFF181B22)
+        } else {
+            if (useSystemColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) androidx.compose.material3.dynamicLightColorScheme(this).surfaceContainerHigh
+            else Color(0xFFFFFFFF)
+        }
+        val dialogStrokeColor = if (isDark) {
+            if (isBlackNight) Color(0x26FFFFFF)
+            else if (useSystemColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) androidx.compose.material3.dynamicDarkColorScheme(this).outlineVariant
+            else Color(0x224E5766)
+        } else {
+            if (useSystemColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) androidx.compose.material3.dynamicLightColorScheme(this).outlineVariant
+            else Color(0x12000000)
+        }
+
         setContent {
             GlassAppTheme(isDark = isDark) {
-                AdbPairingTutorialMiuixScreen(
-                    isDark = isDark,
-                    isBlackNightTheme = isBlackNight,
-                    primaryColor = Color(primaryColorInt),
-                    notificationEnabled = notificationEnabledState.value,
-                    isMiui = isMiui,
-                    isColorOs = isOppo,
-                    onBackClick = { finish() },
-                    onOpenDeveloperOptions = {
-                        launchedDeveloperOptions = true
-                        AdbPairingDetector.request()
-                        val intent = Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).apply {
-                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                            putExtra(":settings:fragment_args_key", "toggle_adb_wireless")
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(dialogBgColor)
+                        .border(1.dp, dialogStrokeColor, RoundedCornerShape(24.dp))
+                ) {
+                    AdbPairingTutorialMiuixScreen(
+                        isDark = isDark,
+                        isBlackNightTheme = isBlackNight,
+                        primaryColor = Color(primaryColorInt),
+                        notificationEnabled = notificationEnabledState.value,
+                        isMiui = isMiui,
+                        isColorOs = isOppo,
+                        onBackClick = { finish() },
+                        onOpenDeveloperOptions = {
+                            launchedDeveloperOptions = true
+                            AdbPairingDetector.request()
+                            val intent = Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).apply {
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                                putExtra(":settings:fragment_args_key", "toggle_adb_wireless")
+                            }
+                            try {
+                                context.startActivity(intent)
+                            } catch (e: ActivityNotFoundException) {
+                                launchedDeveloperOptions = false
+                                AdbPairingDetector.cancel()
+                            }
+                        },
+                        onOpenNotificationOptions = {
+                            val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                                putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                            }
+                            try {
+                                context.startActivity(intent)
+                            } catch (_: ActivityNotFoundException) {
+                            }
+                        },
+                        onPairingSuccess = {
+                            val intent = Intent(context, HomeActivity::class.java).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                                putExtra("EXTRA_AUTO_START_AFTER_PAIRING", true)
+                            }
+                            startActivity(intent)
+                            finish()
                         }
-                        try {
-                            context.startActivity(intent)
-                        } catch (e: ActivityNotFoundException) {
-                            launchedDeveloperOptions = false
-                            AdbPairingDetector.cancel()
-                        }
-                    },
-                    onOpenNotificationOptions = {
-                        val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
-                            putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
-                        }
-                        try {
-                            context.startActivity(intent)
-                        } catch (_: ActivityNotFoundException) {
-                        }
-                    },
-                    onPairingSuccess = {
-                        val intent = Intent(context, HomeActivity::class.java).apply {
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                            putExtra("EXTRA_AUTO_START_AFTER_PAIRING", true)
-                        }
-                        startActivity(intent)
-                        finish()
-                    }
-                )
+                    )
+                }
             }
         }
     }
@@ -285,7 +326,7 @@ private fun AdbPairingTutorialMiuixScreen(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = bgColor,
+        containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) {
         LazyColumn(
@@ -293,12 +334,12 @@ private fun AdbPairingTutorialMiuixScreen(
                 .fillMaxSize()
                 .overScrollVertical(),
             contentPadding = PaddingValues(
-                top = 54.dp,
+                top = 12.dp,
                 start = 14.dp,
                 end = 14.dp,
-                bottom = 48.dp
+                bottom = 16.dp
             ),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             item(key = "header-top") {
                 MiuixSubPageTopBar(
@@ -712,7 +753,7 @@ private fun MiuixManualPairingDialog(
         }
     }
 
-    WindowDialog(
+    CenteredAppDialog(
         show = show,
         title = stringResource(R.string.dialog_adb_pairing_title),
         summary = if (showDesc) "可在分屏/小窗模式下打开系统「无线调试 → 使用配对码配对设备」，系统将自动填入端口或由您手动输入。" else null,

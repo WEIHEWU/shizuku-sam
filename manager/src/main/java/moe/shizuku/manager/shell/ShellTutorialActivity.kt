@@ -1,10 +1,14 @@
 package moe.shizuku.manager.shell
 
 import android.content.res.Configuration
+import android.graphics.Color as AndroidColor
+import android.graphics.drawable.ColorDrawable
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.DocumentsContract
 import android.util.TypedValue
+import android.view.Gravity
 import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -13,13 +17,17 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -97,6 +105,16 @@ class ShellTutorialActivity : AppActivity() {
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
+        window?.let { win ->
+            win.setBackgroundDrawable(ColorDrawable(AndroidColor.TRANSPARENT))
+            val dm = resources.displayMetrics
+            val dialogWidth = minOf((dm.widthPixels * 0.92f).toInt(), (520 * dm.density).toInt())
+            val dialogHeight = (dm.heightPixels * 0.82f).toInt()
+            win.setLayout(dialogWidth, dialogHeight)
+            win.setDimAmount(0.55f)
+            win.setGravity(Gravity.CENTER)
+        }
+
         val isDark = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
         val isBlackNight = isDark && ThemeHelper.isBlackNightTheme(this)
         val primaryColorInt = runCatching {
@@ -105,15 +123,41 @@ class ShellTutorialActivity : AppActivity() {
             else if (isDark) 0xFF277AF7.toInt() else 0xFF3482FF.toInt()
         }.getOrDefault(if (isDark) 0xFF277AF7.toInt() else 0xFF3482FF.toInt())
 
+        val useSystemColor = ThemeHelper.isUsingSystemColor()
+        val dialogBgColor = if (isDark) {
+            if (isBlackNight) Color(0xFF000000)
+            else if (useSystemColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) androidx.compose.material3.dynamicDarkColorScheme(this).surfaceContainerHigh
+            else Color(0xFF181B22)
+        } else {
+            if (useSystemColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) androidx.compose.material3.dynamicLightColorScheme(this).surfaceContainerHigh
+            else Color(0xFFFFFFFF)
+        }
+        val dialogStrokeColor = if (isDark) {
+            if (isBlackNight) Color(0x26FFFFFF)
+            else if (useSystemColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) androidx.compose.material3.dynamicDarkColorScheme(this).outlineVariant
+            else Color(0x224E5766)
+        } else {
+            if (useSystemColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) androidx.compose.material3.dynamicLightColorScheme(this).outlineVariant
+            else Color(0x12000000)
+        }
+
         setContent {
             GlassAppTheme(isDark = isDark) {
-                ShellTutorialMiuixScreen(
-                    isDark = isDark,
-                    isBlackNightTheme = isBlackNight,
-                    primaryColor = Color(primaryColorInt),
-                    onBackClick = { finish() },
-                    onExportFilesClick = { openDocumentsTree.launch(null) }
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(dialogBgColor)
+                        .border(1.dp, dialogStrokeColor, RoundedCornerShape(24.dp))
+                ) {
+                    ShellTutorialMiuixScreen(
+                        isDark = isDark,
+                        isBlackNightTheme = isBlackNight,
+                        primaryColor = Color(primaryColorInt),
+                        onBackClick = { finish() },
+                        onExportFilesClick = { openDocumentsTree.launch(null) }
+                    )
+                }
             }
         }
     }
@@ -161,7 +205,7 @@ private fun ShellTutorialMiuixScreen(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = bgColor,
+        containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) {
         LazyColumn(
@@ -169,12 +213,12 @@ private fun ShellTutorialMiuixScreen(
                 .fillMaxSize()
                 .overScrollVertical(),
             contentPadding = PaddingValues(
-                top = 54.dp,
+                top = 12.dp,
                 start = 14.dp,
                 end = 14.dp,
-                bottom = 48.dp
+                bottom = 16.dp
             ),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             item(key = "header-top") {
                 MiuixSubPageTopBar(

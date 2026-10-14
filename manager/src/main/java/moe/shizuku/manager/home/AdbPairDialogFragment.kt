@@ -58,6 +58,48 @@ class AdbPairDialogFragment : DialogFragment() {
     private fun onDialogShow(dialog: AlertDialog) {
         val context = dialog.context
 
+        val isDark = (context.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
+        val isBlack = isDark && moe.shizuku.manager.app.ThemeHelper.isBlackNightTheme(context)
+        val useSystemColor = moe.shizuku.manager.app.ThemeHelper.isUsingSystemColor()
+
+        fun resolveAttrColor(attr: Int, fallback: Int): Int {
+            val tv = android.util.TypedValue()
+            return if (context.theme.resolveAttribute(attr, tv, true)) {
+                if (tv.resourceId != 0) androidx.core.content.ContextCompat.getColor(context, tv.resourceId) else tv.data
+            } else fallback
+        }
+
+        val bgColor = if (isDark) {
+            if (isBlack) 0xFF000000.toInt()
+            else if (useSystemColor) resolveAttrColor(com.google.android.material.R.attr.colorSurfaceContainerHigh, 0xFF181B22.toInt())
+            else 0xFF181B22.toInt()
+        } else {
+            if (useSystemColor) resolveAttrColor(com.google.android.material.R.attr.colorSurfaceContainerHigh, 0xFFFFFFFF.toInt())
+            else 0xFFFFFFFF.toInt()
+        }
+        val strokeColor = if (isDark) {
+            if (isBlack) 0x26FFFFFF.toInt()
+            else if (useSystemColor) resolveAttrColor(com.google.android.material.R.attr.colorOutlineVariant, 0x224E5766.toInt())
+            else 0x224E5766.toInt()
+        } else {
+            if (useSystemColor) resolveAttrColor(com.google.android.material.R.attr.colorOutlineVariant, 0x12000000.toInt())
+            else 0x12000000.toInt()
+        }
+        val cardDrawable = android.graphics.drawable.GradientDrawable().apply {
+            val dm = context.resources.displayMetrics
+            cornerRadius = 24 * dm.density
+            setColor(bgColor)
+            setStroke((1 * dm.density).toInt(), strokeColor)
+        }
+        dialog.window?.let { win ->
+            win.setBackgroundDrawable(cardDrawable)
+            val dm = context.resources.displayMetrics
+            val dialogWidth = minOf((dm.widthPixels * 0.92f).toInt(), (520 * dm.density).toInt())
+            win.setLayout(dialogWidth, android.view.ViewGroup.LayoutParams.WRAP_CONTENT)
+            win.setDimAmount(0.55f)
+            win.setGravity(android.view.Gravity.CENTER)
+        }
+
         binding.pairingCode.editText!!.doAfterTextChanged {
             binding.pairingCode.error = null
         }

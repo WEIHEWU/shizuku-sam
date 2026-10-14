@@ -49,6 +49,7 @@ import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.window.WindowDialog
+import moe.shizuku.manager.home.CenteredAppDialog
 import java.util.Locale
 
 @Composable
@@ -328,28 +329,14 @@ fun SettingsGlassScreen(
                 }
             }
 
-            // 底部版本提示
-            item(key = "footer-version") {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 16.dp, bottom = 24.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Shizuku Sam v13.8.5",
-                        fontSize = 11.5.sp,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                    )
-                }
-            }
+
         }
     }
 
     // Miuix 窗口级弹窗：端口修改
     var inputPort by remember(showPortDialog, tcpPort) { mutableStateOf(tcpPort.toString()) }
     var portDialogShowDesc by remember(showPortDialog) { mutableStateOf(false) }
-    WindowDialog(
+    CenteredAppDialog(
         show = showPortDialog,
         title = stringResource(R.string.settings_port_dialog_title),
         summary = if (portDialogShowDesc) "请输入 1 ~ 65535 之间的合法本地 TCP 端口号（建议保持默认 5555）。" else null,
@@ -401,7 +388,7 @@ fun SettingsGlassScreen(
         AppCompatDelegate.MODE_NIGHT_YES to stringResource(R.string.settings_night_mode_on),
         AppCompatDelegate.MODE_NIGHT_NO to stringResource(R.string.settings_night_mode_off)
     )
-    WindowDialog(
+    CenteredAppDialog(
         show = showNightModeDialog,
         title = stringResource(R.string.settings_night_mode_title),
         onDismissRequest = { showNightModeDialog = false }
@@ -479,7 +466,7 @@ fun SettingsGlassScreen(
     val prefTag = ShizukuSettings.getPreferences().getString(ShizukuSettings.LANGUAGE, "SYSTEM")
     val currentConfiguredLang = if (prefTag.isNullOrEmpty()) "SYSTEM" else prefTag
 
-    WindowDialog(
+    CenteredAppDialog(
         show = showLanguageDialog,
         title = stringResource(R.string.settings_section_language),
         onDismissRequest = { showLanguageDialog = false }

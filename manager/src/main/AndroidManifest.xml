@@ -116,12 +116,15 @@
             android:exported="false" />
         <activity
             android:name=".management.ApplicationManagementActivity"
+            android:theme="@style/Theme.App.ModalDialog"
             android:label="@string/home_app_management_title" />
         <activity
             android:name=".adb.AdbPairingTutorialActivity"
+            android:theme="@style/Theme.App.ModalDialog"
             android:label="@string/adb_pairing" />
         <activity
             android:name=".shell.ShellTutorialActivity"
+            android:theme="@style/Theme.App.ModalDialog"
             android:label="@string/home_terminal_title" />
         <activity
             android:name=".settings.SettingsActivity"
@@ -138,6 +141,7 @@
 
         <activity
             android:name=".starter.StarterActivity"
+            android:theme="@style/Theme.App.ModalDialog"
             android:launchMode="singleTop"
             android:label="@string/starter" />
         <activity

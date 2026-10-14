@@ -461,14 +461,18 @@ abstract class HomeActivity : MaxHzActivity() {
         onHelpClick = { handleHelpClick() },
         onAboutClick = { showAboutDialog() },
         onStopServiceClick = {
-            MaterialAlertDialogBuilder(this)
+            val dialog = MaterialAlertDialogBuilder(this)
                 .setMessage(R.string.dialog_stop_message)
                 .setPositiveButton(android.R.string.ok) { _, _ ->
                     ShizukuSettings.setLastSettledStateRunning(false)
                     try { Shizuku.exit() } catch (_: Throwable) {}
                 }
                 .setNegativeButton(android.R.string.cancel, null)
-                .show()
+                .create()
+            dialog.show()
+            val isDark = isDarkMode()
+            dialog.window?.setBackgroundDrawable(unifiedDialogCardBackground(isDark))
+            applyUnifiedDialogWindowStyle(dialog)
         },
         onConfirmStopService = {
             ShizukuSettings.setLastSettledStateRunning(false)
@@ -996,7 +1000,7 @@ abstract class HomeActivity : MaxHzActivity() {
     }
 
     private fun handleRestoreDefaultsClick() {
-        MaterialAlertDialogBuilder(this)
+        val dialog = MaterialAlertDialogBuilder(this)
             .setTitle(R.string.restore_defaults_dialog_title)
             .setMessage(R.string.restore_defaults_dialog_message)
             .setNegativeButton(android.R.string.cancel, null)
@@ -1026,7 +1030,11 @@ abstract class HomeActivity : MaxHzActivity() {
                     }
                 }
             }
-            .show()
+            .create()
+        dialog.show()
+        val isDark = isDarkMode()
+        dialog.window?.setBackgroundDrawable(unifiedDialogCardBackground(isDark))
+        applyUnifiedDialogWindowStyle(dialog)
     }
 
     private fun handleCalibrateLtpoAdaptiveClick() {
@@ -1050,7 +1058,7 @@ abstract class HomeActivity : MaxHzActivity() {
             getString(R.string.geek_lab_opt_process_manager),
             getString(R.string.geek_lab_opt_system_diagnostics)
         )
-        MaterialAlertDialogBuilder(this)
+        val dialog = MaterialAlertDialogBuilder(this)
             .setTitle(R.string.geek_lab_dialog_title)
             .setItems(options) { _, which ->
                 when (which) {
@@ -1060,7 +1068,11 @@ abstract class HomeActivity : MaxHzActivity() {
                 }
             }
             .setNegativeButton(R.string.dialog_close, null)
-            .show()
+            .create()
+        dialog.show()
+        val isDark = isDarkMode()
+        dialog.window?.setBackgroundDrawable(unifiedDialogCardBackground(isDark))
+        applyUnifiedDialogWindowStyle(dialog)
     }
 
     private fun handleUnlockRestrictedSettings() {
@@ -1142,11 +1154,15 @@ abstract class HomeActivity : MaxHzActivity() {
                 append("⚙️ 系统: Android ").append(android.os.Build.VERSION.RELEASE).append(" (API ").append(android.os.Build.VERSION.SDK_INT).append(")")
             }
 
-            MaterialAlertDialogBuilder(this@HomeActivity)
+            val dialog = MaterialAlertDialogBuilder(this@HomeActivity)
                 .setTitle(R.string.geek_lab_opt_system_diagnostics)
                 .setMessage(msg)
                 .setPositiveButton(R.string.dialog_close, null)
-                .show()
+                .create()
+            dialog.show()
+            val isDark = isDarkMode()
+            dialog.window?.setBackgroundDrawable(unifiedDialogCardBackground(isDark))
+            applyUnifiedDialogWindowStyle(dialog)
         }
     }
 
@@ -1585,7 +1601,7 @@ abstract class HomeActivity : MaxHzActivity() {
     }
 
     private fun handleStartAdbClick() {
-        MaterialAlertDialogBuilder(this)
+        val dialog = MaterialAlertDialogBuilder(this)
             .setTitle(R.string.home_adb_button_view_command)
             .setMessage(
                 HtmlCompat.fromHtml(
@@ -1609,7 +1625,11 @@ abstract class HomeActivity : MaxHzActivity() {
                 }
                 startActivity(Intent.createChooser(intent, getString(R.string.home_adb_dialog_view_command_button_send)))
             }
-            .show()
+            .create()
+        dialog.show()
+        val isDark = isDarkMode()
+        dialog.window?.setBackgroundDrawable(unifiedDialogCardBackground(isDark))
+        applyUnifiedDialogWindowStyle(dialog)
     }
 
     private fun handleStartRootClick() {
@@ -1635,9 +1655,13 @@ abstract class HomeActivity : MaxHzActivity() {
             )
         )
         binding.versionName.text = packageManager.getPackageInfo(packageName, 0).versionName
-        MaterialAlertDialogBuilder(this)
+        val dialog = MaterialAlertDialogBuilder(this)
             .setView(binding.root)
-            .show()
+            .create()
+        dialog.show()
+        val isDark = isDarkMode()
+        dialog.window?.setBackgroundDrawable(unifiedDialogCardBackground(isDark))
+        applyUnifiedDialogWindowStyle(dialog)
     }
 
     override fun pushDetail(
@@ -1753,7 +1777,7 @@ abstract class HomeActivity : MaxHzActivity() {
                 if (!Shizuku.pingBinder()) {
                     return true
                 }
-                MaterialAlertDialogBuilder(this)
+                val dialog = MaterialAlertDialogBuilder(this)
                     .setMessage(R.string.dialog_stop_message)
                     .setPositiveButton(android.R.string.ok) { _: DialogInterface?, _: Int ->
                         ShizukuSettings.setLastSettledStateRunning(false)
@@ -1763,7 +1787,11 @@ abstract class HomeActivity : MaxHzActivity() {
                         }
                     }
                     .setNegativeButton(android.R.string.cancel, null)
-                    .show()
+                    .create()
+                dialog.show()
+                val isDark = isDarkMode()
+                dialog.window?.setBackgroundDrawable(unifiedDialogCardBackground(isDark))
+                applyUnifiedDialogWindowStyle(dialog)
                 true
             }
             R.id.action_settings -> {

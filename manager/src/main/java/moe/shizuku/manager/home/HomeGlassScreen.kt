@@ -429,7 +429,7 @@ fun ShizukuHomeScreen(
         // ==========================================================
         // Miuix WindowDialog 1：停止 Shizuku 服务确认弹窗（独立顶层 Window，不惧底部悬浮栏遮挡）
         // ==========================================================
-        WindowDialog(
+        CenteredAppDialog(
             show = showStopConfirmDialog,
             title = "停止 Shizuku 服务",
             summary = stringResource(R.string.dialog_stop_message),
@@ -730,7 +730,7 @@ private fun MiuixBatteryProtectionDialog(
     }
     var isWorking by remember(show) { mutableStateOf(false) }
 
-    WindowDialog(
+    CenteredAppDialog(
         show = show,
         title = "充电上限保护",
         summary = if (showDesc) "自定义充电截止电量与恢复充电阈值，达到上限后自动停止充电以延长电池循环寿命。" else null,
@@ -905,7 +905,7 @@ private fun MiuixBatteryInfoDialog(
         }
     }
 
-    WindowDialog(
+    CenteredAppDialog(
         show = show,
         title = "电池运行信息与健康度",
         summary = if (showDesc) "显示当前电量、温度、充电状态、电流、电压、循环数、三星健康度等实时硬件信息。" else null,

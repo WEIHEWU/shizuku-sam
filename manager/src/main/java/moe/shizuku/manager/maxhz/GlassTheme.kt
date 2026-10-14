@@ -101,25 +101,48 @@ fun GlassAppTheme(
         }
     }
 
-    val miuixColors = remember(isDark, primaryColor) {
+    val useSystem = ThemeHelper.isUsingSystemColor()
+    val miuixColors = remember(isDark, useSystem, primaryColor, colorScheme) {
         if (isDark) {
-            top.yukonga.miuix.kmp.theme.darkColorScheme(
-                primary = primaryColor,
-                primaryVariant = primaryColor,
-                surface = Color(0xFF0D0F12),
-                background = Color(0xFF0D0F12),
-                surfaceContainer = Color(0xFF181A20),
-                surfaceVariant = Color(0xFF181A20)
-            )
+            if (useSystem && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                top.yukonga.miuix.kmp.theme.darkColorScheme(
+                    primary = primaryColor,
+                    primaryVariant = primaryColor,
+                    surface = colorScheme.surface,
+                    background = colorScheme.background,
+                    surfaceContainer = colorScheme.surfaceContainer,
+                    surfaceVariant = colorScheme.surfaceContainerHigh
+                )
+            } else {
+                top.yukonga.miuix.kmp.theme.darkColorScheme(
+                    primary = primaryColor,
+                    primaryVariant = primaryColor,
+                    surface = Color(0xFF0D0F12),
+                    background = Color(0xFF0D0F12),
+                    surfaceContainer = Color(0xFF181A20),
+                    surfaceVariant = Color(0xFF181A20)
+                )
+            }
         } else {
-            top.yukonga.miuix.kmp.theme.lightColorScheme(
-                primary = primaryColor,
-                primaryVariant = primaryColor,
-                surface = Color(0xFFF5F6F9),
-                background = Color(0xFFF5F6F9),
-                surfaceContainer = Color(0xFFFFFFFF),
-                surfaceVariant = Color(0xFFFFFFFF)
-            )
+            if (useSystem && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                top.yukonga.miuix.kmp.theme.lightColorScheme(
+                    primary = primaryColor,
+                    primaryVariant = primaryColor,
+                    surface = colorScheme.surface,
+                    background = colorScheme.background,
+                    surfaceContainer = colorScheme.surfaceContainer,
+                    surfaceVariant = colorScheme.surfaceContainerHigh
+                )
+            } else {
+                top.yukonga.miuix.kmp.theme.lightColorScheme(
+                    primary = primaryColor,
+                    primaryVariant = primaryColor,
+                    surface = Color(0xFFF5F6F9),
+                    background = Color(0xFFF5F6F9),
+                    surfaceContainer = Color(0xFFFFFFFF),
+                    surfaceVariant = Color(0xFFFFFFFF)
+                )
+            }
         }
     }
 

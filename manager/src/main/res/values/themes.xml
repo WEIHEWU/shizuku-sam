@@ -31,6 +31,15 @@
         <item name="android:popupBackground">@drawable/bg_popup_menu_dark</item>
     </style>
 
+    <style name="ShapeAppearance.App.DialogCorner" parent="ShapeAppearance.Material3.Corner.ExtraLarge">
+        <item name="cornerSize">24dp</item>
+    </style>
+
+    <style name="ThemeOverlay.App.MaterialAlertDialog" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <item name="dialogCornerRadius">24dp</item>
+        <item name="shapeAppearanceCornerExtraLarge">@style/ShapeAppearance.App.DialogCorner</item>
+    </style>
+
     <style name="Base.AppTheme.Light" parent="Theme.Material3.Light.Shizuku">
         <item name="android:statusBarColor">?android:colorBackground</item>
 
@@ -42,6 +51,8 @@
         <item name="colorSurfaceContainerLow">#FFFFFFFF</item>
         <item name="colorSurfaceContainerHigh">#FFFFFFFF</item>
         <item name="colorSurfaceContainerHighest">#FFFFFFFF</item>
+        <item name="materialAlertDialogTheme">@style/ThemeOverlay.App.MaterialAlertDialog</item>
+        <item name="alertDialogTheme">@style/ThemeOverlay.App.MaterialAlertDialog</item>
         <item name="android:popupBackground">@drawable/bg_popup_menu_light</item>
         <item name="popupMenuBackground">@drawable/bg_popup_menu_light</item>
         <item name="actionBarPopupTheme">@style/ThemeOverlay.App.PopupMenu</item>
@@ -65,6 +76,8 @@
         <item name="colorSurfaceContainerLow">#FF1E222A</item>
         <item name="colorSurfaceContainerHigh">#FF1E222A</item>
         <item name="colorSurfaceContainerHighest">#FF1E222A</item>
+        <item name="materialAlertDialogTheme">@style/ThemeOverlay.App.MaterialAlertDialog</item>
+        <item name="alertDialogTheme">@style/ThemeOverlay.App.MaterialAlertDialog</item>
         <item name="android:popupBackground">@drawable/bg_popup_menu_dark</item>
         <item name="popupMenuBackground">@drawable/bg_popup_menu_dark</item>
         <item name="actionBarPopupTheme">@style/ThemeOverlay.App.PopupMenu.Dark</item>
