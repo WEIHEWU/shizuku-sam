@@ -114,8 +114,31 @@ jobs:
           files: |
             releases/Shizuku-Sam-v13.8.8.apk
 
+      - name: Publish Release v13.8.9 (Android 17 ACCESS_LOCAL_NETWORK Runtime Grant, Android17Compat Deep Integration, Relaxed Discovery Timeouts)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v13.8.9
+          name: "Shizuku Sam v13.8.9 — 深度融合 thedjchi / Nightzuku Android 17 网络权限补丁与服务端反射兼容"
+          body: |
+            ### Shizuku Sam v13.8.9
+
+            #### 🌐 Android 17 / One UI 9 无线配对与局域网网络权限深度修复
+            - **`ACCESS_LOCAL_NETWORK` (SDK 37) 与 `NEARBY_WIFI_DEVICES` (SDK 36) 运行时主动申请 (`AdbPairingTutorialActivity.kt`)**：
+              - 适配 Android 17 / One UI 9 对本地网络沙盒的强力管控。在启动无线配对前台服务前，主动发起运行时权限申请，彻底解决 Android 17 系统弹出的死循环「选择要连接的设备」设备选择器（Choose a device to connect）弹窗拦截；
+            - **服务端 Android 17 反射兼容层全面整合 (`Android17Compat.java` / `InstalledPackagesCompat.java`)**：
+              - 针对 Android 17 底层 `IPermissionManager` 引入的 `deviceId = 0` 参数与 5 参数的 `revokeRuntimePermission`，以及 `flags` 全面迁移为 `long` 的变动，在 `ShizukuService`、`ShizukuConfigManager`、`BinderSender` 与 `ShizukuUserServiceManager` 中全面采用动态签名自适应反射兼容，杜绝底层 `NoSuchMethodError`；
+              - 服务端应用枚举全面迁移至 `InstalledPackagesCompat`，自动兼容 `PackageInfoList` 与 `ParceledListSlice` 双数据结构；
+            - **慢速与负载场景超时容错放宽**：
+              - mDNS 搜索发现超时放宽至 45 秒，Binder 启动等待从 20 秒提升至 60 秒，大幅改善开机初期的启动与连接稳定性。
+
+            #### 🔄 核心协议与防杀体系
+            - 100% 对齐原生 Shizuku 核心协议；
+            - 保留 Watchdog `specialUse` 服务、`AotCompileService` 前台服务带 WakeLock，以及 16KB 内存页面对齐。
+          files: |
+            releases/Shizuku-Sam-v13.8.9.apk
+
       - name: Publish Future Version Tag Release
-        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2' && github.ref_name != 'v13.8.3' && github.ref_name != 'v13.8.4' && github.ref_name != 'v13.8.5' && github.ref_name != 'v13.8.6' && github.ref_name != 'v13.8.7' && github.ref_name != 'v13.8.8'
+        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2' && github.ref_name != 'v13.8.3' && github.ref_name != 'v13.8.4' && github.ref_name != 'v13.8.5' && github.ref_name != 'v13.8.6' && github.ref_name != 'v13.8.7' && github.ref_name != 'v13.8.8' && github.ref_name != 'v13.8.9'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}

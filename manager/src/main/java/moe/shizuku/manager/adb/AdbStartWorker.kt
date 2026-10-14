@@ -123,7 +123,7 @@ class AdbStartWorker(
                         adbMdns.start()
                         timeoutJob?.cancel()
                         timeoutJob = launch {
-                            delay(15_000L)
+                            delay(45_000L)
                             close(TimeoutException("Timed out during mDNS port discovery"))
                         }
                     }

@@ -1,13 +1,16 @@
 package moe.shizuku.manager.adb
 
+import android.Manifest
 import android.app.AppOpsManager
 import android.app.ForegroundServiceStartNotAllowedException
 import android.app.NotificationManager
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
+import androidx.activity.result.contract.ActivityResultContracts
 import android.provider.Settings
 import android.util.Log
 import android.util.TypedValue
@@ -188,7 +191,30 @@ class AdbPairingTutorialActivity : AppActivity() {
         super.onDestroy()
     }
 
+    // Android 17 (SDK 37) 将局域网访问限制在 ACCESS_LOCAL_NETWORK 运行时权限之后；
+    // Android 16 (SDK 36) 使用 NEARBY_WIFI_DEVICES。
+    // 若未在运行时获批，系统会在发起配对时弹出无限死循环的选择设备框 (Choose a device to connect)。
+    private fun localNetworkPermission(): String? = when {
+        Build.VERSION.SDK_INT >= 37 -> "android.permission.ACCESS_LOCAL_NETWORK"
+        Build.VERSION.SDK_INT >= 36 -> Manifest.permission.NEARBY_WIFI_DEVICES
+        else -> null
+    }
+
+    private val localNetworkPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) {
+            doStartPairingService()
+        }
+
     private fun startPairingService() {
+        val permission = localNetworkPermission()
+        if (permission != null && checkSelfPermission(permission) != PackageManager.PERMISSION_GRANTED) {
+            localNetworkPermissionLauncher.launch(permission)
+        } else {
+            doStartPairingService()
+        }
+    }
+
+    private fun doStartPairingService() {
         val intent = AdbPairingService.startIntent(this)
         try {
             startForegroundService(intent)
