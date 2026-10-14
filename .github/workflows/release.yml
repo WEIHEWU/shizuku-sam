@@ -137,7 +137,7 @@ jobs:
           files: |
             releases/Shizuku-Sam-v13.8.9.apk
 
-      - name: Publish Release v13.8.10 (Plan A: Segmented Tabs in AOT Picker Dialog)
+      - name: "Publish Release v13.8.10 (Plan A Segmented Tabs in AOT Picker Dialog)"
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v13.8.10
