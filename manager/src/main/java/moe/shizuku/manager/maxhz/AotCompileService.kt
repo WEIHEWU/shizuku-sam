@@ -254,8 +254,12 @@ class AotCompileService : Service() {
 
             val totalSec = (SystemClock.elapsedRealtime() - batchStartMs) / 1000L
 
-            if (succeededPkgs.isNotEmpty() && !isReset) {
-                MaxHzPrefs.recordMDexoptCompiled(applicationContext, succeededPkgs, compileMode)
+            if (succeededPkgs.isNotEmpty()) {
+                MaxHzPrefs.recordMDexoptCompiled(
+                    applicationContext,
+                    succeededPkgs,
+                    if (isReset) "reset" else compileMode
+                )
             }
 
             val wasCancelled = isCancelled.get()

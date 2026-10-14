@@ -305,6 +305,11 @@ open class MaxHzActivity : AppBarActivity() {
         SYSTEM
     }
 
+    private enum class AotPickerTab {
+        UNCOMPILED,
+        COMPILED
+    }
+
     private enum class MPage {
         MAIN,
         GRAPHICS,
@@ -5108,19 +5113,31 @@ open class MaxHzActivity : AppBarActivity() {
             val compiledMap = MaxHzPrefs.mDexoptCompiledMap(this@MaxHzActivity).toMutableMap()
             val iconCache = mutableMapOf<String, Drawable?>()
             val selectedPackages = linkedSetOf<String>()
+            var currentTab = AotPickerTab.UNCOMPILED
             var selectedFilter = if (allApps.any { !it.systemApp }) AppListFilter.USER else AppListFilter.ALL
             var compileMode = "speed-profile" // 默认推荐热点极速编译（1~3秒完成，兼顾速度与体积）
             var searchQuery = ""
             val visibleApps = mutableListOf<UserAppChoice>()
 
+            lateinit var tabContainer: LinearLayout
             lateinit var modeContainer: LinearLayout
             lateinit var modeDescView: TextView
             lateinit var filterContainer: LinearLayout
             lateinit var selectionCountView: TextView
+            lateinit var emptyHintView: TextView
+            lateinit var listView: ListView
             lateinit var listAdapter: ArrayAdapter<UserAppChoice>
+            var pickerDialog: androidx.appcompat.app.AlertDialog? = null
 
             fun filteredApps(): List<UserAppChoice> {
                 return allApps.filter { app ->
+                    val isCompiled = compiledMap.containsKey(app.packageName)
+                    val matchesTab = when (currentTab) {
+                        AotPickerTab.UNCOMPILED -> !isCompiled
+                        AotPickerTab.COMPILED -> isCompiled
+                    }
+                    if (!matchesTab) return@filter false
+
                     val matchesFilter = when (selectedFilter) {
                         AppListFilter.ALL -> true
                         AppListFilter.USER -> !app.systemApp
@@ -5135,11 +5152,21 @@ open class MaxHzActivity : AppBarActivity() {
             }
 
             fun updateSelectionSummary() {
-                val compiledCount = compiledMap.size
-                selectionCountView.text = if (compiledCount > 0) {
-                    "已选 ${selectedPackages.size} 个 · 已编译 $compiledCount 个"
+                val tabTotal = filteredApps().size
+                val tabLabel = if (currentTab == AotPickerTab.UNCOMPILED) "未编译" else "已编译"
+                selectionCountView.text = if (selectedPackages.isNotEmpty()) {
+                    "已勾选 ${selectedPackages.size} 个 · $tabLabel $tabTotal 个"
                 } else {
-                    "已勾选 ${selectedPackages.size} 个应用"
+                    "${tabLabel}共 $tabTotal 个应用"
+                }
+            }
+
+            fun updateDialogButtons() {
+                val btn = pickerDialog?.getButton(android.content.DialogInterface.BUTTON_POSITIVE) ?: return
+                btn.text = when {
+                    compileMode == "reset" -> "清除缓存"
+                    currentTab == AotPickerTab.COMPILED -> "重新编译"
+                    else -> "开始编译"
                 }
             }
 
@@ -5148,40 +5175,32 @@ open class MaxHzActivity : AppBarActivity() {
                 visibleApps.addAll(filteredApps())
                 listAdapter.notifyDataSetChanged()
                 updateSelectionSummary()
-            }
 
-            fun updateModeChips() {
-                modeContainer.removeAllViews()
-                val modes = listOf(
-                    "speed-profile" to "热点极速",
-                    "speed" to "全量编译",
-                    "reset" to "重置缓存"
-                )
-                modes.forEachIndexed { idx, (modeKey, label) ->
-                    modeContainer.addView(
-                        filterChip(label, compileMode == modeKey) {
-                            compileMode = modeKey
-                            updateModeChips()
-                        },
-                        LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-                            if (idx > 0) leftMargin = dp(6)
-                        }
-                    )
-                }
-                modeDescView.text = when (compileMode) {
-                    "speed-profile" -> "⚡ 热点极速（默认推荐 · speed-profile）：仅编译日常高频调用的 10%~20% 启动与滑动代码。单应用仅需 1~3 秒、占 10~30MB 空间，即可获得约 90% 流畅度提升，适合绝大多数日常应用。"
-                    "speed" -> "🔥 全量编译（深度拉满 · speed）：强制将应用内 100% 所有类与插件 SDK 全部编译为原生机器码。大型应用耗时 15~60 秒、占 100~400MB 空间，适合最重度使用的 3~5 个主力应用（如微信/大型游戏）或新装应用。"
-                    else -> "🧹 重置缓存（--reset）：清除所选应用已生成的本地机器码（.odex）编译缓存，释放存储空间并恢复系统初始状态。"
+                if (visibleApps.isEmpty()) {
+                    emptyHintView.visibility = View.VISIBLE
+                    listView.visibility = View.GONE
+                    emptyHintView.text = when {
+                        searchQuery.isNotBlank() -> "🔍 未找到匹配的应用"
+                        currentTab == AotPickerTab.COMPILED -> "暂无已编译应用\n请先在「⚡ 未编译」中勾选应用进行加速优化"
+                        else -> "🎉 所有应用均已完成编译加速"
+                    }
+                } else {
+                    emptyHintView.visibility = View.GONE
+                    listView.visibility = View.VISIBLE
                 }
             }
 
             fun updateFilterChips() {
                 filterContainer.removeAllViews()
-                val userCount = allApps.count { !it.systemApp }
-                val sysCount = allApps.count { it.systemApp }
+                val tabApps = allApps.filter { app ->
+                    if (currentTab == AotPickerTab.UNCOMPILED) !compiledMap.containsKey(app.packageName)
+                    else compiledMap.containsKey(app.packageName)
+                }
+                val userCount = tabApps.count { !it.systemApp }
+                val sysCount = tabApps.count { it.systemApp }
                 listOf(
                     AppListFilter.USER to "用户 ($userCount)",
-                    AppListFilter.ALL to "全部 (${allApps.size})",
+                    AppListFilter.ALL to "全部 (${tabApps.size})",
                     AppListFilter.SYSTEM to "系统 ($sysCount)"
                 ).forEachIndexed { idx, (filter, label) ->
                     filterContainer.addView(
@@ -5197,10 +5216,97 @@ open class MaxHzActivity : AppBarActivity() {
                 }
             }
 
+            fun updateModeChips() {
+                modeContainer.removeAllViews()
+                val modes = if (currentTab == AotPickerTab.UNCOMPILED) {
+                    listOf(
+                        "speed-profile" to "热点极速",
+                        "speed" to "全量编译"
+                    )
+                } else {
+                    listOf(
+                        "speed-profile" to "热点极速",
+                        "speed" to "全量编译",
+                        "reset" to "重置缓存"
+                    )
+                }
+                modes.forEachIndexed { idx, (modeKey, label) ->
+                    modeContainer.addView(
+                        filterChip(label, compileMode == modeKey) {
+                            compileMode = modeKey
+                            updateModeChips()
+                            updateDialogButtons()
+                        },
+                        LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                            if (idx > 0) leftMargin = dp(6)
+                        }
+                    )
+                }
+                modeDescView.text = when (compileMode) {
+                    "speed-profile" -> "⚡ 热点极速（默认推荐 · speed-profile）：仅编译日常高频调用的 10%~20% 核心代码。耗时仅 1~3 秒、占 10~30MB 空间，即可获得约 90% 流畅度提升，兼顾速度与空间。"
+                    "speed" -> "🔥 全量编译（深度拉满 · speed）：将应用内 100% 所有类与组件全部编译为原生机器码。大型应用耗时 15~60 秒、占 100~400MB 空间，适合重度主力应用或游戏。"
+                    else -> "🧹 重置缓存（--reset）：清除所选应用生成的本地机器码（.odex）编译缓存，释放存储空间并恢复系统初始运行状态。"
+                }
+            }
+
+            fun updateTabs() {
+                tabContainer.removeAllViews()
+                val uncompiledCount = allApps.count { !compiledMap.containsKey(it.packageName) }
+                val compiledCount = allApps.count { compiledMap.containsKey(it.packageName) }
+
+                val tabs = listOf(
+                    AotPickerTab.UNCOMPILED to "⚡ 未编译 ($uncompiledCount)",
+                    AotPickerTab.COMPILED to "✅ 已编译 ($compiledCount)"
+                )
+
+                tabs.forEachIndexed { idx, (tab, title) ->
+                    val isSelected = currentTab == tab
+                    val tabView = TextView(this@MaxHzActivity).apply {
+                        text = title
+                        gravity = Gravity.CENTER
+                        textSize = 13.5f
+                        setTypeface(typeface, if (isSelected) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
+                        setTextColor(if (isSelected) 0xFFFFFFFF.toInt() else themeColors.onSurfaceVariant)
+                        includeFontPadding = false
+                        minHeight = dp(38)
+                        background = GradientDrawable().apply {
+                            cornerRadius = dp(11).toFloat()
+                            if (isSelected) {
+                                setColor(if (isDark) 0xFF277AF7.toInt() else 0xFF3482FF.toInt())
+                            } else {
+                                setColor(android.graphics.Color.TRANSPARENT)
+                            }
+                        }
+                        isClickable = true
+                        isFocusable = true
+                        setOnClickListener {
+                            if (currentTab == tab) return@setOnClickListener
+                            playClickFeedback(this)
+                            currentTab = tab
+                            selectedPackages.clear()
+                            if (currentTab == AotPickerTab.UNCOMPILED && compileMode == "reset") {
+                                compileMode = "speed-profile"
+                            }
+                            updateTabs()
+                            updateModeChips()
+                            updateFilterChips()
+                            refreshList()
+                            updateDialogButtons()
+                        }
+                    }
+                    tabContainer.addView(
+                        tabView,
+                        LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                            if (idx > 0) leftMargin = dp(4)
+                        }
+                    )
+                }
+            }
+
             var showDialogSubtitles = false
             val expandedRowPkgs = mutableSetOf<String>()
 
-            val listView = ListView(this@MaxHzActivity).apply {
+            listView = ListView(this@MaxHzActivity).apply {
                 dividerHeight = 0
                 listAdapter = object : ArrayAdapter<UserAppChoice>(
                     this@MaxHzActivity,
@@ -5265,6 +5371,22 @@ open class MaxHzActivity : AppBarActivity() {
                                             LinearLayout.LayoutParams.WRAP_CONTENT,
                                             LinearLayout.LayoutParams.WRAP_CONTENT
                                         ).apply { leftMargin = dp(6) })
+                                    } else {
+                                        addView(TextView(this@MaxHzActivity).apply {
+                                            text = "未编译"
+                                            textSize = 10.5f
+                                            setTextColor(if (isDark) 0xFF94A3B8.toInt() else 0xFF64748B.toInt())
+                                            setTypeface(typeface, android.graphics.Typeface.NORMAL)
+                                            includeFontPadding = false
+                                            setPadding(dp(7), dp(2), dp(7), dp(2))
+                                            background = GradientDrawable().apply {
+                                                cornerRadius = dp(999).toFloat()
+                                                setColor(if (isDark) 0x1FFFFFFF else 0x0F000000)
+                                            }
+                                        }, LinearLayout.LayoutParams(
+                                            LinearLayout.LayoutParams.WRAP_CONTENT,
+                                            LinearLayout.LayoutParams.WRAP_CONTENT
+                                        ).apply { leftMargin = dp(6) })
                                     }
                                 })
                                 if (showSub) {
@@ -5313,9 +5435,32 @@ open class MaxHzActivity : AppBarActivity() {
                 }
             }
 
+            emptyHintView = TextView(this@MaxHzActivity).apply {
+                gravity = Gravity.CENTER
+                textSize = 13.5f
+                setTextColor(themeColors.onSurfaceVariant)
+                setLineSpacing(0f, 1.3f)
+                setPadding(dp(16), dp(40), dp(16), dp(40))
+                visibility = View.GONE
+            }
+
             val rootView = LinearLayout(this@MaxHzActivity).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(dp(18), dp(8), dp(18), 0)
+
+                tabContainer = LinearLayout(this@MaxHzActivity).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    setPadding(dp(4), dp(4), dp(4), dp(4))
+                    background = GradientDrawable().apply {
+                        cornerRadius = dp(14).toFloat()
+                        setColor(if (isDark) 0xFF20232B.toInt() else 0xFFEAEFF8.toInt())
+                    }
+                }
+                addView(tabContainer, LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { bottomMargin = dp(10) })
 
                 modeContainer = LinearLayout(this@MaxHzActivity).apply {
                     orientation = LinearLayout.HORIZONTAL
@@ -5371,7 +5516,7 @@ open class MaxHzActivity : AppBarActivity() {
                     gravity = Gravity.CENTER_VERTICAL
                     setPadding(dp(4), 0, dp(4), dp(6))
                     selectionCountView = TextView(this@MaxHzActivity).apply {
-                        text = "已勾选 0 个应用"
+                        text = "未编译共 0 个应用"
                         textSize = 12f
                         setTextColor(themeColors.primary)
                         setTypeface(typeface, android.graphics.Typeface.BOLD)
@@ -5412,26 +5557,38 @@ open class MaxHzActivity : AppBarActivity() {
                     })
                 })
 
-                addView(listView, LinearLayout.LayoutParams(
+                val listContainer = FrameLayout(this@MaxHzActivity).apply {
+                    addView(listView, FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        FrameLayout.LayoutParams.MATCH_PARENT
+                    ))
+                    addView(emptyHintView, FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        FrameLayout.LayoutParams.MATCH_PARENT
+                    ))
+                }
+                addView(listContainer, LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     dp(330)
                 ))
 
+                updateTabs()
                 updateModeChips()
                 updateFilterChips()
                 refreshList()
             }
 
-            val pickerDialog = MaterialAlertDialogBuilder(this@MaxHzActivity)
+            pickerDialog = MaterialAlertDialogBuilder(this@MaxHzActivity)
                 .setTitle("自选应用 ART 预编译加速")
                 .setView(rootView)
                 .setNegativeButton("取消", null)
                 .setPositiveButton("开始执行", null)
                 .show()
 
-            pickerDialog.getButton(android.content.DialogInterface.BUTTON_POSITIVE)?.setOnClickListener {
+            pickerDialog?.getButton(android.content.DialogInterface.BUTTON_POSITIVE)?.setOnClickListener {
                 if (selectedPackages.isEmpty()) {
-                    Toast.makeText(this@MaxHzActivity, "请至少勾选 1 个需要操作的应用", Toast.LENGTH_SHORT).show()
+                    val actionVerb = if (compileMode == "reset") "清除缓存" else "编译加速"
+                    Toast.makeText(this@MaxHzActivity, "请至少勾选 1 个需要${actionVerb}的应用", Toast.LENGTH_SHORT).show()
                     return@setOnClickListener
                 }
                 val appMap = allApps.associateBy { it.packageName }
@@ -5439,9 +5596,10 @@ open class MaxHzActivity : AppBarActivity() {
                     val app = appMap[pkg]
                     pkg to (app?.label ?: pkg)
                 }
-                pickerDialog.dismiss()
+                pickerDialog?.dismiss()
                 runSelectedAppsAotWithProgress(targetList, compileMode, onCompleteState)
             }
+            updateDialogButtons()
         }
     }
 

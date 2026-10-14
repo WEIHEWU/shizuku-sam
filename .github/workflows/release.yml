@@ -137,8 +137,35 @@ jobs:
           files: |
             releases/Shizuku-Sam-v13.8.9.apk
 
+      - name: Publish Release v13.8.10 (Plan A: Segmented Tabs in AOT Picker Dialog)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v13.8.10
+          name: "Shizuku Sam v13.8.10 — 自选应用 ART 预编译双分类分栏（方案 A 顶部分段选择器）"
+          body: |
+            ### Shizuku Sam v13.8.10
+
+            #### ⚡ 自选应用 ART 预编译加速双分类分栏体系（方案 A）
+            - **顶部 One UI 9 风格分段选择器（Segmented Tabs）**：
+              - 「⚡ 未编译 (N)」与「✅ 已编译 (M)」双分栏设计，默认进入「未编译」视图，分类清晰直观；
+              - 切换标签页具备 One UI 触控震动反馈与安全防误触机制，标签页间自动隔离勾选状态；
+            - **模式选择与操作按钮动态智能联动**：
+              - 「未编译」标签页智能隐藏无意义的「重置缓存」，聚焦「热点极速」与「全量编译」，底部按钮呈现「开始编译」；
+              - 「已编译」标签页提供「热点极速」、「全量编译」与「重置缓存」三重选项，选择「重置缓存」时按钮联动更新为「清除缓存」；
+            - **双向缓存状态同步与精准列表过滤**：
+              - 修复 `AotCompileService` 缓存重置后未更新 Shizuku Prefs 记录的问题，成功重置后应用无缝回流至「未编译」标签页；
+              - 列表项支持「已全量 / 已热点 / 未编译」全状态胶囊徽标展示；
+              - 搜索栏与「用户 / 全部 / 系统」子分类芯片与当前标签页完全联动，并新增优雅的空状态提示。
+
+            #### 🔄 核心协议与防杀体系
+            - 100% 对齐原生 Shizuku 核心协议；
+            - 延续 Android 17 / One UI 9 `ACCESS_LOCAL_NETWORK` 运行时权限主动申请与底层反射兼容层；
+            - 保留 Watchdog `specialUse` 服务、`AotCompileService` 前台服务带 WakeLock，以及 16KB 内存页面对齐。
+          files: |
+            releases/Shizuku-Sam-v13.8.10.apk
+
       - name: Publish Future Version Tag Release
-        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2' && github.ref_name != 'v13.8.3' && github.ref_name != 'v13.8.4' && github.ref_name != 'v13.8.5' && github.ref_name != 'v13.8.6' && github.ref_name != 'v13.8.7' && github.ref_name != 'v13.8.8' && github.ref_name != 'v13.8.9'
+        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2' && github.ref_name != 'v13.8.3' && github.ref_name != 'v13.8.4' && github.ref_name != 'v13.8.5' && github.ref_name != 'v13.8.6' && github.ref_name != 'v13.8.7' && github.ref_name != 'v13.8.8' && github.ref_name != 'v13.8.9' && github.ref_name != 'v13.8.10'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}

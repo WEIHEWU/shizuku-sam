@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <a href="./README.md">简体中文</a> | <a href="./README.en.md">English</a> | <a href="https://github.com/WEIHEWU/shizuku-sam/releases/latest"><b>⬇️ Download Latest Release (v13.8.9)</b></a>
+  <a href="./README.md">简体中文</a> | <a href="./README.en.md">English</a> | <a href="https://github.com/WEIHEWU/shizuku-sam/releases/latest"><b>⬇️ Download Latest Release (v13.8.10)</b></a>
 </p>
 
 ---
@@ -15,7 +15,7 @@
 
 **Shizuku Sam** integrates the **Shizuku privileged service** with a purpose-built **Samsung Galaxy (One UI) system scheduler & hardware enhancer, background & deep sleep controller, and per-app refresh rate rule manager** in a single cohesive application.
 
-The entire app (Level 1, Level 2, Level 3 screens, and all dialogs) is unified under the **Miuix (`top.yukonga.miuix.kmp`) UI system**, a **3-tab Liquid Glass floating dock (`Shizuku` · `Hardware` · `App Rules`)**, and **on-demand subtitle toggles (clean single-line titles by default + long-press any row/card to toggle its explanation in place + a `显示说明 / 隐藏说明` pill button on every section/page header)**. Every section, card title, switch, and secondary screen listed below corresponds 1:1 with the actual `v13.8.9` app UI, with 100% full adaptation for **Samsung One UI 9 / Android 17**.
+The entire app (Level 1, Level 2, Level 3 screens, and all dialogs) is unified under the **Miuix (`top.yukonga.miuix.kmp`) UI system**, a **3-tab Liquid Glass floating dock (`Shizuku` · `Hardware` · `App Rules`)**, and **on-demand subtitle toggles (clean single-line titles by default + long-press any row/card to toggle its explanation in place + a `显示说明 / 隐藏说明` pill button on every section/page header)**. Every section, card title, switch, and secondary screen listed below corresponds 1:1 with the actual `v13.8.10` app UI, with 100% full adaptation for **Samsung One UI 9 / Android 17**.
 
 ---
 
@@ -71,7 +71,7 @@ The entire app (Level 1, Level 2, Level 3 screens, and all dialogs) is unified u
 - **`Battery Info & Health`**: Opens a scrollable Miuix `WindowDialog` reading real-time battery level, temperature, charging status, current, voltage, cycle count, and Samsung factory health, with a **`Refresh Data`** button.
 - **`App Cold Launch Boost & Cleanup`** (Tap to open the **`App Launch Boost`** secondary screen):
   - Card 1 **`ART Machine Code Precompilation`** (`v13.8.7` Plan A UI overhaul with Foreground Service + real-time notification/status-bar progress & CPU WakeLock keepalive): Four action buttons:
-    - **`Selected Apps Precompile`** (`自选应用编译`): Multi-select app picker supporting **`Profile-Guided (Recommended)` (`speed-profile`)**, **`Full Speed` (`speed`)**, and **`Reset Cache` (`--reset`)**, real-time compilation progress with one-click **`Send to Background`** (`转到后台`);
+    - **`Selected Apps Precompile`** (`自选应用编译`) (`v13.8.10` Plan A Segmented Tabs upgrade): Multi-select app picker featuring One UI 9 styled Segmented Tabs for **`⚡ Not Compiled (N)`** and **`✅ Compiled (M)`**, isolated selection safety, **`Profile-Guided (Recommended)` (`speed-profile`)**, **`Full Speed` (`speed`)**, and **`Reset Cache` (`--reset`)**, real-time compilation progress with one-click **`Send to Background`** (`转到后台`);
     - **`Optimize System & Launcher`** (`优化系统与桌面`): Runs profile-guided speed optimization on Launcher, SystemUI, and system core components for instant butter-smooth navigation;
     - **`Optimize All Apps`** (`全部应用极速优化`): Batch optimizes all installed apps using `speed-profile` to eliminate cold launch lag across the system;
     - **`Clear Compiled Cache`** (`清除编译缓存`): Clears compiled native machine code caches and restores stock defaults.
@@ -133,11 +133,11 @@ The entire app (Level 1, Level 2, Level 3 screens, and all dialogs) is unified u
 
 ### Prebuilt APK
 Download the latest signed release APK from **[GitHub Releases](https://github.com/WEIHEWU/shizuku-sam/releases/latest)**:
-- Latest Release: **[`Shizuku-Sam-v13.8.9.apk`](https://github.com/WEIHEWU/shizuku-sam/releases/download/v13.8.9/Shizuku-Sam-v13.8.9.apk)** (also archived under [`releases/`](./releases/))
+- Latest Release: **[`Shizuku-Sam-v13.8.10.apk`](https://github.com/WEIHEWU/shizuku-sam/releases/download/v13.8.10/Shizuku-Sam-v13.8.10.apk)** (also archived under [`releases/`](./releases/))
 
 ### Build from Source
 - **JDK**: Java 21
-- **Android SDK**: `compileSdk 36` / `targetSdk 36` / `minSdk 26`
+- **Android SDK**: `compileSdk 37` / `targetSdk 37` / `minSdk 26`
 
 ```bash
 git clone https://github.com/WEIHEWU/shizuku-sam.git
