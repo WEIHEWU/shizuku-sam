@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <a href="./README.md">简体中文</a> | <a href="./README.en.md">English</a> | <a href="https://github.com/WEIHEWU/shizuku-sam/releases/latest"><b>⬇️ Download Latest Release (v13.8.18)</b></a>
+  <a href="./README.md">简体中文</a> | <a href="./README.en.md">English</a> | <a href="https://github.com/WEIHEWU/shizuku-sam/releases/latest"><b>⬇️ Download Latest Release (v13.8.19)</b></a>
 </p>
 
 ---
@@ -15,21 +15,24 @@
 
 **Shizuku Sam** integrates the **Shizuku privileged service** with a purpose-built **Samsung Galaxy (One UI) system scheduler & hardware enhancer, background & deep sleep controller, and per-app refresh rate rule manager** in a single cohesive application.
 
-The entire app (Level 1, Level 2, Level 3 screens, and all dialogs) is unified under the **Miuix (`top.yukonga.miuix.kmp`) UI system**, a **3-tab Liquid Glass floating dock (`Shizuku` · `Hardware` · `App Rules`)**, **One UI 9 Unified Modal Architecture (100% modal sheet representation for secondary and tertiary menus + in-modal smooth slide navigation, persistent home dashboard and floating dock without flicker)**, and **on-demand subtitle toggles (clean single-line titles by default + long-press any row/card to toggle its explanation in place + a `显示说明 / 隐藏说明` pill button on every section/page header)**. Every section, card title, switch, and secondary screen listed below corresponds 1:1 with the actual `v13.8.18` app UI, with 100% full adaptation for **Samsung One UI 9 / Android 17**.
+The entire app (Level 1, Level 2, Level 3 screens, and all dialogs) is unified under the **Miuix (`top.yukonga.miuix.kmp`) UI system**, a **3-tab Liquid Glass floating dock (`Shizuku` · `Hardware` · `App Rules`)**, **One UI 9 Unified Modal Architecture (100% modal sheet representation for secondary and tertiary menus + in-modal smooth slide navigation, persistent home dashboard and floating dock without flicker)**, and **on-demand subtitle toggles (clean single-line titles by default + long-press any row/card to toggle its explanation in place + a `显示说明 / 隐藏说明` pill button on every section/page header)**. Every section, card title, switch, and secondary screen listed below corresponds 1:1 with the actual `v13.8.19` app UI, with 100% full adaptation for **Samsung One UI 9 / Android 17**.
 
 ---
 
-## 🚀 What's New in `v13.8.18`
+## 🚀 What's New in `v13.8.19`
 
-1. **System-wide Dynamic Monet Dialog Theming (Levels 1 to 5 Unified)**:
+1. **Fixed Third-Party Permission Request Dialog Collapse Defect**:
+   - Completely resolved an issue where third-party apps (e.g., Samsung Root, Scene) requesting Shizuku authorization via `Shizuku.requestPermission()` caused the floating activity layout to collapse into a narrow 60px pill, squishing out the application title and "Always allow / Deny" buttons.
+   - `RequestPermissionActivity` and the permission confirmation dialog are now fully integrated with `DialogThemeHelper` and system Monet theming, enforcing a defensive minimum width (`minWidth="320dp"`) and adaptive 92% screen bounds with proper rounded corners.
+2. **System-wide Dynamic Monet Dialog Theming (Levels 1 to 5 Unified)**:
    - All dialog levels across the entire application (Level 1 main screens, Level 2 detail modal dialogs, Level 3/4 pickers and confirmations, Level 5 result reports) now share a unified `DialogThemeHelper` implementation based on system `surfaceContainerHigh` and `outlineVariant`.
    - Guaranteed 24dp rounded corners, subtle translucent outline, and exact horizontal/vertical screen centering without breaking adaptive wallpaper dynamic palette coloring.
-2. **Text Display & Font Truncation Resolved**:
+3. **Text Display & Font Truncation Resolved**:
    - Game mode action selector buttons now dynamically measure text length: long labels automatically wrap to a 2-column layout rather than cramming into 3 columns, with `TextViewCompat` dynamic font scaling (10sp~13sp) to completely eliminate text truncation or clipping.
    - Filter chips and app picker rows feature auto-sizing text to prevent multi-line wrapping and ensure complete visibility of app titles and package identifiers.
-3. **Adaptive Quick Doze Layout**:
+4. **Adaptive Quick Doze Layout**:
    - Eliminated pre-allocated empty space below "Off" state in Quick Doze. The card now tightly hugs its content when collapsed and smoothly expands when explanations are toggled.
-4. **Standardized Button Selection Logic**:
+5. **Standardized Button Selection Logic**:
    - Removed legacy hardcoded keyword-based color divergences; all active/selected buttons uniformly utilize dynamic system Monet primary color tokens (`primary` + `onPrimary`).
 
 ---
@@ -148,7 +151,7 @@ The entire app (Level 1, Level 2, Level 3 screens, and all dialogs) is unified u
 
 ### Prebuilt APK
 Download the latest signed release APK from **[GitHub Releases](https://github.com/WEIHEWU/shizuku-sam/releases/latest)**:
-- Latest Release: **[`Shizuku-Sam-v13.8.18.apk`](https://github.com/WEIHEWU/shizuku-sam/releases/download/v13.8.18/Shizuku-Sam-v13.8.18.apk)** (also archived under [`releases/`](./releases/))
+- Latest Release: **[`Shizuku-Sam-v13.8.19.apk`](https://github.com/WEIHEWU/shizuku-sam/releases/download/v13.8.19/Shizuku-Sam-v13.8.19.apk)** (also archived under [`releases/`](./releases/))
 
 ### Build from Source
 - **JDK**: Java 21

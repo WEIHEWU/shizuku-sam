@@ -60,6 +60,7 @@ class RequestPermissionActivity : AppActivity() {
         }
         try {
             dialog.show()
+            moe.shizuku.manager.utils.DialogThemeHelper.applyUnifiedDialogWindowStyle(dialog)
         } catch (ignored: Throwable) {
         }
         return false
@@ -126,6 +127,10 @@ class RequestPermissionActivity : AppActivity() {
                     label, getString(R.string.permission_group_description)))
         }
 
+        val dm = resources.displayMetrics
+        val w = minOf((dm.widthPixels * 0.92f).toInt(), (520 * dm.density).toInt())
+        window.setLayout(w, android.view.ViewGroup.LayoutParams.WRAP_CONTENT)
+
         dialog = MaterialAlertDialogBuilder(this)
                 .setView(binding.root)
                 .setCancelable(false)
@@ -133,6 +138,7 @@ class RequestPermissionActivity : AppActivity() {
                 .create()
         dialog.setCanceledOnTouchOutside(false)
         dialog.show()
+        moe.shizuku.manager.utils.DialogThemeHelper.applyUnifiedDialogWindowStyle(dialog)
     }
 }
 
