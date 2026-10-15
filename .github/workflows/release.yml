@@ -223,8 +223,30 @@ jobs:
           files: |
             releases/Shizuku-Sam-v13.8.19.apk
 
+      - name: "Publish Release v13.8.20 (Align Startup Output with Upstream & Compact Starter Dialog)"
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/v13.8.20')
+        with:
+          tag_name: v13.8.20
+          name: "Shizuku Sam v13.8.20 — 服务启动终端输出严格对齐上游官方规范 & 弹窗紧凑自适应排版"
+          body: |
+            ### Shizuku Sam v13.8.20
+
+            #### 🖥️ 服务启动终端输出 100% 严格对齐上游官方规范
+            - **清除中间冗余提示与消除重复输出 (`AdbStarter.kt` / `Starter.kt` / `StarterActivity.kt`)**：
+              - 彻底移除 ADB 本地内部重试连接的中间控制台输出（`Connecting on port...` / `Successfully connected...` 等）；
+              - 消除 `Waiting for service...` 重复输出与竞争状态，保持与上游官方原汁原味的原生控制台输出步骤与时序。
+
+            #### 📱 启动程序弹窗紧凑自适应排版重构 (`StarterActivity.kt`)
+            - **自适应内容高度与平滑滚动**：
+              - 彻底解决启动弹窗垂直拉伸撑满 82% 屏高的留白过大问题，全面重构为根据内容自适应高度（`wrapContentHeight`）；
+              - 终端日志框设置自适应最大高度（`max = 260dp`）并集成平滑垂直滚动与自动跟随滚动（Auto-scroll to bottom）；
+              - 移除顶部与分组标题处重复的「显示说明」胶囊按钮，界面居中利落精致。
+          files: |
+            releases/Shizuku-Sam-v13.8.20.apk
+
       - name: Publish Future Version Tag Release
-        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2' && github.ref_name != 'v13.8.3' && github.ref_name != 'v13.8.4' && github.ref_name != 'v13.8.5' && github.ref_name != 'v13.8.6' && github.ref_name != 'v13.8.7' && github.ref_name != 'v13.8.8' && github.ref_name != 'v13.8.9' && github.ref_name != 'v13.8.10' && github.ref_name != 'v13.8.11' && github.ref_name != 'v13.8.19'
+        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2' && github.ref_name != 'v13.8.3' && github.ref_name != 'v13.8.4' && github.ref_name != 'v13.8.5' && github.ref_name != 'v13.8.6' && github.ref_name != 'v13.8.7' && github.ref_name != 'v13.8.8' && github.ref_name != 'v13.8.9' && github.ref_name != 'v13.8.10' && github.ref_name != 'v13.8.11' && github.ref_name != 'v13.8.19' && github.ref_name != 'v13.8.20'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}

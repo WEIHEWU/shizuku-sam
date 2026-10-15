@@ -46,7 +46,7 @@ object AdbStarter {
 
     suspend fun startAdb(context: Context, port: Int, log: ((String) -> Unit)? = null) {
         try {
-            log?.invoke("Starting with wireless adb in port $port...\n")
+            log?.invoke("Starting with wireless adb in port $port...\n\n")
 
             withContext(Dispatchers.IO) {
                 val key = runCatching {
@@ -60,21 +60,16 @@ object AdbStarter {
                 val tcpMode = ShizukuSettings.getTcpMode()
                 val tcpPort = ShizukuSettings.getTcpPort()
                 if (tcpMode && activePort != tcpPort) {
-                    log?.invoke("Connecting on port $activePort...\n")
                     AdbClient("127.0.0.1", activePort, key).use { client ->
                         connectWithRetry(client)
-                        log?.invoke("Successfully connected on port $activePort...\n")
-                        log?.invoke("Restarting in TCP mode port: $tcpPort\n")
                         activePort = tcpPort
                         runCatching { client.command("tcpip:$activePort") }
                             .onFailure { if (it !is EOFException && it !is SocketException) throw it }
                     }
                 }
 
-                log?.invoke("Connecting on port $activePort...\n")
                 AdbClient("127.0.0.1", activePort, key).use { client ->
                     connectWithRetry(client)
-                    log?.invoke("Successfully connected on port $activePort...\n")
                     client.command("shell:${Starter.internalCommand}") { log?.invoke(String(it)) }
                     runCatching {
                         client.command("shell:${buildSelfHardeningCommand(context)}")

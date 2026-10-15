@@ -20,21 +20,12 @@ object Starter {
             return "LD_LIBRARY_PATH=$nativeLibDir $userCommand --apk=${application.applicationInfo.sourceDir}"
         }
 
-    suspend fun waitForBinder(timeoutMs: Long = 60_000L, log: ((String) -> Unit)? = null): Boolean {
-        if (rikka.shizuku.Shizuku.pingBinder()) {
-            log?.invoke("\nService started, this window will be automatically closed in 3 seconds\n")
-            return true
-        }
-        log?.invoke("\nWaiting for service...\n")
+    suspend fun waitForBinder(timeoutMs: Long = 60_000L): Boolean {
+        if (rikka.shizuku.Shizuku.pingBinder()) return true
         val start = System.currentTimeMillis()
         while (System.currentTimeMillis() - start < timeoutMs) {
             kotlinx.coroutines.delay(250)
-            if (rikka.shizuku.Shizuku.pingBinder()) {
-                val elapsed = (System.currentTimeMillis() - start) / 1000.0
-                log?.invoke("Connected in ${String.format("%.1f", elapsed)}s\n")
-                log?.invoke("Service started, this window will be automatically closed in 3 seconds\n")
-                return true
-            }
+            if (rikka.shizuku.Shizuku.pingBinder()) return true
         }
         return false
     }

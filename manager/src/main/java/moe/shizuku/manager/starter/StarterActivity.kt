@@ -23,8 +23,10 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -116,7 +118,7 @@ class StarterActivity : AppActivity() {
         serviceReadyState.value = true
         val current = viewModel.output.value?.data?.toString() ?: ""
         if (!current.contains("Service started, this window will be automatically closed")) {
-            viewModel.appendOutput("Service started, this window will be automatically closed in 3 seconds")
+            viewModel.appendOutput("\nService started, this window will be automatically closed in 3 seconds")
         }
         window?.decorView?.postDelayed({
             if (!isFinishing) finish()
@@ -218,6 +220,7 @@ class StarterActivity : AppActivity() {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .wrapContentHeight()
                         .heightIn(max = maxHeightDp)
                         .clip(RoundedCornerShape(24.dp))
                         .background(dialogBgColor)
@@ -298,118 +301,124 @@ private fun StarterMiuixScreen(
         MiuixTheme.colorScheme.surface
     }
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        containerColor = Color.Transparent,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0)
-    ) {
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .overScrollVertical(),
-            contentPadding = PaddingValues(
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .wrapContentHeight()
+            .verticalScroll(rememberScrollState())
+            .padding(
                 top = 12.dp,
                 start = 14.dp,
                 end = 14.dp,
                 bottom = 16.dp
-            ),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            )
+    ) {
+        MiuixSubPageTopBar(
+            title = stringResource(R.string.starter),
+            subtitle = "实时显示 Shizuku_starter 守护进程握手与注入日志，启动成功后窗口将自动关闭",
+            isDark = isDark,
+            primaryColor = primaryColor,
+            expanded = groupExpanded,
+            onToggleExpand = { groupExpanded = !groupExpanded },
+            backSymbol = "✕",
+            onBackClick = onCloseClick
+        )
+
+        Spacer(Modifier.height(8.dp))
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            item(key = "header-top") {
-                MiuixSubPageTopBar(
-                    title = stringResource(R.string.starter),
-                    subtitle = "实时显示 Shizuku_starter 守护进程握手与注入日志，启动成功后窗口将自动关闭",
-                    isDark = isDark,
-                    primaryColor = primaryColor,
-                    expanded = groupExpanded,
-                    onToggleExpand = { groupExpanded = !groupExpanded },
-                    backSymbol = "✕",
-                    onBackClick = onCloseClick
-                )
-            }
+            Text(
+                text = if (isServiceReady) "启动状态：已就绪" else "终端启动输出",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                color = primaryColor
+            )
+        }
 
-            item(key = "section-terminal") {
-                Column {
-                    GroupHeaderWithToggle(
-                        text = if (isServiceReady) "启动状态：已就绪" else "终端启动输出",
+        Spacer(Modifier.height(4.dp))
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .onLongPressToggle(haptic) { cardToggled = !cardToggled },
+            cornerRadius = 20.dp,
+            colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+        ) {
+            Column(Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    MiuixRowIcon(
                         isDark = isDark,
-                        primaryColor = primaryColor,
-                        expanded = groupExpanded,
-                        onToggle = { groupExpanded = !groupExpanded }
+                        icon = painterResource(R.drawable.ic_terminal_24),
+                        iconTint = if (isServiceReady) Color(0xFF10B981) else primaryColor
                     )
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .onLongPressToggle(haptic) { cardToggled = !cardToggled },
-                        cornerRadius = 20.dp,
-                        colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
-                    ) {
-                        Column(Modifier.padding(16.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                MiuixRowIcon(
-                                    isDark = isDark,
-                                    icon = painterResource(R.drawable.ic_terminal_24),
-                                    iconTint = if (isServiceReady) Color(0xFF10B981) else primaryColor
-                                )
-                                Column(Modifier.weight(1f)) {
-                                    Text(
-                                        text = if (isServiceReady) "Shizuku 服务已成功拉起" else "正在拉起 Shizuku 底层服务...",
-                                        fontSize = 15.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MiuixTheme.colorScheme.onSurface
-                                    )
-                                    AnimatedVisibility(
-                                        visible = showSub,
-                                        enter = expandVertically() + fadeIn(),
-                                        exit = shrinkVertically() + fadeOut()
-                                    ) {
-                                        Text(
-                                            text = "通过本地回环 ADB 或 Root 注入启动 shizuku_starter，绑定成功后自动在 3 秒内关闭窗口。",
-                                            fontSize = 12.sp,
-                                            lineHeight = 17.sp,
-                                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                            modifier = Modifier
-                                                .padding(top = 3.dp)
-                                                .clickable { cardToggled = !cardToggled }
-                                        )
-                                    }
-                                }
-                            }
-
-                            Spacer(Modifier.height(12.dp))
-
-                            Box(
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            text = if (isServiceReady) "Shizuku 服务已成功拉起" else "正在拉起 Shizuku 底层服务...",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MiuixTheme.colorScheme.onSurface
+                        )
+                        AnimatedVisibility(
+                            visible = showSub,
+                            enter = expandVertically() + fadeIn(),
+                            exit = shrinkVertically() + fadeOut()
+                        ) {
+                            Text(
+                                text = "通过本地回环 ADB 或 Root 注入启动 shizuku_starter，绑定成功后自动在 3 秒内关闭窗口。",
+                                fontSize = 12.sp,
+                                lineHeight = 17.sp,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .background(if (isDark) Color(0xFF21242C) else Color(0xFFF0F2F6))
-                                    .padding(14.dp)
-                            ) {
-                                SelectionContainer {
-                                    Text(
-                                        text = outputText.ifBlank { "正在初始化启动环境..." },
-                                        fontSize = 12.sp,
-                                        lineHeight = 18.sp,
-                                        fontFamily = FontFamily.Monospace,
-                                        color = MiuixTheme.colorScheme.onSurface
-                                    )
-                                }
-                            }
-
-                            if (isServiceReady) {
-                                Spacer(Modifier.height(12.dp))
-                                TextButton(
-                                    text = "完成并返回主页",
-                                    colors = ButtonDefaults.textButtonColorsPrimary(),
-                                    onClick = onCloseClick,
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                            }
+                                    .padding(top = 3.dp)
+                                    .clickable { cardToggled = !cardToggled }
+                            )
                         }
                     }
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                val terminalScrollState = rememberScrollState()
+                LaunchedEffect(outputText) {
+                    terminalScrollState.animateScrollTo(terminalScrollState.maxValue)
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 100.dp, max = 260.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(if (isDark) Color(0xFF21242C) else Color(0xFFF0F2F6))
+                        .verticalScroll(terminalScrollState)
+                        .padding(14.dp)
+                ) {
+                    SelectionContainer {
+                        Text(
+                            text = outputText.ifBlank { "正在初始化启动环境..." },
+                            fontSize = 12.sp,
+                            lineHeight = 18.sp,
+                            fontFamily = FontFamily.Monospace,
+                            color = MiuixTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+
+                if (isServiceReady) {
+                    Spacer(Modifier.height(12.dp))
+                    TextButton(
+                        text = "完成并返回主页",
+                        colors = ButtonDefaults.textButtonColorsPrimary(),
+                        onClick = onCloseClick,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
         }
@@ -596,10 +605,6 @@ private class ViewModel(context: Context, root: Boolean, host: String?, port: In
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 AdbStarter.startAdb(appContext, port) {
-                    sb.append(it)
-                    postResult()
-                }
-                Starter.waitForBinder {
                     sb.append(it)
                     postResult()
                 }
