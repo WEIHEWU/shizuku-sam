@@ -196,8 +196,35 @@ jobs:
           files: |
             releases/Shizuku-Sam-v13.8.11.apk
 
+      - name: "Publish Release v13.8.19 (Fix Permission Request Dialog Layout Collapse)"
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/v13.8.19')
+        with:
+          tag_name: v13.8.19
+          name: "Shizuku Sam v13.8.19 — 修复第三方应用特权授权弹窗坍塌变形与无法授权问题"
+          body: |
+            ### Shizuku Sam v13.8.19
+
+            #### 🐛 彻底修复第三方应用请求特权授权弹窗横向坍塌变形缺陷
+            - **解决浮动窗口测量坍塌导致按钮消失问题 (`confirmation_dialog.xml` / `RequestPermissionActivity.kt`)**：
+              - 彻底解决第三方应用（如 Samsung Root、Scene 等）调用 `Shizuku.requestPermission()` 请求授权时，浮动透明 Activity 宽度测量塌陷为 60px 窄条胶囊、导致应用名称被截断且「始终允许 / 拒绝」按钮全部消失无法点击的问题；
+              - `confirmation_dialog.xml` 增加防御性最小宽度约束（`android:minWidth="320dp"`），修正高度为 `wrap_content`；
+              - `RequestPermissionActivity` 窗口分配屏幕 92% 黄金宽度（上限 520dp）。
+            - **全量接入 Monet 动态取色与圆角浮层规范**：
+              - 权限请求弹窗及受限调试弹窗全面接入 `DialogThemeHelper.applyUnifiedDialogWindowStyle`；
+              - 具备 24dp 优雅圆角、微暗半透明背景与动态壁纸取色适配，居中显示，触控精准丝滑。
+            - **修正样式属性引用 (`styles.xml`)**：
+              - 修正 `?textColorOnPrimaryContainer` 为标准 `?colorOnPrimaryContainer` 属性。
+
+            #### 🎨 全应用弹窗动态主题色彩与排版优化（继承 v13.8.18）
+            - 全应用一级主界面、二级模态浮层、三级/四级/五级弹窗（包括权限确认、应用挑选器、AOT 预编译、白名单冲突警示、运行报告等）全面接入 `DialogThemeHelper` 动态取色规范；
+            - 进游戏模式多选项按钮与应用挑选器筛选芯片全量自适应文字排版与缩放，杜绝文字挤压与截断；
+            - 极速待机（Quick Doze）自适应伸缩收折，无多余空白。
+          files: |
+            releases/Shizuku-Sam-v13.8.19.apk
+
       - name: Publish Future Version Tag Release
-        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2' && github.ref_name != 'v13.8.3' && github.ref_name != 'v13.8.4' && github.ref_name != 'v13.8.5' && github.ref_name != 'v13.8.6' && github.ref_name != 'v13.8.7' && github.ref_name != 'v13.8.8' && github.ref_name != 'v13.8.9' && github.ref_name != 'v13.8.10' && github.ref_name != 'v13.8.11'
+        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2' && github.ref_name != 'v13.8.3' && github.ref_name != 'v13.8.4' && github.ref_name != 'v13.8.5' && github.ref_name != 'v13.8.6' && github.ref_name != 'v13.8.7' && github.ref_name != 'v13.8.8' && github.ref_name != 'v13.8.9' && github.ref_name != 'v13.8.10' && github.ref_name != 'v13.8.11' && github.ref_name != 'v13.8.19'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
