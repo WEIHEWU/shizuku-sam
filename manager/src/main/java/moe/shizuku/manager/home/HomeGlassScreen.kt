@@ -217,6 +217,27 @@ fun ShizukuHomeScreen(
     var showStopConfirmDialog by remember { mutableStateOf(false) }
     var showBatteryProtectionDialog by remember { mutableStateOf(false) }
     var showBatteryInfoDialog by remember { mutableStateOf(false) }
+    var autoUpdateReleaseInfo by remember { mutableStateOf<moe.shizuku.manager.update.AppUpdater.ReleaseInfo?>(null) }
+
+    LaunchedEffect(Unit) {
+        if (moe.shizuku.manager.update.AppUpdater.shouldPerformAutoCheck()) {
+            moe.shizuku.manager.update.AppUpdater.checkForUpdate().onSuccess { info ->
+                moe.shizuku.manager.update.AppUpdater.markAutoCheckPerformed()
+                if (info != null) {
+                    autoUpdateReleaseInfo = info
+                }
+            }
+        }
+    }
+
+    if (autoUpdateReleaseInfo != null) {
+        moe.shizuku.manager.update.AppUpdateDialog(
+            releaseInfo = autoUpdateReleaseInfo,
+            isDark = isDark,
+            primaryColor = primaryColor,
+            onDismiss = { autoUpdateReleaseInfo = null }
+        )
+    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),

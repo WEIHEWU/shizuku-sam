@@ -262,8 +262,27 @@ jobs:
           files: |
             releases/Shizuku-Sam-v13.8.21.apk
 
+      - name: "Publish Release v13.8.22 (In-App GitHub Update Checker & Direct Upgrade)"
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/v13.8.22')
+        with:
+          tag_name: v13.8.22
+          name: "Shizuku Sam v13.8.22 — 新增 GitHub 在线检查更新与应用内一键直装升级"
+          body: |
+            ### Shizuku Sam v13.8.22
+
+            #### 🚀 新增 GitHub 在线检查更新与应用内一键升级 (`AppUpdater.kt` / `AppUpdateDialog.kt`)
+            - **在线版本检测与多通道容灾**：
+              - 在「设置 -> 关于」新增 **`检查更新`** 与 **`启动时自动检查更新`** 开关；
+              - 直连 GitHub Releases API 获取最新正式版信息（版本号、安装包体积、更新日志），并在 API 限流或网络波动时自动回退至 Raw 清单与镜像加速通道。
+            - **应用内实时进度下载与双模无缝安装**：
+              - **特权静默自更新（Shizuku / Root 运行中）**：下载完成后自动通过 `pm install -r -d` 执行静默覆盖安装并自动重新拉起应用，免除系统安装器弹窗与三星自动拦截；
+              - **系统安装器标准兜底（未运行时）**：通过 `FileProvider` 自动调起系统安装器完成覆盖更新，所有配置与授权数据完整保留。
+          files: |
+            releases/Shizuku-Sam-v13.8.22.apk
+
       - name: Publish Future Version Tag Release
-        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2' && github.ref_name != 'v13.8.3' && github.ref_name != 'v13.8.4' && github.ref_name != 'v13.8.5' && github.ref_name != 'v13.8.6' && github.ref_name != 'v13.8.7' && github.ref_name != 'v13.8.8' && github.ref_name != 'v13.8.9' && github.ref_name != 'v13.8.10' && github.ref_name != 'v13.8.11' && github.ref_name != 'v13.8.19' && github.ref_name != 'v13.8.20' && github.ref_name != 'v13.8.21'
+        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2' && github.ref_name != 'v13.8.3' && github.ref_name != 'v13.8.4' && github.ref_name != 'v13.8.5' && github.ref_name != 'v13.8.6' && github.ref_name != 'v13.8.7' && github.ref_name != 'v13.8.8' && github.ref_name != 'v13.8.9' && github.ref_name != 'v13.8.10' && github.ref_name != 'v13.8.11' && github.ref_name != 'v13.8.19' && github.ref_name != 'v13.8.20' && github.ref_name != 'v13.8.21' && github.ref_name != 'v13.8.22'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}

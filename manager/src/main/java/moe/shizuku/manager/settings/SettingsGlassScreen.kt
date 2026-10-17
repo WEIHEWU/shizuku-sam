@@ -48,8 +48,11 @@ import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
-import top.yukonga.miuix.kmp.window.WindowDialog
+import android.widget.Toast
+import kotlinx.coroutines.launch
 import moe.shizuku.manager.home.CenteredAppDialog
+import moe.shizuku.manager.update.AppUpdateDialog
+import moe.shizuku.manager.update.AppUpdater
 import java.util.Locale
 
 @Composable
@@ -62,6 +65,7 @@ fun SettingsGlassScreen(
 ) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
+    val scope = rememberCoroutineScope()
 
     val bgColor = if (isBlackNightTheme) {
         Color.Black
@@ -77,6 +81,10 @@ fun SettingsGlassScreen(
     var nightMode by remember { mutableIntStateOf(ShizukuSettings.getNightMode()) }
     var blackNightTheme by remember { mutableStateOf(ThemeHelper.isBlackNightTheme(context)) }
     var useSystemColor by remember { mutableStateOf(ThemeHelper.isUsingSystemColor()) }
+    var autoCheckUpdate by remember { mutableStateOf(AppUpdater.isAutoCheckEnabled()) }
+    var isCheckingUpdate by remember { mutableStateOf(false) }
+    var pendingReleaseInfo by remember { mutableStateOf<AppUpdater.ReleaseInfo?>(null) }
+    var showUpdateDialog by remember { mutableStateOf(false) }
 
     var showPortDialog by remember { mutableStateOf(false) }
     var showNightModeDialog by remember { mutableStateOf(false) }
@@ -299,7 +307,7 @@ fun SettingsGlassScreen(
                 }
             }
 
-            // 4. 关于与翻译
+            // 4. 关于与更新
             item(key = "section-about") {
                 Column {
                     GroupHeaderWithToggle(
@@ -314,6 +322,75 @@ fun SettingsGlassScreen(
                         cornerRadius = 20.dp,
                         colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
                     ) {
+                        val updateValueText = when {
+                            isCheckingUpdate -> "检查中..."
+                            pendingReleaseInfo != null -> "发现 v${pendingReleaseInfo!!.versionName}"
+                            else -> "v${AppUpdater.getCurrentVersionName()}"
+                        }
+                        SettingsMiuixActionRow(
+                            isDark = isDark,
+                            icon = painterResource(R.drawable.ic_system_icon),
+                            iconTint = if (isDark) Color(0xFF34D399) else Color(0xFF10B981),
+                            title = "检查更新",
+                            subtitle = "连接 GitHub Releases 检测新版本，支持应用内一键下载与特权静默安装",
+                            valueText = updateValueText,
+                            groupExpanded = aboutExpanded,
+                            onClick = {
+                                if (isCheckingUpdate) return@SettingsMiuixActionRow
+                                if (pendingReleaseInfo != null) {
+                                    showUpdateDialog = true
+                                    return@SettingsMiuixActionRow
+                                }
+                                isCheckingUpdate = true
+                                scope.launch {
+                                    val result = AppUpdater.checkForUpdate()
+                                    isCheckingUpdate = false
+                                    result.onSuccess { info ->
+                                        AppUpdater.markAutoCheckPerformed()
+                                        if (info != null) {
+                                            pendingReleaseInfo = info
+                                            showUpdateDialog = true
+                                        } else {
+                                            Toast.makeText(
+                                                context,
+                                                "当前已是最新版本 (v${AppUpdater.getCurrentVersionName()})",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                    }.onFailure { err ->
+                                        Toast.makeText(
+                                            context,
+                                            err.message ?: "检查更新失败，请检查网络连接",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                }
+                            }
+                        )
+                        SettingsMiuixSwitchRow(
+                            isDark = isDark,
+                            icon = painterResource(R.drawable.ic_maxhz_shield_24),
+                            iconTint = if (isDark) Color(0xFFA78BFA) else Color(0xFF7C3AED),
+                            title = "启动时自动检查更新",
+                            subtitle = "打开应用主页时后台静默检测 GitHub 新版本并弹窗提醒",
+                            checked = autoCheckUpdate,
+                            groupExpanded = aboutExpanded,
+                            onCheckedChange = { checked ->
+                                AppUpdater.setAutoCheckEnabled(checked)
+                                autoCheckUpdate = checked
+                            }
+                        )
+                        SettingsMiuixActionRow(
+                            isDark = isDark,
+                            icon = painterResource(R.drawable.ic_baseline_link_24),
+                            iconTint = if (isDark) Color(0xFF38BDF8) else Color(0xFF0284C7),
+                            title = "GitHub 开源仓库",
+                            subtitle = "访问 WEIHEWU/shizuku-sam 查看源码、更新日志或手动下载历史构建",
+                            groupExpanded = aboutExpanded,
+                            onClick = {
+                                CustomTabsHelper.launchUrlOrCopy(context, AppUpdater.RELEASES_PAGE_URL)
+                            }
+                        )
                         SettingsMiuixActionRow(
                             isDark = isDark,
                             icon = painterResource(R.drawable.ic_baseline_link_24),
@@ -331,6 +408,15 @@ fun SettingsGlassScreen(
 
 
         }
+    }
+
+    if (showUpdateDialog && pendingReleaseInfo != null) {
+        AppUpdateDialog(
+            releaseInfo = pendingReleaseInfo,
+            isDark = isDark,
+            primaryColor = primaryColor,
+            onDismiss = { showUpdateDialog = false }
+        )
     }
 
     // Miuix 窗口级弹窗：端口修改
