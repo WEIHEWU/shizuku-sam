@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <a href="./README.md">简体中文</a> | <a href="./README.en.md">English</a> | <a href="https://github.com/WEIHEWU/shizuku-sam/releases/latest"><b>⬇️ 下载最新正式版 (v13.8.20)</b></a>
+  <a href="./README.md">简体中文</a> | <a href="./README.en.md">English</a> | <a href="https://github.com/WEIHEWU/shizuku-sam/releases/latest"><b>⬇️ 下载最新正式版 (v13.8.21)</b></a>
 </p>
 
 ---
@@ -15,22 +15,20 @@
 
 **Shizuku Sam** 将原生 **Shizuku 特权服务** 与专为三星 Galaxy（One UI）定制的 **系统调度与硬件增强、后台与深度休眠、分应用刷新率规则** 整合为一体。
 
-全应用（一级页面、二级页面、三级页面及所有弹窗）全面统一采用 **Miuix (`top.yukonga.miuix.kmp`) 界面组件体系**、**底部三栏毛玻璃悬浮导航（`Shizuku` · `性能硬件` · `应用规则`）**、**One UI 9 统一模态架构（二级/三级菜单 100% 弹窗浮层化 + 弹窗内平滑推入导航，主仪表盘与底部 Dock 永驻不闪烁）** 以及 **按需展开说明交互（默认单行极简主标题 + 长按单行展开/收起说明 + 顶部 `显示说明 / 隐藏说明` 胶囊开关）**。以下所有卡片名称、开关文案、按钮与二级页面均与当前 `v13.8.20` 真实界面逐字对应，并全面百分之百深度适配 **Samsung One UI 9 / Android 17**。
+全应用（一级页面、二级页面、三级页面及所有弹窗）全面统一采用 **Miuix (`top.yukonga.miuix.kmp`) 界面组件体系**、**底部三栏毛玻璃悬浮导航（`Shizuku` · `性能硬件` · `应用规则`）**、**One UI 9 统一模态架构（二级/三级菜单 100% 弹窗浮层化 + 弹窗内平滑推入导航，主仪表盘与底部 Dock 永驻不闪烁）** 以及 **按需展开说明交互（默认单行极简主标题 + 长按单行展开/收起说明 + 顶部 `显示说明 / 隐藏说明` 胶囊开关）**。以下所有卡片名称、开关文案、按钮与二级页面均与当前 `v13.8.21` 真实界面逐字对应，并全面百分之百深度适配 **Samsung One UI 9 / Android 17**。
 
 ---
 
-## 🚀 最新版本亮点 (`v13.8.20`)
+## 🚀 最新版本亮点 (`v13.8.21`)
 
-1. **服务启动终端输出 100% 严格对齐上游官方规范**：
-   - 彻底清除 ADB 本地内部重试连接的非必要输出（`Connecting on port...` / `Successfully connected...` 等）；
-   - 消除 `Waiting for service...` 重复输出与竞争状态，保持与上游官方原汁原味的原生控制台输出步骤与时序；
-2. **启动程序弹窗紧凑自适应排版优化**：
-   - 彻底解决启动弹窗垂直拉伸占满 82% 屏高的留白过大问题，整体重构为紧凑自适应高度（`wrapContentHeight`）；
-   - 终端日志框设置自适应最大高度（`max = 260dp`）并集成平滑垂直滚动与跟随滚动（Auto-scroll to bottom）；
-   - 消除顶部与分组标题处重复的「显示说明」胶囊按钮，界面居中利落精致。
+1. **修复电池运行信息中「电池电压」误读为 `0 mV` 的问题**：
+   - 将 `dumpsys battery` 的字段提取正则全部加上行首锚定（`/^[ \t]*voltage:/`），彻底避开排在前面的 `Max charging voltage: 0` 子串误命中；
+   - 增加零值自动兜底策略（`[ -z "$voltage_raw" ] || [ "$voltage_raw" = "0" ]`），一旦 `dumpsys` 返回异常值自动回退直读内核硬件节点 `/sys/class/power_supply/battery/voltage_now` 与 `batt_vol`。
+2. **服务启动终端输出严格对齐上游官方规范与弹窗紧凑排版（继承 v13.8.20）**：
+   - 清除 ADB 本地内部重试连接的中间杂音，消除 `Waiting for service...` 重复输出；
+   - 启动弹窗重构为紧凑自适应高度（`wrapContentHeight`），终端日志框支持 `260dp` 上限与平滑自动跟随滚动。
 3. **第三方授权弹窗防坍塌加固与全弹窗 Monet 统一（继承 v13.8.19）**：
-   - 彻底解决第三方应用（如 Samsung Root、Scene 等）调用 `Shizuku.requestPermission()` 时弹窗测量塌陷为 60px 窄条胶囊问题；
-   - 全应用一级主界面、二级模态浮层、三级/四级/五级弹窗全面接入 `DialogThemeHelper` 动态取色规范。
+   - 彻底解决第三方应用调用 `Shizuku.requestPermission()` 时弹窗测量塌陷为 60px 窄条胶囊问题，全量接入 `DialogThemeHelper` 动态取色规范。
 
 ---
 
@@ -152,7 +150,7 @@
 
 ### 直接下载安装包
 前往 **[GitHub Releases](https://github.com/WEIHEWU/shizuku-sam/releases/latest)** 下载最新签名正式版 APK：
-- 最新版本：**[`Shizuku-Sam-v13.8.20.apk`](https://github.com/WEIHEWU/shizuku-sam/releases/download/v13.8.20/Shizuku-Sam-v13.8.20.apk)**（仓库 [`releases/`](./releases/) 目录下亦同步存档）
+- 最新版本：**[`Shizuku-Sam-v13.8.21.apk`](https://github.com/WEIHEWU/shizuku-sam/releases/download/v13.8.21/Shizuku-Sam-v13.8.21.apk)**（仓库 [`releases/`](./releases/) 目录下亦同步存档）
 
 ### 本地编译
 - **JDK**：Java 21

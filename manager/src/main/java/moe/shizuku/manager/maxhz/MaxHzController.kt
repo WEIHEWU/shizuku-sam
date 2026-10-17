@@ -1296,13 +1296,13 @@ object MaxHzController {
               '
             }
 
-            level="$(echo "${'$'}battery" | awk -F: '/level:/ {gsub(/ /,"",${'$'}2); print ${'$'}2; exit}')"
+            level="$(echo "${'$'}battery" | awk -F: '/^[ \t]*level:/ {gsub(/ /,"",${'$'}2); print ${'$'}2; exit}')"
             [ -z "${'$'}level" ] && level="$(read_node /sys/class/power_supply/battery/capacity)"
 
-            temp_raw="$(echo "${'$'}battery" | awk -F: '/temperature:/ {gsub(/ /,"",${'$'}2); print ${'$'}2; exit}')"
+            temp_raw="$(echo "${'$'}battery" | awk -F: '/^[ \t]*temperature:/ {gsub(/ /,"",${'$'}2); print ${'$'}2; exit}')"
             [ -z "${'$'}temp_raw" ] && temp_raw="$(read_node /sys/class/power_supply/battery/temp /sys/class/power_supply/battery/batt_temp)"
 
-            status_num="$(echo "${'$'}battery" | awk -F: '/status:/ {gsub(/ /,"",${'$'}2); print ${'$'}2; exit}')"
+            status_num="$(echo "${'$'}battery" | awk -F: '/^[ \t]*status:/ {gsub(/ /,"",${'$'}2); print ${'$'}2; exit}')"
             case "${'$'}status_num" in
               2) status_text="正在充电" ;;
               3) status_text="未充电" ;;
@@ -1312,7 +1312,7 @@ object MaxHzController {
             esac
             [ -z "${'$'}status_text" ] && status_text="系统未提供"
 
-            health_num="$(echo "${'$'}battery" | awk -F: '/health:/ {gsub(/ /,"",${'$'}2); print ${'$'}2; exit}')"
+            health_num="$(echo "${'$'}battery" | awk -F: '/^[ \t]*health:/ {gsub(/ /,"",${'$'}2); print ${'$'}2; exit}')"
             case "${'$'}health_num" in
               2) health_text="良好" ;;
               3) health_text="过热" ;;
@@ -1325,16 +1325,18 @@ object MaxHzController {
             [ -z "${'$'}health_text" ] && health_text="系统未提供"
 
             current_raw="$(read_node /sys/class/power_supply/battery/current_now /sys/class/power_supply/battery/batt_current_ua_now /sys/class/power_supply/battery/input_current_now)"
-            voltage_raw="$(echo "${'$'}battery" | awk -F: '/voltage:/ {gsub(/ /,"",${'$'}2); print ${'$'}2; exit}')"
-            [ -z "${'$'}voltage_raw" ] && voltage_raw="$(read_node /sys/class/power_supply/battery/voltage_now /sys/class/power_supply/battery/batt_vol)"
+            voltage_raw="$(echo "${'$'}battery" | awk -F: '/^[ \t]*voltage:/ {gsub(/ /,"",${'$'}2); print ${'$'}2; exit}')"
+            if [ -z "${'$'}voltage_raw" ] || [ "${'$'}voltage_raw" = "0" ]; then
+              voltage_raw="$(read_node /sys/class/power_supply/battery/voltage_now /sys/class/power_supply/battery/batt_vol)"
+            fi
             cycle_count="$(read_node /sys/class/power_supply/battery/cycle_count /sys/class/power_supply/battery/batt_cycle /sys/class/power_supply/battery/battery_cycle)"
             saved_usage="$(saved_value mSavedBatteryUsage)"
             saved_asoc="$(saved_value mSavedBatteryAsoc)"
             saved_max_temp="$(saved_value mSavedBatteryMaxTemp)"
             saved_max_current="$(saved_value mSavedBatteryMaxCurrent)"
             saved_beginning_date="$(saved_value mSavedBatteryBeginningDate)"
-            charge_counter="$(echo "${'$'}battery" | awk -F: '/Charge counter:/ {gsub(/^ +| +${'$'}/,"",${'$'}2); print ${'$'}2; exit}')"
-            technology="$(echo "${'$'}battery" | awk -F: '/technology:/ {gsub(/^ +| +${'$'}/,"",${'$'}2); print ${'$'}2; exit}')"
+            charge_counter="$(echo "${'$'}battery" | awk -F: '/^[ \t]*Charge counter:/ {gsub(/^ +| +${'$'}/,"",${'$'}2); print ${'$'}2; exit}')"
+            technology="$(echo "${'$'}battery" | awk -F: '/^[ \t]*technology:/ {gsub(/^ +| +${'$'}/,"",${'$'}2); print ${'$'}2; exit}')"
             if [ -z "${'$'}cycle_count" ] && echo "${'$'}saved_usage" | grep -Eq '^[0-9]+${'$'}'; then
               cycle_count="$(awk -v v="${'$'}saved_usage" 'BEGIN { printf "%.2f 次", v / 100 }')"
             fi
@@ -1374,8 +1376,8 @@ object MaxHzController {
             [ "${'$'}system_pass" = "1" ] && accepted=1
 
             battery="$(dumpsys battery 2>/dev/null)"
-            level="$(echo "${'$'}battery" | awk -F: '/level:/ {gsub(/ /,"",${'$'}2); print ${'$'}2; exit}')"
-            status_num="$(echo "${'$'}battery" | awk -F: '/status:/ {gsub(/ /,"",${'$'}2); print ${'$'}2; exit}')"
+            level="$(echo "${'$'}battery" | awk -F: '/^[ \t]*level:/ {gsub(/ /,"",${'$'}2); print ${'$'}2; exit}')"
+            status_num="$(echo "${'$'}battery" | awk -F: '/^[ \t]*status:/ {gsub(/ /,"",${'$'}2); print ${'$'}2; exit}')"
             charger_type="$(echo "${'$'}battery" | awk -F: '/charger_type:/ {gsub(/ /,"",${'$'}2); print ${'$'}2; exit}')"
             if [ -z "${'$'}charger_type" ]; then
               charger_type="$(dumpsys batteryproperties 2>/dev/null | awk -F: '/charger_type:/ {gsub(/ /,"",${'$'}2); print ${'$'}2; exit}')"
