@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <a href="./README.md">简体中文</a> | <a href="./README.en.md">English</a> | <a href="https://github.com/WEIHEWU/shizuku-sam/releases/latest"><b>⬇️ 下载最新正式版 (v13.8.22)</b></a>
+  <a href="./README.md">简体中文</a> | <a href="./README.en.md">English</a> | <a href="https://github.com/WEIHEWU/shizuku-sam/releases/latest"><b>⬇️ 下载最新正式版 (v13.8.23)</b></a>
 </p>
 
 ---
@@ -15,20 +15,19 @@
 
 **Shizuku Sam** 将原生 **Shizuku 特权服务** 与专为三星 Galaxy（One UI）定制的 **系统调度与硬件增强、后台与深度休眠、分应用刷新率规则** 整合为一体。
 
-全应用（一级页面、二级页面、三级页面及所有弹窗）全面统一采用 **Miuix (`top.yukonga.miuix.kmp`) 界面组件体系**、**底部三栏毛玻璃悬浮导航（`Shizuku` · `性能硬件` · `应用规则`）**、**One UI 9 统一模态架构（二级/三级菜单 100% 弹窗浮层化 + 弹窗内平滑推入导航，主仪表盘与底部 Dock 永驻不闪烁）** 以及 **按需展开说明交互（默认单行极简主标题 + 长按单行展开/收起说明 + 顶部 `显示说明 / 隐藏说明` 胶囊开关）**。以下所有卡片名称、开关文案、按钮与二级页面均与当前 `v13.8.22` 真实界面逐字对应，并全面百分之百深度适配 **Samsung One UI 9 / Android 17**。
+全应用（一级页面、二级页面、三级页面及所有弹窗）全面统一采用 **Miuix (`top.yukonga.miuix.kmp`) 界面组件体系**、**底部三栏毛玻璃悬浮导航（`Shizuku` · `性能硬件` · `应用规则`）**、**One UI 9 统一模态架构（二级/三级菜单 100% 弹窗浮层化 + 弹窗内平滑推入导航，主仪表盘与底部 Dock 永驻不闪烁）** 以及 **按需展开说明交互（默认单行极简主标题 + 长按单行展开/收起说明 + 顶部 `显示说明 / 隐藏说明` 胶囊开关）**。以下所有卡片名称、开关文案、按钮与二级页面均与当前 `v13.8.23` 真实界面逐字对应，并全面百分之百深度适配 **Samsung One UI 9 / Android 17**。
 
 ---
 
-## 🚀 最新版本亮点 (`v13.8.22`)
+## 🚀 最新版本亮点 (`v13.8.23`)
 
-1. **新增 GitHub 在线检查更新与应用内一键直装升级 (`AppUpdater.kt` / `AppUpdateDialog.kt`)**：
-   - 在「设置 -> 关于」新增 **`检查更新`** 与 **`启动时自动检查更新`** 开关，直连 GitHub Releases API（附带 Raw 清单与加速镜像自动回退）；
-   - 发现新版本时弹出 Monet 动态取色更新弹窗，直观展示新版本号、安装包大小与更新日志，支持应用内实时进度条下载；
-   - **双模无缝覆盖升级**：当 Shizuku（或 Root）运行中时，自动通过 `pm install -r -d` 执行特权静默自更新并自动重启应用（免系统安装器确认与三星自动拦截）；未运行时自动通过 `FileProvider` 调起系统安装器完成覆盖安装。
-2. **修复电池运行信息中「电池电压」误读为 `0 mV` 的问题（继承 v13.8.21）**：
-   - 将 `dumpsys battery` 的字段提取正则全部加上行首锚定（`/^[ \t]*voltage:/`），彻底避开排在前面的 `Max charging voltage: 0` 子串误命中，并增加零值自动回退直读内核硬件节点。
-3. **服务启动终端输出严格对齐上游官方规范与弹窗紧凑排版（继承 v13.8.20）**：
-   - 清除 ADB 本地内部重试连接的中间杂音，消除 `Waiting for service...` 重复输出，启动弹窗重构为紧凑自适应高度（`wrapContentHeight`）。
+1. **修复开启「游戏自动高刷加速」后应用反复崩溃（屡次停止运行）致命缺陷 (`MaxHzService.kt`)**：
+   - 彻底修复 `MaxHzService` 在前台服务初始化时遗漏调用 `createNotificationChannel()`，导致向系统服务发送不存在渠道的前台通知从而引发 `CannotPostForegroundServiceNotificationException` 导致进程闪退与开屏死循环的缺陷；
+   - 在 `onCreate()` 与 `updateForegroundState()` 中增加双重渠道注册保障，并严格适配 Android 10+ / 14+ 前台服务类型声明规范（`FOREGROUND_SERVICE_TYPE_DATA_SYNC`）。
+2. **新增 GitHub 在线检查更新与应用内一键直装升级（继承 v13.8.22）**：
+   - 在「设置 -> 关于」新增 `检查更新` 与 `启动时自动检查更新` 开关，支持应用内实时进度下载与 Shizuku/Root 静默自更新及系统安装器双模覆盖升级。
+3. **修复电池运行信息中「电池电压」误读为 `0 mV` 的问题（继承 v13.8.21）**：
+   - 正则行首锚定加固与内核硬件节点自动兜底。
 
 ---
 

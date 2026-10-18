@@ -76,6 +76,7 @@ class MaxHzService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        createNotificationChannel()
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_SCREEN_OFF)
             addAction(Intent.ACTION_SCREEN_ON)
@@ -124,16 +125,23 @@ class MaxHzService : Service() {
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        getSystemService(NotificationManager::class.java).createNotificationChannel(
-            NotificationChannel(
-                NOTIFICATION_CHANNEL_ID,
-                "MaxHz 后台服务",
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                setShowBadge(false)
-                setSound(null, null)
+        val manager = getSystemService(NotificationManager::class.java) ?: return
+        try {
+            if (manager.getNotificationChannel(NOTIFICATION_CHANNEL_ID) == null) {
+                val channel = NotificationChannel(
+                    NOTIFICATION_CHANNEL_ID,
+                    "MaxHz 后台服务",
+                    NotificationManager.IMPORTANCE_LOW
+                ).apply {
+                    description = "保持已启用的刷新率、待机护栏和电量调度规则"
+                    setShowBadge(false)
+                    setSound(null, null)
+                }
+                manager.createNotificationChannel(channel)
             }
-        )
+        } catch (t: Throwable) {
+            Log.e(TAG, "Failed to create notification channel", t)
+        }
     }
 
     private fun updateForegroundState() {
@@ -141,8 +149,18 @@ class MaxHzService : Service() {
             stopForegroundCompat()
             return
         }
+        createNotificationChannel()
         runCatching {
-            startForeground(NOTIFICATION_ID, serviceNotification())
+            val notif = serviceNotification()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    notif,
+                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, notif)
+            }
         }.onFailure {
             Log.w(TAG, "startForeground failed", it)
         }

@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <a href="./README.md">简体中文</a> | <a href="./README.en.md">English</a> | <a href="https://github.com/WEIHEWU/shizuku-sam/releases/latest"><b>⬇️ Download Latest Release (v13.8.22)</b></a>
+  <a href="./README.md">简体中文</a> | <a href="./README.en.md">English</a> | <a href="https://github.com/WEIHEWU/shizuku-sam/releases/latest"><b>⬇️ Download Latest Release (v13.8.23)</b></a>
 </p>
 
 ---
@@ -15,20 +15,19 @@
 
 **Shizuku Sam** integrates the **Shizuku privileged service** with a purpose-built **Samsung Galaxy (One UI) system scheduler & hardware enhancer, background & deep sleep controller, and per-app refresh rate rule manager** in a single cohesive application.
 
-The entire app (Level 1, Level 2, Level 3 screens, and all dialogs) is unified under the **Miuix (`top.yukonga.miuix.kmp`) UI system**, a **3-tab Liquid Glass floating dock (`Shizuku` · `Hardware` · `App Rules`)**, **One UI 9 Unified Modal Architecture (100% modal sheet representation for secondary and tertiary menus + in-modal smooth slide navigation, persistent home dashboard and floating dock without flicker)**, and **on-demand subtitle toggles (clean single-line titles by default + long-press any row/card to toggle its explanation in place + a `显示说明 / 隐藏说明` pill button on every section/page header)**. Every section, card title, switch, and secondary screen listed below corresponds 1:1 with the actual `v13.8.22` app UI, with 100% full adaptation for **Samsung One UI 9 / Android 17**.
+The entire app (Level 1, Level 2, Level 3 screens, and all dialogs) is unified under the **Miuix (`top.yukonga.miuix.kmp`) UI system**, a **3-tab Liquid Glass floating dock (`Shizuku` · `Hardware` · `App Rules`)**, **One UI 9 Unified Modal Architecture (100% modal sheet representation for secondary and tertiary menus + in-modal smooth slide navigation, persistent home dashboard and floating dock without flicker)**, and **on-demand subtitle toggles (clean single-line titles by default + long-press any row/card to toggle its explanation in place + a `显示说明 / 隐藏说明` pill button on every section/page header)**. Every section, card title, switch, and secondary screen listed below corresponds 1:1 with the actual `v13.8.23` app UI, with 100% full adaptation for **Samsung One UI 9 / Android 17**.
 
 ---
 
-## 🚀 What's New in `v13.8.22`
+## 🚀 What's New in `v13.8.23`
 
-1. **In-App GitHub Update Checker & One-Tap Direct Upgrade (`AppUpdater.kt` / `AppUpdateDialog.kt`)**:
-   - Added **`Check for Updates`** and **`Auto-Check for Updates on Launch`** under Settings -> About, querying GitHub Releases API with automatic fallback to Raw manifest and mirror acceleration;
-   - Displays a Monet-styled update dialog showing the new version, APK size, and release notes with a real-time in-app download progress bar;
-   - **Dual-Mode Seamless Installation**: When Shizuku (or Root) is active, performs privileged silent self-update (`pm install -r -d`) and automatically relaunches the app (bypassing system installer prompts and Samsung Auto Blocker); falls back to standard `FileProvider` system package installer when Shizuku is not running.
-2. **Fixed Battery Voltage Reading `0 mV` When Unplugged (from v13.8.21)**:
-   - Anchored all `awk` field regexes in `dumpsys battery` parsing to the start of the line (`/^[ \t]*voltage:/`) and added a zero-value fallback to kernel sysfs nodes.
-3. **Service Startup Terminal Output Aligned with Upstream & Compact Dialog (from v13.8.20)**:
-   - Stripped away unnecessary intermediate ADB connection noise and duplicate `Waiting for service...` lines, with a compact content-wrapping dialog layout.
+1. **Fixed Crash Loop Upon Enabling "Game Auto High-Hz Boost" (`MaxHzService.kt`)**:
+   - Fixed fatal defect where `MaxHzService` omitted calling `createNotificationChannel()` during foreground service initialization, causing the system server to throw an uncaught `CannotPostForegroundServiceNotificationException` and crash the app;
+   - Added dual-channel registration guards in `onCreate()` and `updateForegroundState()`, and strictly passed `FOREGROUND_SERVICE_TYPE_DATA_SYNC` conforming to Android 10+ / 14+ specifications.
+2. **In-App GitHub Update Checker & One-Tap Direct Upgrade (from v13.8.22)**:
+   - Added `Check for Updates` and `Auto-Check for Updates on Launch` with real-time download progress and dual-mode silent / system installation.
+3. **Fixed Battery Voltage Reading `0 mV` When Unplugged (from v13.8.21)**:
+   - Anchored `dumpsys battery` field regexes to line start and added kernel sysfs fallback.
 
 ---
 
