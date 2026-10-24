@@ -1313,6 +1313,7 @@ open class MaxHzActivity : AppBarActivity() {
                     ) {
                         GlassDockNav(
                             isDark = isDarkMode(),
+                            isBlackNightTheme = isShizukuBlackTheme(),
                             selectedIndex = dockSelectedTabState.intValue,
                             bottomInsetDp = bottomInsetDp,
                             onTabClick = { index -> handleDockTabClick(index) }
@@ -11635,10 +11636,7 @@ open class MaxHzActivity : AppBarActivity() {
                     setStroke(dp(1), 0x14000000.toInt())
                 }
             } else {
-                android.graphics.drawable.GradientDrawable().apply {
-                    setColor(if (dark) 0xF4181C24.toInt() else 0xF6FFFFFF.toInt())
-                    setStroke(dp(1), if (dark) 0x24FFFFFF.toInt() else 0x14000000.toInt())
-                }
+                android.graphics.drawable.ColorDrawable(Color.TRANSPARENT)
             }
             it.background = topBarBg
             it.elevation = 0f

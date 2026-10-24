@@ -52,6 +52,8 @@ import top.yukonga.miuix.kmp.utils.overScrollVertical
 import android.widget.Toast
 import kotlinx.coroutines.launch
 import moe.shizuku.manager.home.CenteredAppDialog
+import moe.shizuku.manager.maxhz.GlassCard
+import moe.shizuku.manager.maxhz.glassBackgroundBrush
 import moe.shizuku.manager.update.AppUpdateDialog
 import moe.shizuku.manager.update.AppUpdater
 import java.util.Locale
@@ -68,11 +70,8 @@ fun SettingsGlassScreen(
     val haptic = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
 
-    val bgColor = if (isBlackNightTheme) {
-        Color.Black
-    } else {
-        MiuixTheme.colorScheme.surface
-    }
+    val effectiveDark = isDark || isBlackNightTheme
+    val bgBrush = glassBackgroundBrush(isDark = isDark, isBlackNightTheme = isBlackNightTheme)
 
     val bootComponent = remember { ComponentName(context.packageName, BootCompleteReceiver::class.java.name) }
     var startOnBoot by remember { mutableStateOf(context.packageManager.isComponentEnabled(bootComponent)) }
@@ -97,53 +96,59 @@ fun SettingsGlassScreen(
     var languageExpanded by remember { mutableStateOf(false) }
     var aboutExpanded by remember { mutableStateOf(false) }
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        containerColor = bgColor,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(bgBrush)
     ) {
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .overScrollVertical(),
-            contentPadding = PaddingValues(
-                top = 54.dp,
-                start = 14.dp,
-                end = 14.dp,
-                bottom = 48.dp
-            ),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            containerColor = Color.Transparent,
+            contentWindowInsets = WindowInsets(0, 0, 0, 0)
         ) {
-            // Miuix 顶栏标头（支持长按展开说明）
-            item(key = "header-top") {
-                MiuixSubPageTopBar(
-                    title = stringResource(R.string.settings_title),
-                    subtitle = "管理开机自启、服务进程守护、界面深浅色外观与多语言偏好",
-                    isDark = isDark,
-                    primaryColor = primaryColor,
-                    onBackClick = onBackClick
-                )
-            }
-
-            // 1. 启动与常驻
-            item(key = "section-startup") {
-                Column {
-                    GroupHeaderWithToggle(
-                        text = stringResource(R.string.settings_section_startup),
-                        isDark = isDark,
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .overScrollVertical(),
+                contentPadding = PaddingValues(
+                    top = 54.dp,
+                    start = 14.dp,
+                    end = 14.dp,
+                    bottom = 48.dp
+                ),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Miuix 顶栏标头（支持长按展开说明）
+                item(key = "header-top") {
+                    MiuixSubPageTopBar(
+                        title = stringResource(R.string.settings_title),
+                        subtitle = "管理开机自启、服务进程守护、界面深浅色外观与多语言偏好",
+                        isDark = effectiveDark,
                         primaryColor = primaryColor,
-                        expanded = startupExpanded,
-                        onToggle = { startupExpanded = !startupExpanded }
+                        onBackClick = onBackClick
                     )
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        cornerRadius = 20.dp,
-                        colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
-                    ) {
+                }
+
+                // 1. 启动与常驻
+                item(key = "section-startup") {
+                    Column {
+                        GroupHeaderWithToggle(
+                            text = stringResource(R.string.settings_section_startup),
+                            isDark = effectiveDark,
+                            primaryColor = primaryColor,
+                            expanded = startupExpanded,
+                            onToggle = { startupExpanded = !startupExpanded }
+                        )
+                        GlassCard(
+                            modifier = Modifier.fillMaxWidth(),
+                            isDark = effectiveDark,
+                            isBlackNightTheme = isBlackNightTheme,
+                            cornerRadius = 20.dp
+                        ) {
                         SettingsMiuixSwitchRow(
-                            isDark = isDark,
+                            isDark = effectiveDark,
                             icon = painterResource(R.drawable.ic_root_24dp),
-                            iconTint = if (isDark) Color(0xFFF87171) else Color(0xFFDC2626),
+                            iconTint = if (effectiveDark) Color(0xFFF87171) else Color(0xFFDC2626),
                             title = stringResource(R.string.settings_start_on_boot),
                             subtitle = stringResource(R.string.settings_start_on_boot_summary),
                             checked = startOnBoot,
@@ -161,9 +166,9 @@ fun SettingsGlassScreen(
                             }
                         )
                         SettingsMiuixSwitchRow(
-                            isDark = isDark,
+                            isDark = effectiveDark,
                             icon = painterResource(R.drawable.ic_maxhz_shield_24),
-                            iconTint = if (isDark) Color(0xFF34D399) else Color(0xFF10B981),
+                            iconTint = if (effectiveDark) Color(0xFF34D399) else Color(0xFF10B981),
                             title = stringResource(R.string.settings_watchdog),
                             subtitle = stringResource(R.string.settings_watchdog_summary),
                             checked = watchdog,
@@ -174,9 +179,9 @@ fun SettingsGlassScreen(
                             }
                         )
                         SettingsMiuixSwitchRow(
-                            isDark = isDark,
+                            isDark = effectiveDark,
                             icon = painterResource(R.drawable.ic_system_icon),
-                            iconTint = if (isDark) Color(0xFF818CF8) else Color(0xFF4F46E5),
+                            iconTint = if (effectiveDark) Color(0xFF818CF8) else Color(0xFF4F46E5),
                             title = "显示后台常驻通知",
                             subtitle = "在系统通知栏常驻显示后台守护通知。默认关闭，保持状态栏纯净无图标。",
                             checked = showForegroundNotification,
@@ -191,9 +196,9 @@ fun SettingsGlassScreen(
                             }
                         )
                         SettingsMiuixSwitchRow(
-                            isDark = isDark,
+                            isDark = effectiveDark,
                             icon = painterResource(R.drawable.ic_wadb_24),
-                            iconTint = if (isDark) Color(0xFF60A5FA) else Color(0xFF2563EB),
+                            iconTint = if (effectiveDark) Color(0xFF60A5FA) else Color(0xFF2563EB),
                             title = stringResource(R.string.settings_tcp_mode),
                             subtitle = stringResource(R.string.settings_tcp_mode_summary),
                             checked = tcpMode,
@@ -204,9 +209,9 @@ fun SettingsGlassScreen(
                             }
                         )
                         SettingsMiuixActionRow(
-                            isDark = isDark,
+                            isDark = effectiveDark,
                             icon = painterResource(R.drawable.ic_terminal_24),
-                            iconTint = if (isDark) Color(0xFFFBBF24) else Color(0xFFD97706),
+                            iconTint = if (effectiveDark) Color(0xFFFBBF24) else Color(0xFFD97706),
                             title = stringResource(R.string.settings_tcp_port),
                             subtitle = "设置在启用 TCP 端口监听时使用的固定本地端口号（默认 5555）",
                             valueText = "$tcpPort",
@@ -222,15 +227,16 @@ fun SettingsGlassScreen(
                 Column {
                     GroupHeaderWithToggle(
                         text = stringResource(R.string.settings_section_appearance),
-                        isDark = isDark,
+                        isDark = effectiveDark,
                         primaryColor = primaryColor,
                         expanded = appearanceExpanded,
                         onToggle = { appearanceExpanded = !appearanceExpanded }
                     )
-                    Card(
+                    GlassCard(
                         modifier = Modifier.fillMaxWidth(),
-                        cornerRadius = 20.dp,
-                        colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+                        isDark = effectiveDark,
+                        isBlackNightTheme = isBlackNightTheme,
+                        cornerRadius = 20.dp
                     ) {
                         val nightModeSummary = when (nightMode) {
                             AppCompatDelegate.MODE_NIGHT_NO -> stringResource(R.string.settings_night_mode_off)
@@ -238,9 +244,9 @@ fun SettingsGlassScreen(
                             else -> stringResource(R.string.settings_night_mode_follow_system)
                         }
                         SettingsMiuixActionRow(
-                            isDark = isDark,
+                            isDark = effectiveDark,
                             icon = painterResource(R.drawable.ic_outline_dark_mode_24),
-                            iconTint = if (isDark) Color(0xFFA78BFA) else Color(0xFF7C3AED),
+                            iconTint = if (effectiveDark) Color(0xFFA78BFA) else Color(0xFF7C3AED),
                             title = stringResource(R.string.dark_theme),
                             subtitle = "切换应用界面的浅色、深色或跟随系统深色模式策略",
                             valueText = nightModeSummary,
@@ -249,9 +255,9 @@ fun SettingsGlassScreen(
                         )
                         if (nightMode != AppCompatDelegate.MODE_NIGHT_NO) {
                             SettingsMiuixSwitchRow(
-                                isDark = isDark,
+                                isDark = effectiveDark,
                                 icon = painterResource(R.drawable.ic_maxhz_sun_24),
-                                iconTint = if (isDark) Color(0xFF818CF8) else Color(0xFF4F46E5),
+                                iconTint = if (effectiveDark) Color(0xFF818CF8) else Color(0xFF4F46E5),
                                 title = stringResource(R.string.settings_black_night_theme),
                                 subtitle = stringResource(R.string.settings_black_night_theme_summary),
                                 checked = blackNightTheme,
@@ -265,7 +271,7 @@ fun SettingsGlassScreen(
                         }
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                             SettingsMiuixSwitchRow(
-                                isDark = isDark,
+                                isDark = effectiveDark,
                                 icon = painterResource(R.drawable.ic_system_icon),
                                 iconTint = primaryColor,
                                 title = stringResource(R.string.settings_use_system_color),
@@ -288,15 +294,16 @@ fun SettingsGlassScreen(
                 Column {
                     GroupHeaderWithToggle(
                         text = stringResource(R.string.settings_section_language),
-                        isDark = isDark,
+                        isDark = effectiveDark,
                         primaryColor = primaryColor,
                         expanded = languageExpanded,
                         onToggle = { languageExpanded = !languageExpanded }
                     )
-                    Card(
+                    GlassCard(
                         modifier = Modifier.fillMaxWidth(),
-                        cornerRadius = 20.dp,
-                        colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+                        isDark = effectiveDark,
+                        isBlackNightTheme = isBlackNightTheme,
+                        cornerRadius = 20.dp
                     ) {
                         val currentConfiguredLang = ShizukuSettings.getPreferences().getString(ShizukuSettings.LANGUAGE, "SYSTEM") ?: "SYSTEM"
                         val currentLangName = if (currentConfiguredLang == "SYSTEM" || currentConfiguredLang.isEmpty()) {
@@ -313,9 +320,9 @@ fun SettingsGlassScreen(
                             }
                         }
                         SettingsMiuixActionRow(
-                            isDark = isDark,
+                            isDark = effectiveDark,
                             icon = painterResource(R.drawable.ic_outline_translate_24),
-                            iconTint = if (isDark) Color(0xFF38BDF8) else Color(0xFF0284C7),
+                            iconTint = if (effectiveDark) Color(0xFF38BDF8) else Color(0xFF0284C7),
                             title = stringResource(R.string.settings_language),
                             subtitle = "单独指定本应用界面的显示语言，无需更改系统全局语言",
                             valueText = currentLangName,
@@ -331,15 +338,16 @@ fun SettingsGlassScreen(
                 Column {
                     GroupHeaderWithToggle(
                         text = stringResource(R.string.settings_section_about),
-                        isDark = isDark,
+                        isDark = effectiveDark,
                         primaryColor = primaryColor,
                         expanded = aboutExpanded,
                         onToggle = { aboutExpanded = !aboutExpanded }
                     )
-                    Card(
+                    GlassCard(
                         modifier = Modifier.fillMaxWidth(),
-                        cornerRadius = 20.dp,
-                        colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+                        isDark = effectiveDark,
+                        isBlackNightTheme = isBlackNightTheme,
+                        cornerRadius = 20.dp
                     ) {
                         val updateValueText = when {
                             isCheckingUpdate -> "检查中..."
@@ -347,9 +355,9 @@ fun SettingsGlassScreen(
                             else -> "v${AppUpdater.getCurrentVersionName()}"
                         }
                         SettingsMiuixActionRow(
-                            isDark = isDark,
+                            isDark = effectiveDark,
                             icon = painterResource(R.drawable.ic_system_icon),
-                            iconTint = if (isDark) Color(0xFF34D399) else Color(0xFF10B981),
+                            iconTint = if (effectiveDark) Color(0xFF34D399) else Color(0xFF10B981),
                             title = "检查更新",
                             subtitle = "连接 GitHub Releases 检测新版本，支持应用内一键下载与特权静默安装",
                             valueText = updateValueText,
@@ -387,9 +395,9 @@ fun SettingsGlassScreen(
                             }
                         )
                         SettingsMiuixSwitchRow(
-                            isDark = isDark,
+                            isDark = effectiveDark,
                             icon = painterResource(R.drawable.ic_maxhz_shield_24),
-                            iconTint = if (isDark) Color(0xFFA78BFA) else Color(0xFF7C3AED),
+                            iconTint = if (effectiveDark) Color(0xFFA78BFA) else Color(0xFF7C3AED),
                             title = "启动时自动检查更新",
                             subtitle = "打开应用主页时后台静默检测 GitHub 新版本并弹窗提醒",
                             checked = autoCheckUpdate,
@@ -400,9 +408,9 @@ fun SettingsGlassScreen(
                             }
                         )
                         SettingsMiuixActionRow(
-                            isDark = isDark,
+                            isDark = effectiveDark,
                             icon = painterResource(R.drawable.ic_baseline_link_24),
-                            iconTint = if (isDark) Color(0xFF38BDF8) else Color(0xFF0284C7),
+                            iconTint = if (effectiveDark) Color(0xFF38BDF8) else Color(0xFF0284C7),
                             title = "GitHub 开源仓库",
                             subtitle = "访问 WEIHEWU/shizuku-sam 查看源码、更新日志或手动下载历史构建",
                             groupExpanded = aboutExpanded,
@@ -411,9 +419,9 @@ fun SettingsGlassScreen(
                             }
                         )
                         SettingsMiuixActionRow(
-                            isDark = isDark,
+                            isDark = effectiveDark,
                             icon = painterResource(R.drawable.ic_baseline_link_24),
-                            iconTint = if (isDark) Color(0xFF60A5FA) else Color(0xFF2563EB),
+                            iconTint = if (effectiveDark) Color(0xFF60A5FA) else Color(0xFF2563EB),
                             title = stringResource(R.string.settings_translation),
                             subtitle = stringResource(R.string.settings_translation_summary, stringResource(R.string.app_name)),
                             groupExpanded = aboutExpanded,
@@ -428,11 +436,12 @@ fun SettingsGlassScreen(
 
         }
     }
+}
 
     if (showUpdateDialog && pendingReleaseInfo != null) {
         AppUpdateDialog(
             releaseInfo = pendingReleaseInfo,
-            isDark = isDark,
+            isDark = effectiveDark,
             primaryColor = primaryColor,
             onDismiss = { showUpdateDialog = false }
         )

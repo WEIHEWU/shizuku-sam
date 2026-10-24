@@ -63,30 +63,53 @@ fun com.kyant.backdrop.BackdropEffectScope.glassEffects(
 fun GlassCard(
     backdrop: Any? = null,
     isDark: Boolean,
+    isBlackNightTheme: Boolean = false,
+    cornerRadius: androidx.compose.ui.unit.Dp = 20.dp,
     modifier: Modifier = Modifier.fillMaxWidth(),
     interactive: Boolean = false,
     tintColor: Color? = null,
     onClick: (() -> Unit)? = null,
-    content: @Composable () -> Unit
+    content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
+    val dark = isDark || isBlackNightTheme
     val cardBgColor = when {
-        tintColor != null -> tintColor.copy(alpha = if (isDark) 0.25f else 0.15f)
-        isDark -> TitaniumDark.Card
+        tintColor != null -> tintColor.copy(alpha = if (dark) 0.25f else 0.15f)
+        isBlackNightTheme -> TitaniumBlack.Card
+        dark -> TitaniumDark.Card
         else -> GlassLight.Card
     }
-    val cardShape = RoundedCornerShape(20.dp)
-    val hairline = if (isDark) TitaniumDark.Hairline else GlassLight.Hairline
-    val sheenAlpha = if (isDark) TitaniumDark.SheenAlpha else GlassLight.SheenAlpha
+    val cardShape = RoundedCornerShape(cornerRadius)
+    val hairline = if (dark) TitaniumDark.Hairline else GlassLight.Hairline
+    val sheenAlpha = if (dark) TitaniumDark.SheenAlpha else GlassLight.SheenAlpha
 
     val cardModifier = modifier
         .clip(cardShape)
         .border(1.dp, hairline, cardShape)
 
+    val innerContent: @Composable () -> Unit = {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        0f to Color.White.copy(alpha = sheenAlpha),
+                        0.5f to Color.Transparent
+                    )
+                )
+        ) {
+            androidx.compose.foundation.layout.Column(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                content()
+            }
+        }
+    }
+
     if (onClick != null) {
         top.yukonga.miuix.kmp.basic.Card(
             modifier = cardModifier,
-            cornerRadius = 20.dp,
+            cornerRadius = cornerRadius,
             colors = top.yukonga.miuix.kmp.basic.CardDefaults.defaultColors(color = cardBgColor),
             pressFeedbackType = top.yukonga.miuix.kmp.utils.PressFeedbackType.Sink,
             showIndication = true,
@@ -95,37 +118,15 @@ fun GlassCard(
                 onClick()
             }
         ) {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .background(
-                        Brush.verticalGradient(
-                            0f to Color.White.copy(alpha = sheenAlpha),
-                            0.5f to Color.Transparent
-                        )
-                    )
-            ) {
-                content()
-            }
+            innerContent()
         }
     } else {
         top.yukonga.miuix.kmp.basic.Card(
             modifier = cardModifier,
-            cornerRadius = 20.dp,
+            cornerRadius = cornerRadius,
             colors = top.yukonga.miuix.kmp.basic.CardDefaults.defaultColors(color = cardBgColor)
         ) {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .background(
-                        Brush.verticalGradient(
-                            0f to Color.White.copy(alpha = sheenAlpha),
-                            0.5f to Color.Transparent
-                        )
-                    )
-            ) {
-                content()
-            }
+            innerContent()
         }
     }
 }

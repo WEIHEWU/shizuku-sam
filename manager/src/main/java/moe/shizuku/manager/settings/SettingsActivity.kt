@@ -16,7 +16,7 @@ class SettingsActivity : AppActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
         val isDark = resources.configuration.isNight()
-        val isBlack = ThemeHelper.isBlackNightTheme(this)
+        val isBlack = isDark && ThemeHelper.isBlackNightTheme(this)
 
         setContent {
             GlassAppTheme(isDark = isDark) {

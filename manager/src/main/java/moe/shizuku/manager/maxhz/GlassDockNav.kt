@@ -59,6 +59,7 @@ private val DOCK_PILL_HEIGHT = 46.dp
 fun GlassDockNav(
     backdrop: Any? = null,
     isDark: Boolean,
+    isBlackNightTheme: Boolean = false,
     selectedIndex: Int,
     bottomInsetDp: Dp,
     onTabClick: (Int) -> Unit,
@@ -86,15 +87,21 @@ fun GlassDockNav(
         label = "dockPillX"
     )
 
+    val dark = isDark || isBlackNightTheme
     val pillShape = remember { RoundedCornerShape(GlassRadii.Pill) }
     val primaryColor = top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme.primary
-    val pillBgColor = if (isDark) primaryColor.copy(alpha = 0.28f) else primaryColor.copy(alpha = 0.16f)
-    val pillBorderColor = if (isDark) primaryColor.copy(alpha = 0.45f) else primaryColor.copy(alpha = 0.30f)
+    val pillBgColor = if (dark) primaryColor.copy(alpha = 0.28f) else primaryColor.copy(alpha = 0.16f)
+    val pillBorderColor = if (dark) primaryColor.copy(alpha = 0.45f) else primaryColor.copy(alpha = 0.30f)
 
     // SamsungRootKit 钛金双发丝玻璃设计
-    val frostedFill = if (isDark) TitaniumDark.Card else GlassLight.Card
-    val outerBorder = if (isDark) TitaniumDark.Hairline else GlassLight.Hairline
-    val sheenAlpha = if (isDark) TitaniumDark.SheenAlpha else GlassLight.SheenAlpha
+    val frostedFill = when {
+        isBlackNightTheme -> TitaniumBlack.Card
+        dark -> TitaniumDark.Card
+        else -> GlassLight.Card
+    }
+    val outerBorder = if (dark) TitaniumDark.Hairline else GlassLight.Hairline
+    val innerBorder = if (dark) Color.Transparent else GlassLight.Hairline
+    val sheenAlpha = if (dark) TitaniumDark.SheenAlpha else GlassLight.SheenAlpha
 
     Box(
         Modifier
@@ -110,7 +117,13 @@ fun GlassDockNav(
                     0.5f to Color.Transparent
                 )
             )
-            .border(1.dp, outerBorder, dockShape),
+            .border(1.dp, outerBorder, dockShape)
+            .then(
+                if (!dark) Modifier
+                    .padding(1.dp)
+                    .border(1.dp, innerBorder, dockShape)
+                else Modifier
+            ),
         contentAlignment = Alignment.CenterStart
     ) {
         // 1. Miuix 指示器胶囊（纯 GPU 硬件变换层）

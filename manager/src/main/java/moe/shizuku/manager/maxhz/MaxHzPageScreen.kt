@@ -107,9 +107,9 @@ fun MaxHzPageScreen(
 ) {
     val density = LocalDensity.current
     val bottomInsetDp = with(density) { bottomInsetPx.toDp() }
-    val bgColor = if (isBlackNightTheme) Color.Black else MiuixTheme.colorScheme.surface
+    val bgBrush = glassBackgroundBrush(isDark = isDark, isBlackNightTheme = isBlackNightTheme)
 
-    Box(Modifier.fillMaxSize().background(bgColor)) {
+    Box(Modifier.fillMaxSize().background(bgBrush)) {
         val expandedStates = remember { mutableStateMapOf<String, Boolean>() }
         val listState = rememberLazyListState()
 
@@ -127,6 +127,7 @@ fun MaxHzPageScreen(
                 item(key = "group-${group.label}", contentType = "group") {
                     GroupGlassCard(
                         isDark = isDark,
+                        isBlackNightTheme = isBlackNightTheme,
                         primaryColor = primaryColor,
                         group = group,
                         refreshTick = refreshTick,
@@ -143,6 +144,7 @@ fun MaxHzPageScreen(
                 item(key = "action-$ai", contentType = "action") {
                     ActionGlassCard(
                         isDark = isDark,
+                        isBlackNightTheme = isBlackNightTheme,
                         primaryColor = primaryColor,
                         card = card
                     )
@@ -190,20 +192,22 @@ private fun Modifier.onLongPressTogglePage(onLongPress: () -> Unit): Modifier {
 @Composable
 private fun ActionGlassCard(
     isDark: Boolean,
+    isBlackNightTheme: Boolean = false,
     primaryColor: Color,
     card: MaxHzActionCard
 ) {
     val haptic = LocalHapticFeedback.current
     var showSubtitle by remember { mutableStateOf(false) }
-    Card(
+    GlassCard(
         modifier = Modifier
             .fillMaxWidth()
             .onLongPressTogglePage {
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 showSubtitle = !showSubtitle
             },
-        cornerRadius = 16.dp,
-        colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+        isDark = isDark,
+        isBlackNightTheme = isBlackNightTheme,
+        cornerRadius = 16.dp
     ) {
         Column(Modifier.padding(16.dp)) {
             Row(
@@ -250,6 +254,7 @@ private fun ActionGlassCard(
 @Composable
 private fun GroupGlassCard(
     isDark: Boolean,
+    isBlackNightTheme: Boolean = false,
     primaryColor: Color,
     group: MaxHzGroup,
     refreshTick: Int,
@@ -319,10 +324,11 @@ private fun GroupGlassCard(
             }
         }
         if (expanded) {
-            Card(
+            GlassCard(
                 modifier = Modifier.fillMaxWidth(),
-                cornerRadius = 20.dp,
-                colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+                isDark = isDark,
+                isBlackNightTheme = isBlackNightTheme,
+                cornerRadius = 20.dp
             ) {
                 Column {
                     group.entries.forEach { entry ->

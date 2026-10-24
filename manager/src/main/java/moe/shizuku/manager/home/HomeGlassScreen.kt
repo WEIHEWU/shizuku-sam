@@ -77,9 +77,13 @@ import moe.shizuku.manager.R
 import moe.shizuku.manager.maxhz.GLASS_DOCK_CLEARANCE_DP
 import moe.shizuku.manager.maxhz.GlassButtonStyle
 import moe.shizuku.manager.maxhz.GlassCard
+import moe.shizuku.manager.maxhz.GlassCard
+import moe.shizuku.manager.maxhz.GlassLight
 import moe.shizuku.manager.maxhz.GlassPillButton
 import moe.shizuku.manager.maxhz.IconBadge
 import moe.shizuku.manager.maxhz.MaxHzPrefs
+import moe.shizuku.manager.maxhz.TitaniumDark
+import moe.shizuku.manager.maxhz.glassBackgroundBrush
 import moe.shizuku.manager.model.ServiceStatus
 import moe.shizuku.manager.utils.Contrast
 import top.yukonga.miuix.kmp.basic.BasicComponent
@@ -203,11 +207,8 @@ fun ShizukuHomeScreen(
     val bottomInsetDp = with(density) { bottomInsetPx.toDp() }
     val ok = status?.isRunning == true
 
-    val bgColor = if (isBlackNightTheme) {
-        Color.Black
-    } else {
-        MiuixTheme.colorScheme.surface
-    }
+    val effectiveDark = isDark || isBlackNightTheme
+    val bgBrush = glassBackgroundBrush(isDark = isDark, isBlackNightTheme = isBlackNightTheme)
 
     val shizukuListState = rememberLazyListState()
     val perfListState = rememberLazyListState()
@@ -233,17 +234,22 @@ fun ShizukuHomeScreen(
     if (autoUpdateReleaseInfo != null) {
         moe.shizuku.manager.update.AppUpdateDialog(
             releaseInfo = autoUpdateReleaseInfo,
-            isDark = isDark,
+            isDark = effectiveDark,
             primaryColor = primaryColor,
             onDismiss = { autoUpdateReleaseInfo = null }
         )
     }
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        containerColor = bgColor,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0)
-    ) { _ ->
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(bgBrush)
+    ) {
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            containerColor = Color.Transparent,
+            contentWindowInsets = WindowInsets(0, 0, 0, 0)
+        ) { _ ->
         when (currentTab) {
             0 -> {
                 // ==========================================================
@@ -268,7 +274,7 @@ fun ShizukuHomeScreen(
                             title = "Shizuku Sam",
                             subtitle = if (ok) stringResource(R.string.home_header_shizuku_running_subtitle)
                             else stringResource(R.string.home_header_shizuku_stopped_subtitle),
-                            isDark = isDark,
+                            isDark = effectiveDark,
                             primaryColor = primaryColor,
                             expanded = tab0HeaderExpanded,
                             onToggle = { tab0HeaderExpanded = !tab0HeaderExpanded }
@@ -277,7 +283,8 @@ fun ShizukuHomeScreen(
 
                     item(key = "hero", contentType = "hero") {
                         HeroCard(
-                            isDark = isDark,
+                            isDark = effectiveDark,
+                            isBlackNightTheme = isBlackNightTheme,
                             primaryColor = primaryColor,
                             status = status,
                             grantedCount = grantedCount,
@@ -293,7 +300,8 @@ fun ShizukuHomeScreen(
                     if (!ok) {
                         item(key = "adb-pairing", contentType = "pairing") {
                             AdbPairingHubCard(
-                                isDark = isDark,
+                                isDark = effectiveDark,
+                                isBlackNightTheme = isBlackNightTheme,
                                 primaryColor = primaryColor,
                                 isAutoPairingEnabled = isAutoPairingEnabled,
                                 actions = actions
@@ -302,7 +310,8 @@ fun ShizukuHomeScreen(
 
                         item(key = "adb-alt", contentType = "alt") {
                             PrivilegeLaunchMethodsCard(
-                                isDark = isDark,
+                                isDark = effectiveDark,
+                                isBlackNightTheme = isBlackNightTheme,
                                 primaryColor = primaryColor,
                                 isDeviceOwner = isDeviceOwner,
                                 actions = actions
@@ -311,7 +320,8 @@ fun ShizukuHomeScreen(
                     } else {
                         item(key = "adb-running-tools", contentType = "tools") {
                             AdbRunningToolsCard(
-                                isDark = isDark,
+                                isDark = effectiveDark,
+                                isBlackNightTheme = isBlackNightTheme,
                                 primaryColor = primaryColor,
                                 isRoot = status?.uid == 0,
                                 isDeviceOwner = isDeviceOwner,
@@ -349,7 +359,7 @@ fun ShizukuHomeScreen(
                             title = stringResource(R.string.home_header_hardware_title),
                             subtitle = if (isRootEnv) "Root 硬件直通 · " + stringResource(R.string.home_header_hardware_subtitle)
                             else "Shizuku 模式 · " + stringResource(R.string.home_header_hardware_subtitle),
-                            isDark = isDark,
+                            isDark = effectiveDark,
                             primaryColor = primaryColor,
                             expanded = tab1HeaderExpanded,
                             onToggle = { tab1HeaderExpanded = !tab1HeaderExpanded }
@@ -358,7 +368,8 @@ fun ShizukuHomeScreen(
 
                     item(key = "perf-mode", contentType = "perf") {
                         PerformanceModeCard(
-                            isDark = isDark,
+                            isDark = effectiveDark,
+                            isBlackNightTheme = isBlackNightTheme,
                             primaryColor = primaryColor,
                             currentMode = gameTileMode,
                             onModeChange = actions.onModeChange
@@ -367,7 +378,8 @@ fun ShizukuHomeScreen(
 
                     item(key = "quick-switches", contentType = "switches") {
                         QuickSwitchesCard(
-                            isDark = isDark,
+                            isDark = effectiveDark,
+                            isBlackNightTheme = isBlackNightTheme,
                             primaryColor = primaryColor,
                             isRootAvailable = isRootAvailable || (status?.uid == 0),
                             isPassThroughActive = isPassThroughActive,
@@ -396,7 +408,8 @@ fun ShizukuHomeScreen(
 
                     item(key = "background-power", contentType = "background") {
                         BackgroundPowerCard(
-                            isDark = isDark,
+                            isDark = effectiveDark,
+                            isBlackNightTheme = isBlackNightTheme,
                             primaryColor = primaryColor,
                             isTombstoneActive = isTombstoneActive,
                             isQuickDozeActive = isQuickDozeActive,
@@ -414,7 +427,8 @@ fun ShizukuHomeScreen(
 
                     item(key = "quick-actions", contentType = "actions") {
                         QuickActionsCard(
-                            isDark = isDark,
+                            isDark = effectiveDark,
+                            isBlackNightTheme = isBlackNightTheme,
                             primaryColor = primaryColor,
                             isAppLaunchBoostActive = isAppLaunchBoostActive,
                             isForceResizableActive = isForceResizableActive,
@@ -434,7 +448,8 @@ fun ShizukuHomeScreen(
                 // Tab 2：【应用规则】（Miuix 下拉菜单与分应用刷新率规则）
                 // ==========================================================
                 AppRulesTabContent(
-                    isDark = isDark,
+                    isDark = effectiveDark,
+                    isBlackNightTheme = isBlackNightTheme,
                     primaryColor = primaryColor,
                     topInsetPx = topInsetPx,
                     bottomInsetDp = bottomInsetDp,
@@ -503,12 +518,13 @@ fun ShizukuHomeScreen(
         // ==========================================================
         MiuixBatteryInfoDialog(
             show = showBatteryInfoDialog,
-            isDark = isDark,
+            isDark = effectiveDark,
             primaryColor = primaryColor,
             onDismiss = { showBatteryInfoDialog = false },
             onFetchBatteryInfo = actions.onFetchBatteryInfo
         )
     }
+}
 }
 
 // ==================================================================
@@ -1106,6 +1122,7 @@ private fun SectionHeader(
 @Composable
 private fun HeroCard(
     isDark: Boolean,
+    isBlackNightTheme: Boolean = false,
     primaryColor: Color,
     status: ServiceStatus?,
     grantedCount: Int,
@@ -1126,12 +1143,13 @@ private fun HeroCard(
     val patchVersion = status?.patchVersion ?: 0
     val runningModeName = if (isRoot) "Root" else "ADB"
 
-    Card(
+    GlassCard(
         modifier = Modifier
             .fillMaxWidth()
             .onLongPressToggle(haptic) { rowToggled = !rowToggled },
-        cornerRadius = 20.dp,
-        colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+        isDark = isDark,
+        isBlackNightTheme = isBlackNightTheme,
+        cornerRadius = 20.dp
     ) {
         Box(
             modifier = Modifier
@@ -1352,6 +1370,7 @@ private fun HeroCard(
 @Composable
 private fun AdbPairingHubCard(
     isDark: Boolean,
+    isBlackNightTheme: Boolean = false,
     primaryColor: Color,
     isAutoPairingEnabled: Boolean,
     actions: HomeActions
@@ -1365,10 +1384,11 @@ private fun AdbPairingHubCard(
             expanded = groupExpanded,
             onToggle = { groupExpanded = !groupExpanded }
         )
-        Card(
+        GlassCard(
             modifier = Modifier.fillMaxWidth(),
-            cornerRadius = 20.dp,
-            colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+            isDark = isDark,
+            isBlackNightTheme = isBlackNightTheme,
+            cornerRadius = 20.dp
         ) {
             AdbActionRow(
                 isDark = isDark,
@@ -1410,6 +1430,7 @@ private fun AdbPairingHubCard(
 @Composable
 private fun PrivilegeLaunchMethodsCard(
     isDark: Boolean,
+    isBlackNightTheme: Boolean = false,
     primaryColor: Color,
     isDeviceOwner: Boolean,
     actions: HomeActions
@@ -1423,10 +1444,11 @@ private fun PrivilegeLaunchMethodsCard(
             expanded = groupExpanded,
             onToggle = { groupExpanded = !groupExpanded }
         )
-        Card(
+        GlassCard(
             modifier = Modifier.fillMaxWidth(),
-            cornerRadius = 20.dp,
-            colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+            isDark = isDark,
+            isBlackNightTheme = isBlackNightTheme,
+            cornerRadius = 20.dp
         ) {
             AdbActionRow(
                 isDark = isDark,
@@ -1470,6 +1492,7 @@ private fun PrivilegeLaunchMethodsCard(
 @Composable
 private fun AdbRunningToolsCard(
     isDark: Boolean,
+    isBlackNightTheme: Boolean = false,
     primaryColor: Color,
     isRoot: Boolean = false,
     isDeviceOwner: Boolean,
@@ -1484,10 +1507,11 @@ private fun AdbRunningToolsCard(
             expanded = groupExpanded,
             onToggle = { groupExpanded = !groupExpanded }
         )
-        Card(
+        GlassCard(
             modifier = Modifier.fillMaxWidth(),
-            cornerRadius = 20.dp,
-            colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+            isDark = isDark,
+            isBlackNightTheme = isBlackNightTheme,
+            cornerRadius = 20.dp
         ) {
             if (!isRoot) {
                 AdbActionRow(
@@ -1542,6 +1566,7 @@ private fun AdbRunningToolsCard(
 @Composable
 private fun PerformanceModeCard(
     isDark: Boolean,
+    isBlackNightTheme: Boolean = false,
     primaryColor: Color,
     currentMode: Int,
     onModeChange: (Int) -> Unit
@@ -1559,12 +1584,13 @@ private fun PerformanceModeCard(
             expanded = showSubtitle,
             onToggle = { groupExpanded = !showSubtitle }
         )
-        Card(
+        GlassCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .onLongPressToggle(haptic) { cardToggled = !cardToggled },
-            cornerRadius = 20.dp,
-            colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+            isDark = isDark,
+            isBlackNightTheme = isBlackNightTheme,
+            cornerRadius = 20.dp
         ) {
             Column(Modifier.padding(14.dp)) {
                 Row(
@@ -1658,6 +1684,7 @@ private fun PerformanceModeCard(
 @Composable
 private fun QuickSwitchesCard(
     isDark: Boolean,
+    isBlackNightTheme: Boolean = false,
     primaryColor: Color,
     isRootAvailable: Boolean = false,
     isPassThroughActive: Boolean,
@@ -1691,10 +1718,11 @@ private fun QuickSwitchesCard(
             expanded = groupExpanded,
             onToggle = { groupExpanded = !groupExpanded }
         )
-        Card(
+        GlassCard(
             modifier = Modifier.fillMaxWidth(),
-            cornerRadius = 20.dp,
-            colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+            isDark = isDark,
+            isBlackNightTheme = isBlackNightTheme,
+            cornerRadius = 20.dp
         ) {
             SwitchItemRow(
                 isDark = isDark,
@@ -1783,6 +1811,7 @@ private fun QuickSwitchesCard(
 @Composable
 private fun BackgroundPowerCard(
     isDark: Boolean,
+    isBlackNightTheme: Boolean = false,
     primaryColor: Color,
     isTombstoneActive: Boolean,
     isQuickDozeActive: Boolean,
@@ -1805,10 +1834,11 @@ private fun BackgroundPowerCard(
             expanded = groupExpanded,
             onToggle = { groupExpanded = !groupExpanded }
         )
-        Card(
+        GlassCard(
             modifier = Modifier.fillMaxWidth(),
-            cornerRadius = 20.dp,
-            colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+            isDark = isDark,
+            isBlackNightTheme = isBlackNightTheme,
+            cornerRadius = 20.dp
         ) {
             SwitchItemRow(
                 isDark = isDark,
@@ -1958,6 +1988,7 @@ private fun SwitchItemRow(
 @Composable
 private fun QuickActionsCard(
     isDark: Boolean,
+    isBlackNightTheme: Boolean = false,
     primaryColor: Color,
     isAppLaunchBoostActive: Boolean = false,
     isForceResizableActive: Boolean = false,
@@ -1974,10 +2005,11 @@ private fun QuickActionsCard(
             expanded = groupExpanded,
             onToggle = { groupExpanded = !groupExpanded }
         )
-        Card(
+        GlassCard(
             modifier = Modifier.fillMaxWidth(),
-            cornerRadius = 20.dp,
-            colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+            isDark = isDark,
+            isBlackNightTheme = isBlackNightTheme,
+            cornerRadius = 20.dp
         ) {
             SwitchItemRow(
                 isDark = isDark,
@@ -2118,9 +2150,16 @@ private fun Tile(
     isDark: Boolean,
     primaryColor: Color
 ) {
+    val tileShape = RoundedCornerShape(12.dp)
     val tileBgColor = when {
-        isAccent && ok -> if (isDark) Color(0xFF162946) else Color(0xFFEBF3FF)
-        else -> if (isDark) Color(0xFF21242C) else Color(0xFFF5F7FA)
+        isAccent && ok -> if (isDark) primaryColor.copy(alpha = 0.22f) else primaryColor.copy(alpha = 0.12f)
+        isDark -> Color(0x33384850)
+        else -> Color(0x66FFFFFF)
+    }
+    val tileBorder = when {
+        isAccent && ok -> if (isDark) primaryColor.copy(alpha = 0.40f) else primaryColor.copy(alpha = 0.25f)
+        isDark -> TitaniumDark.Hairline
+        else -> GlassLight.Hairline
     }
     val valueColor = when {
         isAccent && ok -> if (isDark) Color(0xFF60A5FA) else primaryColor
@@ -2129,8 +2168,9 @@ private fun Tile(
 
     Column(
         modifier
-            .clip(RoundedCornerShape(12.dp))
+            .clip(tileShape)
             .background(tileBgColor)
+            .border(1.dp, tileBorder, tileShape)
             .padding(horizontal = 10.dp, vertical = 9.dp)
     ) {
         Text(
@@ -2155,6 +2195,7 @@ private fun Tile(
 @Composable
 private fun AppRulesTabContent(
     isDark: Boolean,
+    isBlackNightTheme: Boolean = false,
     primaryColor: Color,
     topInsetPx: Int,
     bottomInsetDp: androidx.compose.ui.unit.Dp,
@@ -2215,12 +2256,13 @@ private fun AppRulesTabContent(
         item(key = "card-accessibility-status") {
             var cardToggled by remember(headerGroupExpanded) { mutableStateOf(false) }
             val showSubtitle = headerGroupExpanded xor cardToggled
-            Card(
+            GlassCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .onLongPressToggle(haptic) { cardToggled = !cardToggled },
-                cornerRadius = 20.dp,
-                colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+                isDark = isDark,
+                isBlackNightTheme = isBlackNightTheme,
+                cornerRadius = 20.dp
             ) {
                 Column(Modifier.padding(16.dp)) {
                     Row(
@@ -2330,12 +2372,13 @@ private fun AppRulesTabContent(
                     expanded = showSubtitle,
                     onToggle = { presetsGroupExpanded = !showSubtitle }
                 )
-                Card(
+                GlassCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .onLongPressToggle(haptic) { cardToggled = !cardToggled },
-                    cornerRadius = 20.dp,
-                    colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+                    isDark = isDark,
+                    isBlackNightTheme = isBlackNightTheme,
+                    cornerRadius = 20.dp
                 ) {
                     val presets = listOf(
                         Triple(stringResource(R.string.rules_preset_daily), Pair(120, 10), true),
@@ -2435,10 +2478,11 @@ private fun AppRulesTabContent(
                     expanded = formGroupExpanded,
                     onToggle = { formGroupExpanded = !formGroupExpanded }
                 )
-                Card(
+                GlassCard(
                     modifier = Modifier.fillMaxWidth(),
-                    cornerRadius = 20.dp,
-                    colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+                    isDark = isDark,
+                    isBlackNightTheme = isBlackNightTheme,
+                    cornerRadius = 20.dp
                 ) {
                     val showSelectSub = formGroupExpanded xor selectRowToggled
                     Box(
@@ -2608,10 +2652,11 @@ private fun AppRulesTabContent(
                     expanded = listGroupExpanded,
                     onToggle = { listGroupExpanded = !listGroupExpanded }
                 )
-                Card(
+                GlassCard(
                     modifier = Modifier.fillMaxWidth(),
-                    cornerRadius = 20.dp,
-                    colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+                    isDark = isDark,
+                    isBlackNightTheme = isBlackNightTheme,
+                    cornerRadius = 20.dp
                 ) {
                     if (appRules.isEmpty()) {
                         Box(
@@ -2729,12 +2774,13 @@ private fun AppRulesTabContent(
                     expanded = guideGroupExpanded,
                     onToggle = { guideGroupExpanded = !guideGroupExpanded }
                 )
-                Card(
+                GlassCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .onLongPressToggle(haptic) { compatToggled = !compatToggled },
-                    cornerRadius = 20.dp,
-                    colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+                    isDark = isDark,
+                    isBlackNightTheme = isBlackNightTheme,
+                    cornerRadius = 20.dp
                 ) {
                     Column(Modifier.padding(16.dp)) {
                         Text(
@@ -2774,12 +2820,13 @@ private fun AppRulesTabContent(
         item(key = "card-calibrate-ltpo-power") {
             var ltpoToggled by remember(guideGroupExpanded) { mutableStateOf(false) }
             val showLtpoSub = guideGroupExpanded xor ltpoToggled
-            Card(
+            GlassCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .onLongPressToggle(haptic) { ltpoToggled = !ltpoToggled },
-                cornerRadius = 20.dp,
-                colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+                isDark = isDark,
+                isBlackNightTheme = isBlackNightTheme,
+                cornerRadius = 20.dp
             ) {
                 Column(Modifier.padding(16.dp)) {
                     Text(

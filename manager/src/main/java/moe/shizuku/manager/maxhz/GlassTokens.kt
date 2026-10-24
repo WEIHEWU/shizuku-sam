@@ -1,6 +1,7 @@
 package moe.shizuku.manager.maxhz
 
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -38,12 +39,20 @@ object TitaniumDark {
     val SheenAlpha = 0.04f                   // 顶部微弱反光强度 (4%)
 }
 
+// ── 黑色夜间主题 ("Titanium Black") ───────────────────────────────────────────────────
+object TitaniumBlack {
+    val Background = Color(0xFF000000)
+    val Card = Color(0xFF161B22)             // AMOLED 纯黑夜间卡片填充 (深灰蓝黑)
+    val Hairline = Color(0x26FFFFFF)         // 发丝描边 (15% 纯白 @ 1dp)
+    val SheenAlpha = 0.04f
+}
+
 // ── 亮色模式 ("Glass Light") ─────────────────────────────────────────────────────────
 object GlassLight {
-    val BackgroundTop = Color(0xFFF8FBFE)     // 亮色顶部微蓝
-    val BackgroundMid = Color(0xFFEFF5FC)     // 亮色中部
-    val BackgroundBottom = Color(0xFFE4EDFA)  // 亮色底部
-    val Card = Color(0x59FFFFFF)             // 玻璃卡片主填充 (AA=59 ≈ 35% 暖白)
+    val BackgroundTop = Color(0xFFF5F3EE)     // 亮色暖调钛金顶部 (SamsungRootKit 官方色)
+    val BackgroundMid = Color(0xFFF0EDE6)     // 亮色中部
+    val BackgroundBottom = Color(0xFFEDEAE2)  // 亮色底部
+    val Card = Color(0x59FFFFFF)             // 玻璃卡片主填充 (AA=59 ≈ 35% 磨砂白，与 SamsungRootKit 完全对齐)
     val Hairline = Color(0xCCFFFFFF)         // 亮色发丝描边 (AA=CC ≈ 80% 高透白 @ 1dp)
     val DialogBg = Color(0xE6FFFDFB)         // 对话框打底 (AA=E6 ≈ 90% 暖白)
     val DialogHairline = Color(0xFFFFFFFF)   // 亮色对话框高亮边
@@ -57,3 +66,25 @@ object GlassLight {
  * 降级为 0 开销的纯色微光卡片，锁定 120Hz 极低功耗。
  */
 val LocalGlassEnabled = compositionLocalOf { true }
+
+fun glassBackgroundBrush(isDark: Boolean, isBlackNightTheme: Boolean = false): Brush {
+    return when {
+        isBlackNightTheme -> Brush.verticalGradient(
+            listOf(Color.Black, Color.Black)
+        )
+        isDark -> Brush.verticalGradient(
+            listOf(
+                TitaniumDark.BackgroundTop,
+                TitaniumDark.BackgroundMid,
+                TitaniumDark.BackgroundBottom
+            )
+        )
+        else -> Brush.verticalGradient(
+            listOf(
+                GlassLight.BackgroundTop,
+                GlassLight.BackgroundMid,
+                GlassLight.BackgroundBottom
+            )
+        )
+    }
+}

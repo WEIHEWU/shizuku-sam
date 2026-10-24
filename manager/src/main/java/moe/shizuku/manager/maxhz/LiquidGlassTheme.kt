@@ -668,16 +668,27 @@ half4 main(float2 coord) {
     // ==================================================================
 
     /**
-     * 页面背景统一 Miuix 纯净底色（亮色 0xFFF5F6F9，深色 0xFF0D0F12，纯黑 0x000000）。
-     * 与 Miuix Compose 页面完全对齐，彻底消除不同界面之间的色差与割裂。
+     * 页面背景统一 SamsungRootKit / OdinBox 钛金渐变底色：
+     * - 纯黑主题：0xFF000000 (AMOLED 纯黑)
+     * - 深色模式：TitaniumDark (0xFF161B22 -> 0xFF12131F -> 0xFF0D0E18)
+     * - 浅色模式：GlassLight (0xFFF5F3EE -> 0xFFF0EDE6 -> 0xFFEDEAE2)
      */
     @JvmStatic
     fun createPageBackgroundDrawable(isDark: Boolean, isBlack: Boolean): Drawable {
         if (isBlack) {
             return ColorDrawable(Color.BLACK)
         }
-        val color = if (isDark) 0xFF0D0F12.toInt() else 0xFFF5F6F9.toInt()
-        return ColorDrawable(color)
+        return if (isDark) {
+            GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(0xFF161B22.toInt(), 0xFF12131F.toInt(), 0xFF0D0E18.toInt())
+            )
+        } else {
+            GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(0xFFF5F3EE.toInt(), 0xFFF0EDE6.toInt(), 0xFFEDEAE2.toInt())
+            )
+        }
     }
 
     /**
