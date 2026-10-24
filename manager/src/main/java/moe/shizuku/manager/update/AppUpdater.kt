@@ -250,13 +250,22 @@ object AppUpdater {
                 if (!release.downloadUrl.startsWith(MIRROR_PREFIX)) {
                     add(MIRROR_PREFIX + release.downloadUrl)
                 }
+                val rawUrl = "https://raw.githubusercontent.com/$GITHUB_REPO/main/releases/Shizuku-Sam-v${release.versionName}.apk"
+                if (!contains(rawUrl)) {
+                    add(rawUrl)
+                    add(MIRROR_PREFIX + rawUrl)
+                }
             }
 
             var downloadedOk = false
             var lastError: Throwable? = null
             for ((index, url) in candidateUrls.withIndex()) {
                 try {
-                    val sourceLabel = if (index == 0) "GitHub" else "镜像加速通道"
+                    val sourceLabel = when {
+                        url.startsWith(MIRROR_PREFIX) -> "镜像加速通道"
+                        url.contains("raw.githubusercontent.com") -> "GitHub 源码通道"
+                        else -> "GitHub Release"
+                    }
                     onProgress(0, 0L, release.assetSize, "正在连接 $sourceLabel 下载更新包...")
                     downloadFile(url, tempFile, release.assetSize) { pct, readBytes, totalBytes ->
                         onProgress(pct, readBytes, totalBytes, "正在从 $sourceLabel 下载... $pct%")

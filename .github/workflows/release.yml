@@ -299,8 +299,33 @@ jobs:
           files: |
             releases/Shizuku-Sam-v13.8.23.apk
 
+      - name: "Publish Release v13.8.27 (SamsungRootKit Optical Blur Architecture & Fix System Color)"
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/v13.8.27')
+        with:
+          tag_name: v13.8.27
+          name: "Shizuku Sam v13.8.27 — 100% 全方位落地 SamsungRootKit 光学毛玻璃架构 & 修复系统主题色切换无效"
+          body: |
+            ### Shizuku Sam v13.8.27
+
+            #### 🎨 100% 全方位落地 SamsungRootKit 光学毛玻璃架构（涵盖 1/2/3/4 级所有界面与弹窗）
+            - **底层实时光学毛玻璃引擎 (`com.kyant.backdrop`)**：
+              - 激活完整的 `graphicsLayer` 实时背景采样、RenderNode 高斯模糊（`blur`）与边缘光学折射（`lens`）渲染管线；
+              - 全面覆盖主界面 3 个 Tab、底栏胶囊悬浮导航（`GlassDockNav`）、全应用卡片（`GlassCard`）及全局操作按钮（`GlassPillButton`）。
+            - **所有二级、三级、四级独立 Activity 窗口与模态弹窗对齐**：
+              - 包括应用管理（`ApplicationManagementActivity`）、配对教程（`AdbPairingTutorialActivity`）、终端日志（`StarterActivity`）、Shell 教程（`ShellTutorialActivity`）；
+              - 以及服务停止确认、充电上限保护、电池健康信息、高级设置、版本更新等所有模态弹窗，均开启 `FLAG_BLUR_BEHIND` 窗口背景高斯模糊与发丝微光边框。
+            - **MaxHz 2/3/4 级 View 详情页与原生对话框升级**：
+              - 全局显示引擎、满血锁定、墓碑冻结等全部二级详情页，以及内部三级/四级选择器与输入框，统一接入半透明玻璃背景、`1dp` 发丝边框与全圆角胶囊渐变玻璃按钮。
+
+            #### 🐛 彻底修复点击「使用系统主题颜色」开关无效问题
+            - 全局响应式主题色状态管理，关闭时严格应用 SamsungRootKit 经典翡翠绿（浅色 `#059669` / 深色 `#10B981`），开启时动态提取 Material You 壁纸主题色；
+            - 彻底移除硬编码蓝色，所有开关轨道、滑块、按钮渐变与高光徽章实时跟随联动。
+          files: |
+            releases/Shizuku-Sam-v13.8.27.apk
+
       - name: Publish Future Version Tag Release
-        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2' && github.ref_name != 'v13.8.3' && github.ref_name != 'v13.8.4' && github.ref_name != 'v13.8.5' && github.ref_name != 'v13.8.6' && github.ref_name != 'v13.8.7' && github.ref_name != 'v13.8.8' && github.ref_name != 'v13.8.9' && github.ref_name != 'v13.8.10' && github.ref_name != 'v13.8.11' && github.ref_name != 'v13.8.19' && github.ref_name != 'v13.8.20' && github.ref_name != 'v13.8.21' && github.ref_name != 'v13.8.22' && github.ref_name != 'v13.8.23'
+        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2' && github.ref_name != 'v13.8.3' && github.ref_name != 'v13.8.4' && github.ref_name != 'v13.8.5' && github.ref_name != 'v13.8.6' && github.ref_name != 'v13.8.7' && github.ref_name != 'v13.8.8' && github.ref_name != 'v13.8.9' && github.ref_name != 'v13.8.10' && github.ref_name != 'v13.8.11' && github.ref_name != 'v13.8.19' && github.ref_name != 'v13.8.20' && github.ref_name != 'v13.8.21' && github.ref_name != 'v13.8.22' && github.ref_name != 'v13.8.23' && github.ref_name != 'v13.8.27'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
