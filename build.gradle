@@ -41,7 +41,7 @@ try {
 } catch (Throwable ignored) {
 }
 ext {
-    versionCode = 130823
-    versionName = "13.8.23"
+    versionCode = 130824
+    versionName = "13.8.24"
 }
 
