@@ -278,7 +278,6 @@ fun SettingsGlassScreen(
                                     blackNightTheme = checked
                                     GlassThemeState.sync()
                                     MaxHzComposeRefreshBus.bump()
-                                    onRecreate()
                                 }
                             )
                         }
@@ -296,7 +295,6 @@ fun SettingsGlassScreen(
                                     useSystemColor = checked
                                     GlassThemeState.sync()
                                     MaxHzComposeRefreshBus.bump()
-                                    onRecreate()
                                 }
                             )
                         }
@@ -555,12 +553,10 @@ fun SettingsGlassScreen(
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             if (nightMode != mode) {
                                 ShizukuSettings.getPreferences().edit().putInt(ShizukuSettings.NIGHT_MODE, mode).apply()
-                                AppCompatDelegate.setDefaultNightMode(mode)
                                 nightMode = mode
                                 showNightModeDialog = false
                                 GlassThemeState.sync()
                                 MaxHzComposeRefreshBus.bump()
-                                onRecreate()
                             } else {
                                 showNightModeDialog = false
                             }

@@ -14,10 +14,9 @@ import rikka.material.app.MaterialActivity
 abstract class AppActivity : MaterialActivity() {
 
     override fun computeUserThemeKey(): String {
-        return ThemeHelper.getTheme(this) +
-            ThemeHelper.isUsingSystemColor() +
-            ShizukuSettings.getNightMode() +
-            ThemeHelper.isBlackNightTheme(this)
+        // 主题（深浅色、纯黑夜间、系统动态取色）已全部改为 GlassThemeState 0ms 原地响应式切换，
+        // 固定返回常量以避免 MaterialActivity.onResume() 触发 Activity.recreate() 重建风暴。
+        return "UNIFIED_GLASS_THEME"
     }
 
     override fun onApplyUserThemeResource(theme: Theme, isDecorView: Boolean) {

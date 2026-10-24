@@ -92,37 +92,27 @@ fun BackdropProvider(
     overlay: (@Composable BoxScope.() -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
-    val backdrop = rememberLayerBackdrop(blurRadius = 0.dp)
-    var scrollTick by remember { mutableIntStateOf(0) }
-    val nestedScrollConnection = remember {
-        object : NestedScrollConnection {
-            override fun onPostScroll(
-                consumed: Offset,
-                available: Offset,
-                source: NestedScrollSource
-            ): Offset {
-                if (consumed.y != 0f || consumed.x != 0f) {
-                    scrollTick++
-                }
-                return Offset.Zero
-            }
+    if (overlay == null) {
+        // 子页面（设置、弹窗等）无悬浮底栏，列表卡片走 SamsungRootKit 0-GPU 静态半透明钛金材质，
+        // 无需挂载全屏离屏 GraphicsLayer 录制，彻底实现 0 离屏重绘开销。
+        Box(modifier = modifier.fillMaxSize()) {
+            content()
         }
+        return
     }
-    PublishBackdrop(backdrop, contentKey = scrollTick)
+    val backdrop = rememberLayerBackdrop(blurRadius = 0.dp)
+    val themeKey = (GlassThemeState.refreshTick.intValue * 1000) + MaxHzComposeRefreshBus.tick.value
+    PublishBackdrop(backdrop, contentKey = themeKey)
     CompositionLocalProvider(LocalBackdrop provides backdrop) {
-        Box(
-            modifier = modifier
-                .fillMaxSize()
-                .nestedScroll(nestedScrollConnection)
-        ) {
+        Box(modifier = modifier.fillMaxSize()) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .layerBackdrop(backdrop, contentKey = scrollTick)
+                    .layerBackdrop(backdrop, contentKey = themeKey)
             ) {
                 content()
             }
-            overlay?.invoke(this)
+            overlay.invoke(this)
         }
     }
 }

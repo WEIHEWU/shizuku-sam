@@ -358,12 +358,14 @@ abstract class HomeActivity : MaxHzActivity() {
         }
         val cv = ComposeView(this).apply {
             setContent {
+                val dark = moe.shizuku.manager.maxhz.rememberEffectiveIsDark()
+                val blackTheme = moe.shizuku.manager.maxhz.rememberEffectiveBlackNight(dark)
                 // 必须包 MaterialTheme：否则 LocalIndication 无水波纹实现，
                 // 所有 .clickable 元素按下时没有任何反馈动画。
-                GlassAppTheme(isDark = isDarkMode()) {
-                    val resolvedPrimary = getSystemOrAppPrimaryColor(isDarkMode())
+                GlassAppTheme(isDark = dark) {
+                    val resolvedPrimary = getSystemOrAppPrimaryColor(dark)
                     ShizukuHomeScreen(
-                        isDark = isDarkMode(),
+                        isDark = dark,
                         currentTab = when (currentDockPage.value) {
                             Page.POWER -> 1
                             Page.REFRESH -> 2
@@ -401,7 +403,7 @@ abstract class HomeActivity : MaxHzActivity() {
                     flatBackground = isFlatBackground(),
                     wallpaperUri = ShizukuSettings.getWallpaperUri()?.let { Uri.parse(it) },
                     wallpaperFit = ShizukuSettings.getWallpaperFit(),
-                    isBlackNightTheme = isShizukuBlackTheme(),
+                    isBlackNightTheme = blackTheme,
                     appRules = appRulesState.value,
                     isInstantSwitchActive = isInstantSwitchActiveState.value,
                     supportedRefreshRates = supportedRefreshRatesState.value,
@@ -1830,13 +1832,7 @@ abstract class HomeActivity : MaxHzActivity() {
         super.onResume()
         moe.shizuku.manager.maxhz.GlassThemeState.sync()
         AdbPairingDetector.cancelIfReturnedToApp()
-        val currentThemeKey = computeUserThemeKey()
-        if (lastRecordedThemeKey != null && lastRecordedThemeKey != currentThemeKey) {
-            lastRecordedThemeKey = currentThemeKey
-            recreate()
-            return
-        }
-        lastRecordedThemeKey = currentThemeKey
+        lastRecordedThemeKey = computeUserThemeKey()
         checkServerStatus()
         syncSchemeAStates()
     }

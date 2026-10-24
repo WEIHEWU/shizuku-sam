@@ -55,9 +55,8 @@ fun CenteredAppDialog(
 ) {
     if (!show) return
 
-    val context = LocalContext.current
-    val isDark = (context.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
-    val isBlackNight = ThemeHelper.isBlackNightTheme(context) && isDark
+    val isDark = moe.shizuku.manager.maxhz.rememberEffectiveIsDark()
+    val isBlackNight = moe.shizuku.manager.maxhz.rememberEffectiveBlackNight(isDark)
     val glassOn = LocalGlassEnabled.current
 
     val dialogBgColor = when {

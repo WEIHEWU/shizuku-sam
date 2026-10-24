@@ -148,33 +148,9 @@ object LiquidGlassTheme {
      */
     @JvmStatic
     fun captureBackdrop(host: View, isDark: Boolean, isBlack: Boolean) {
-        if (GLASS_FORCE_DIRECT) return
-        val w = host.width
-        val h = host.height
-        if (w <= 0 || h <= 0) return
-        try {
-            val loc = IntArray(2)
-            host.getLocationInWindow(loc)
-
-            val bw = (w * BACKDROP_SCALE).toInt().coerceAtLeast(1)
-            val bh = (h * BACKDROP_SCALE).toInt().coerceAtLeast(1)
-            val bmp = Bitmap.createBitmap(bw, bh, Bitmap.Config.ARGB_8888)
-            val canvas = Canvas(bmp)
-            // 用一个独立实例绘制，避免 setBounds 干扰真实背景的布局
-            val snapshot = createPageBackgroundDrawable(isDark, isBlack)
-            snapshot.setBounds(0, 0, bw, bh)
-            snapshot.draw(canvas)
-
-            Backdrop.update(
-                base = bmp,
-                nearBlur = downsampleUpscale(bmp, 2),
-                farBlur = downsampleUpscale(bmp, 8),
-                originX = loc[0],
-                originY = loc[1]
-            )
-        } catch (_: Throwable) {
-            Backdrop.release()
-        }
+        // 已迁移至 SamsungRootKit 高透钛金架构与 Kyant LayerBackdrop，
+        // 停用主线程 5 张全屏 ARGB_8888 Bitmap 分配与 CPU 双线性缩放，彻底消除切换主题/恢复页面时的主线程阻塞与 GC 卡顿。
+        return
     }
 
     /** 释放快照（Activity 销毁或主题切换前调用） */

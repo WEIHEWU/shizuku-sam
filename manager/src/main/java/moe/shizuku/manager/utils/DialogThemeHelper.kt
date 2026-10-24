@@ -17,8 +17,8 @@ import moe.shizuku.manager.app.ThemeHelper
 object DialogThemeHelper {
 
     fun createDialogBackground(context: Context): GradientDrawable {
-        val isDark = (context.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
-        val isBlack = ThemeHelper.isBlackNightTheme(context) && isDark
+        val isDark = moe.shizuku.manager.maxhz.GlassThemeState.resolveIsDark(context)
+        val isBlack = moe.shizuku.manager.maxhz.GlassThemeState.resolveIsBlackNight(context, isDark)
 
         // Align 100% with SamsungRootKit GlassDialog translucent glass fill + 1dp hairline border
         val bgColor = if (isDark) {
@@ -66,7 +66,7 @@ object DialogThemeHelper {
             }
         }
         if (dialog is AlertDialog) {
-            val isDark = (context.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
+            val isDark = moe.shizuku.manager.maxhz.GlassThemeState.resolveIsDark(context)
             val primaryColor = if (ThemeHelper.isUsingSystemColor() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 if (isDark) dynamicDarkColorScheme(context).primary.toArgb() else dynamicLightColorScheme(context).primary.toArgb()
             } else {

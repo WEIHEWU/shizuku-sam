@@ -1322,7 +1322,8 @@ open class MaxHzActivity : AppBarActivity() {
         }
         val cv = ComposeView(this).apply {
             setContent {
-                val dark = isDarkMode()
+                val dark = rememberEffectiveIsDark()
+                val blackTheme = rememberEffectiveBlackNight(dark)
                 GlassAppTheme(isDark = dark) {
                 MaxHzPageScreen(
                     isDark = dark,
@@ -1336,7 +1337,7 @@ open class MaxHzActivity : AppBarActivity() {
                     flatBackground = isFlatBackground(),
                     wallpaperUri = ShizukuSettings.getWallpaperUri()?.let { Uri.parse(it) },
                     wallpaperFit = ShizukuSettings.getWallpaperFit(),
-                    isBlackNightTheme = isShizukuBlackTheme(),
+                    isBlackNightTheme = blackTheme,
                     onTabClick = { index -> handleDockTabClick(index) },
                     groups = maxHzGroups.toList(),
                     actionCards = maxHzActionCards.toList(),
@@ -11755,18 +11756,7 @@ open class MaxHzActivity : AppBarActivity() {
     protected fun isDarkMode(): Boolean {
         // 背景样式选了「纯净浅色 / 纯净深色」时，明暗由它一锤定音
         forcedBackgroundDark()?.let { return it }
-        // 直接读取设置 - 夜间模式偏好，而不是只信 resources.configuration.uiMode。
-        // 原因：AppCompatDelegate.setDefaultNightMode 只对 AppCompatActivity
-        // 链路生效。MaxHzActivity 的基类（rikka MaterialActivity）不一定走
-        // AppCompatDelegate 的覆盖逻辑，因此系统主题（Activity theme）会跟着
-        // values-night 走暗色资源，但 resources.configuration.uiMode 不一定被
-        // 翻成 NIGHT_YES —— 这就导致 “页面背景已变深、文字色却仍按浅色取” 的
-        // 混搭。直接读 ShizukuSettings 与“设置页的 3 个点 / 跟随系统”口径完全一致。
-        return when (ShizukuSettings.getNightMode()) {
-            AppCompatDelegate.MODE_NIGHT_YES -> true
-            AppCompatDelegate.MODE_NIGHT_NO -> false
-            else -> (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
-        }
+        return GlassThemeState.resolveIsDark(this)
     }
 
     private fun riskTextColor(level: RiskLevel): Int {

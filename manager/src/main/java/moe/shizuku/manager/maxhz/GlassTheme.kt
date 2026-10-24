@@ -60,11 +60,55 @@ private val GlassDarkColors = darkColorScheme(
 
 object GlassThemeState {
     val useSystemColor = androidx.compose.runtime.mutableStateOf(ThemeHelper.isUsingSystemColor())
+    val nightMode = androidx.compose.runtime.mutableIntStateOf(moe.shizuku.manager.ShizukuSettings.getNightMode())
+    val blackNightPref = androidx.compose.runtime.mutableStateOf(
+        moe.shizuku.manager.ShizukuSettings.getPreferences()
+            .getBoolean(ThemeHelper.KEY_BLACK_NIGHT_THEME, false)
+    )
     val refreshTick = androidx.compose.runtime.mutableIntStateOf(0)
 
     fun sync() {
         useSystemColor.value = ThemeHelper.isUsingSystemColor()
+        nightMode.intValue = moe.shizuku.manager.ShizukuSettings.getNightMode()
+        blackNightPref.value = moe.shizuku.manager.ShizukuSettings.getPreferences()
+            .getBoolean(ThemeHelper.KEY_BLACK_NIGHT_THEME, false)
         refreshTick.intValue++
+    }
+
+    fun resolveIsDark(context: android.content.Context? = null): Boolean {
+        return when (moe.shizuku.manager.ShizukuSettings.getNightMode()) {
+            androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES -> true
+            androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO -> false
+            else -> {
+                val cfg = android.content.res.Resources.getSystem().configuration
+                (cfg.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+                    android.content.res.Configuration.UI_MODE_NIGHT_YES
+            }
+        }
+    }
+
+    fun resolveIsBlackNight(context: android.content.Context, isDark: Boolean = resolveIsDark(context)): Boolean {
+        return isDark && ThemeHelper.isBlackNightTheme(context)
+    }
+}
+
+@Composable
+fun rememberEffectiveIsDark(): Boolean {
+    val mode = GlassThemeState.nightMode.intValue
+    val tick = GlassThemeState.refreshTick.intValue + MaxHzComposeRefreshBus.tick.value
+    val config = androidx.compose.ui.platform.LocalConfiguration.current
+    return remember(mode, tick, config.uiMode) {
+        GlassThemeState.resolveIsDark()
+    }
+}
+
+@Composable
+fun rememberEffectiveBlackNight(isDark: Boolean = rememberEffectiveIsDark()): Boolean {
+    val context = LocalContext.current
+    val blackPref = GlassThemeState.blackNightPref.value
+    val tick = GlassThemeState.refreshTick.intValue + MaxHzComposeRefreshBus.tick.value
+    return remember(isDark, blackPref, tick) {
+        isDark && (blackPref || ThemeHelper.isBlackNightTheme(context))
     }
 }
 

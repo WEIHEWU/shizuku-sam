@@ -137,8 +137,8 @@ class ApplicationManagementActivity : AppActivity() {
 
         Shizuku.addBinderDeadListener(binderDeadListener)
 
-        val isDark = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
-        val isBlackNight = isDark && ThemeHelper.isBlackNightTheme(this)
+        val isDark = moe.shizuku.manager.maxhz.GlassThemeState.resolveIsDark(this)
+        val isBlackNight = moe.shizuku.manager.maxhz.GlassThemeState.resolveIsBlackNight(this, isDark)
 
         val dialogBgColor = when {
             isBlackNight -> TitaniumBlack.Card.copy(alpha = 0.90f)
