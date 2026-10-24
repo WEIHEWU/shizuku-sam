@@ -2659,16 +2659,6 @@ object MaxHzController {
               
               [ "${'$'}(awk "BEGIN {print (${'$'}{score:-0} < 0.1)}")" = "1" ] && continue
 
-              b_raw="${'$'}(timeout 1 am get-standby-bucket "${'$'}pkg" 2>/dev/null | tr -d '\r' | grep -E '^[0-9]+${'$'}' | tail -n 1)"
-              case "${'$'}b_raw" in
-                10) b_str="活跃(10)" ;;
-                20) b_str="工作集(20)" ;;
-                30) b_str="常用(30)" ;;
-                40) b_str="极少(40)" ;;
-                45) b_str="受限(45)" ;;
-                *) b_str="${'$'}{b_raw:-未知}" ;;
-              esac
-
               unres=""
               grep -Fq "${'$'}pkg" "${'$'}whitelist_file" 2>/dev/null && unres=" · 后台不受限"
 
@@ -2686,20 +2676,31 @@ object MaxHzController {
 
               if is_protected_pkg "${'$'}pkg"; then
                 echo "${'$'}score|${'$'}pkg|${'$'}w|${'$'}wl|${'$'}cpu|${'$'}reasons" >> "${'$'}tmp_dir/protected_active.txt"
-                echo "${'$'}score|${'$'}pkg|${'$'}reasons|${'$'}b_str|protected" >> "${'$'}tmp_dir/candidates_raw.txt"
+                echo "${'$'}score|${'$'}pkg|${'$'}reasons|protected" >> "${'$'}tmp_dir/candidates_raw.txt"
               else
-                echo "${'$'}score|${'$'}pkg|${'$'}reasons|${'$'}b_str|thirdparty" >> "${'$'}tmp_dir/candidates_raw.txt"
+                echo "${'$'}score|${'$'}pkg|${'$'}reasons|thirdparty" >> "${'$'}tmp_dir/candidates_raw.txt"
               fi
             done < "${'$'}tmp_dir/installed_pkgs.txt"
 
             echo "待机异常唤醒与耗电排行（含全量应用与根因分析）："
             if [ -s "${'$'}tmp_dir/candidates_raw.txt" ]; then
               sort -t'|' -k1,1nr "${'$'}tmp_dir/candidates_raw.txt" | head -n 25 > "${'$'}tmp_dir/candidates_ranked.txt"
-              while IFS='|' read -r score pkg reason b_str app_type; do
+              while IFS='|' read -r score pkg reason app_type; do
                 [ -z "${'$'}pkg" ] && continue
                 rank="${'$'}((rank + 1))"
                 candidate_count="${'$'}((candidate_count + 1))"
                 [ "${'$'}rank" = "1" ] && top_pkg="${'$'}pkg" && top_score="${'$'}score" && top_detail="${'$'}reason"
+
+                b_raw="${'$'}(timeout 1 am get-standby-bucket "${'$'}pkg" 2>/dev/null | tr -d '\r' | grep -E '^[0-9]+${'$'}' | tail -n 1)"
+                case "${'$'}b_raw" in
+                  10) b_str="活跃(10)" ;;
+                  20) b_str="工作集(20)" ;;
+                  30) b_str="常用(30)" ;;
+                  40) b_str="极少(40)" ;;
+                  45) b_str="受限(45)" ;;
+                  *) b_str="${'$'}{b_raw:-未知}" ;;
+                esac
+
                 if [ "${'$'}app_type" = "protected" ]; then
                   echo "${'$'}rank. ${'$'}pkg：评估指数约 ${'$'}score；${'$'}reason；分组：${'$'}b_str；核心通讯/系统组件，建议保留以保障即时通话与消息"
                   echo "候选|${'$'}pkg|耗电排行 #${'$'}rank，评估指数 ${'$'}score；${'$'}reason；分组：${'$'}b_str；核心应用（微信/QQ/系统），慎重压制避免影响即时通知；standby=${'$'}b_str"
@@ -2736,7 +2737,7 @@ object MaxHzController {
 
             rm -rf "${'$'}tmp_dir" >/dev/null 2>&1
             """.trimIndent(),
-            timeoutSeconds = 35
+            timeoutSeconds = 60
         )
     }
 

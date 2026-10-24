@@ -144,22 +144,36 @@ class WatchdogService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun createChannel() {
-        getSystemService(NotificationManager::class.java)?.createNotificationChannel(
-            NotificationChannel(
-                CHANNEL_ID,
-                getString(R.string.notification_channel_watchdog),
-                NotificationManager.IMPORTANCE_LOW
-            )
-        )
+        val manager = getSystemService(NotificationManager::class.java) ?: return
+        runCatching { manager.deleteNotificationChannel("watchdog") }
+        val showNotification = ShizukuSettings.getShowForegroundNotification()
+        val importance = if (showNotification) NotificationManager.IMPORTANCE_LOW else NotificationManager.IMPORTANCE_MIN
+        val channel = NotificationChannel(
+            CHANNEL_ID,
+            getString(R.string.notification_channel_watchdog),
+            importance
+        ).apply {
+            setShowBadge(false)
+            setSound(null, null)
+        }
+        manager.createNotificationChannel(channel)
     }
 
-    private fun runningNotification() = NotificationCompat.Builder(this, CHANNEL_ID)
-        .setSmallIcon(R.drawable.ic_system_icon)
-        .setContentTitle(getString(R.string.watchdog_running))
-        .setContentText(getString(R.string.watchdog_running_text))
-        .setContentIntent(launchPendingIntent())
-        .setOngoing(true)
-        .build()
+    private fun runningNotification(): android.app.Notification {
+        val showNotification = ShizukuSettings.getShowForegroundNotification()
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_system_icon)
+            .setContentTitle(getString(R.string.watchdog_running))
+            .setContentText(getString(R.string.watchdog_running_text))
+            .setContentIntent(launchPendingIntent())
+            .setOngoing(true)
+            .setShowWhen(false)
+            .setPriority(if (showNotification) NotificationCompat.PRIORITY_LOW else NotificationCompat.PRIORITY_MIN)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            builder.setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_DEFERRED)
+        }
+        return builder.build()
+    }
 
     private fun notifyRestart() {
         getSystemService(NotificationManager::class.java)?.notify(
@@ -192,7 +206,7 @@ class WatchdogService : Service() {
 
     companion object {
         private const val TAG = "ShizukuWatchdog"
-        private const val CHANNEL_ID = "watchdog"
+        private const val CHANNEL_ID = "watchdog_v2"
         private const val NOTIFICATION_ID_RUNNING = 1001
         private const val NOTIFICATION_ID_CRASH = 1002
         private const val ACTION_STOP_SERVICE = "action.stop_service"

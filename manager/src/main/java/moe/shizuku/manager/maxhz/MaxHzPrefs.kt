@@ -17,6 +17,7 @@ object MaxHzPrefs {
     private const val KEY_BATTERY_RECHARGE = "battery_recharge"
     private const val KEY_PASS_THROUGH_ENABLED = "pass_through_enabled"
     private const val KEY_FPS_MONITOR_RUNNING = "fps_monitor_running"
+    private const val KEY_SHOW_FOREGROUND_NOTIFICATION = "show_foreground_notification"
     private const val KEY_APP_REFRESH_RULES = "app_refresh_rules"
     private const val KEY_SUPPORTED_REFRESH_RATES = "supported_refresh_rates"
     private const val KEY_SUPPORTED_REFRESH_RATES_DETECTED = "supported_refresh_rates_detected"
@@ -139,6 +140,11 @@ object MaxHzPrefs {
     fun controlEnabled(context: Context) = prefs(context).getBoolean(KEY_CONTROL_ENABLED, false)
     fun setControlEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_CONTROL_ENABLED, enabled).apply()
+    }
+
+    fun showForegroundNotification(context: Context) = prefs(context).getBoolean(KEY_SHOW_FOREGROUND_NOTIFICATION, false)
+    fun setShowForegroundNotification(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_SHOW_FOREGROUND_NOTIFICATION, enabled).apply()
     }
 
     fun compatibleSaverEnabled(context: Context) = prefs(context).getBoolean(KEY_COMPATIBLE_SAVER_ENABLED, false)

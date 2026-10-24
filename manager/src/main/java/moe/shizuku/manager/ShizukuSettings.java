@@ -45,6 +45,7 @@ public class ShizukuSettings {
     public static final String LAST_PORT = "last_port";
     public static final String KEY_AUTO_DISABLE_USB_DEBUGGING = "auto_disable_usb_debugging";
     public static final String KEY_FORCE_START_WADB = "force_start_wadb";
+    public static final String SHOW_FOREGROUND_NOTIFICATION = "show_foreground_notification";
 
     private static SharedPreferences sPreferences;
 
@@ -149,6 +150,14 @@ public class ShizukuSettings {
             moe.shizuku.manager.service.WatchdogWorker.cancel(context);
             moe.shizuku.manager.service.WatchdogAlarmReceiver.cancel(context);
         }
+    }
+
+    public static boolean getShowForegroundNotification() {
+        return getPreferences().getBoolean(SHOW_FOREGROUND_NOTIFICATION, false);
+    }
+
+    public static void setShowForegroundNotification(Context context, boolean enable) {
+        getPreferences().edit().putBoolean(SHOW_FOREGROUND_NOTIFICATION, enable).apply();
     }
 
     public static boolean getTcpMode() {

@@ -35,6 +35,7 @@ import moe.shizuku.manager.home.onLongPressToggle
 import moe.shizuku.manager.ktx.isComponentEnabled
 import moe.shizuku.manager.ktx.setComponentEnabled
 import moe.shizuku.manager.receiver.BootCompleteReceiver
+import moe.shizuku.manager.service.WatchdogService
 import moe.shizuku.manager.utils.CustomTabsHelper
 import moe.shizuku.manager.utils.RootBootScriptHelper
 import rikka.material.app.LocaleDelegate
@@ -76,6 +77,7 @@ fun SettingsGlassScreen(
     val bootComponent = remember { ComponentName(context.packageName, BootCompleteReceiver::class.java.name) }
     var startOnBoot by remember { mutableStateOf(context.packageManager.isComponentEnabled(bootComponent)) }
     var watchdog by remember { mutableStateOf(ShizukuSettings.getWatchdog()) }
+    var showForegroundNotification by remember { mutableStateOf(ShizukuSettings.getShowForegroundNotification()) }
     var tcpMode by remember { mutableStateOf(ShizukuSettings.getTcpMode()) }
     var tcpPort by remember { mutableIntStateOf(ShizukuSettings.getTcpPort()) }
     var nightMode by remember { mutableIntStateOf(ShizukuSettings.getNightMode()) }
@@ -169,6 +171,23 @@ fun SettingsGlassScreen(
                             onCheckedChange = { checked ->
                                 ShizukuSettings.setWatchdog(context, checked)
                                 watchdog = ShizukuSettings.getWatchdog()
+                            }
+                        )
+                        SettingsMiuixSwitchRow(
+                            isDark = isDark,
+                            icon = painterResource(R.drawable.ic_system_icon),
+                            iconTint = if (isDark) Color(0xFF818CF8) else Color(0xFF4F46E5),
+                            title = "显示后台常驻通知",
+                            subtitle = "在系统通知栏常驻显示后台守护通知。默认关闭，保持状态栏纯净无图标。",
+                            checked = showForegroundNotification,
+                            groupExpanded = startupExpanded,
+                            onCheckedChange = { checked ->
+                                ShizukuSettings.setShowForegroundNotification(context, checked)
+                                moe.shizuku.manager.maxhz.MaxHzPrefs.setShowForegroundNotification(context, checked)
+                                showForegroundNotification = checked
+                                if (watchdog) {
+                                    WatchdogService.start(context)
+                                }
                             }
                         )
                         SettingsMiuixSwitchRow(

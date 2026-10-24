@@ -72,12 +72,20 @@ fun GlassCard(
     val haptic = LocalHapticFeedback.current
     val cardBgColor = when {
         tintColor != null -> tintColor.copy(alpha = if (isDark) 0.25f else 0.15f)
-        isDark -> top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme.surfaceContainer
-        else -> top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme.surfaceContainer
+        isDark -> TitaniumDark.Card
+        else -> GlassLight.Card
     }
+    val cardShape = RoundedCornerShape(20.dp)
+    val hairline = if (isDark) TitaniumDark.Hairline else GlassLight.Hairline
+    val sheenAlpha = if (isDark) TitaniumDark.SheenAlpha else GlassLight.SheenAlpha
+
+    val cardModifier = modifier
+        .clip(cardShape)
+        .border(1.dp, hairline, cardShape)
+
     if (onClick != null) {
         top.yukonga.miuix.kmp.basic.Card(
-            modifier = modifier,
+            modifier = cardModifier,
             cornerRadius = 20.dp,
             colors = top.yukonga.miuix.kmp.basic.CardDefaults.defaultColors(color = cardBgColor),
             pressFeedbackType = top.yukonga.miuix.kmp.utils.PressFeedbackType.Sink,
@@ -87,15 +95,37 @@ fun GlassCard(
                 onClick()
             }
         ) {
-            Box(Modifier.fillMaxWidth()) { content() }
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .background(
+                        Brush.verticalGradient(
+                            0f to Color.White.copy(alpha = sheenAlpha),
+                            0.5f to Color.Transparent
+                        )
+                    )
+            ) {
+                content()
+            }
         }
     } else {
         top.yukonga.miuix.kmp.basic.Card(
-            modifier = modifier,
+            modifier = cardModifier,
             cornerRadius = 20.dp,
             colors = top.yukonga.miuix.kmp.basic.CardDefaults.defaultColors(color = cardBgColor)
         ) {
-            Box(Modifier.fillMaxWidth()) { content() }
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .background(
+                        Brush.verticalGradient(
+                            0f to Color.White.copy(alpha = sheenAlpha),
+                            0.5f to Color.Transparent
+                        )
+                    )
+            ) {
+                content()
+            }
         }
     }
 }

@@ -4445,6 +4445,10 @@ open class MaxHzActivity : AppBarActivity() {
         onProgress: (() -> Unit)? = null,
         onCompleted: ((Int) -> Unit)? = null
     ) {
+        if (!MaxHzShell.isReady()) {
+            Toast.makeText(this, "Shizuku 服务未就绪，请先在首页启动 Shizuku 后再进行待机排查", Toast.LENGTH_LONG).show()
+            return
+        }
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
         val channelId = "maxhz_night_scan"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && nm != null) {
@@ -11104,7 +11108,7 @@ open class MaxHzActivity : AppBarActivity() {
         val enabled = MaxHzPrefs.nightWakeupGuardEnabled(this)
         val count = MaxHzPrefs.nightWakeupGuardPackages(this).size
         return when {
-            !enabled -> "未激活"
+            !enabled -> "未开启"
             count == 0 -> "待添加名单"
             else -> "已开启 · $count 个"
         }

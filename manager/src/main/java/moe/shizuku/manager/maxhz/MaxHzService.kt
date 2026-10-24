@@ -127,18 +127,19 @@ class MaxHzService : Service() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = getSystemService(NotificationManager::class.java) ?: return
         try {
-            if (manager.getNotificationChannel(NOTIFICATION_CHANNEL_ID) == null) {
-                val channel = NotificationChannel(
-                    NOTIFICATION_CHANNEL_ID,
-                    "MaxHz 后台服务",
-                    NotificationManager.IMPORTANCE_LOW
-                ).apply {
-                    description = "保持已启用的刷新率、待机护栏和电量调度规则"
-                    setShowBadge(false)
-                    setSound(null, null)
-                }
-                manager.createNotificationChannel(channel)
+            runCatching { manager.deleteNotificationChannel("maxhz_background") }
+            val showNotification = MaxHzPrefs.showForegroundNotification(this)
+            val importance = if (showNotification) NotificationManager.IMPORTANCE_LOW else NotificationManager.IMPORTANCE_MIN
+            val channel = NotificationChannel(
+                NOTIFICATION_CHANNEL_ID,
+                "MaxHz 后台服务",
+                importance
+            ).apply {
+                description = "保持已启用的刷新率、待机护栏和电量调度规则"
+                setShowBadge(false)
+                setSound(null, null)
             }
+            manager.createNotificationChannel(channel)
         } catch (t: Throwable) {
             Log.e(TAG, "Failed to create notification channel", t)
         }
@@ -191,6 +192,9 @@ class MaxHzService : Service() {
         } else {
             @Suppress("DEPRECATION")
             Notification.Builder(this)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            builder.setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_DEFERRED)
         }
         return builder
             .setSmallIcon(R.drawable.ic_system_icon)
@@ -443,7 +447,7 @@ class MaxHzService : Service() {
         private const val DEFAULT_POLL_MS = 5 * 60_000L
         private const val BACKGROUND_FAILURE_THROTTLE_MS = 30_000L
         private const val BACKGROUND_FAILURE_RESULT_KEY = "background_error"
-        private const val NOTIFICATION_CHANNEL_ID = "maxhz_background"
+        private const val NOTIFICATION_CHANNEL_ID = "maxhz_background_v2"
         private const val NOTIFICATION_ID = 13601
         private const val TAG = "MaxHzService"
     }

@@ -24,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -70,7 +71,7 @@ fun GlassDockNav(
 ) {
     val haptic = LocalHapticFeedback.current
     val clampedIndex = selectedIndex.coerceIn(0, 2)
-    val dockShape = remember { RoundedCornerShape(30.dp) }
+    val dockShape = remember { RoundedCornerShape(GlassRadii.Pill) }
 
     val density = LocalDensity.current
     val pillTargetXPx = with(density) {
@@ -85,13 +86,15 @@ fun GlassDockNav(
         label = "dockPillX"
     )
 
-    val pillShape = remember { RoundedCornerShape(24.dp) }
+    val pillShape = remember { RoundedCornerShape(GlassRadii.Pill) }
     val primaryColor = top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme.primary
-    val pillBgColor = if (isDark) primaryColor.copy(alpha = 0.22f) else primaryColor.copy(alpha = 0.14f)
-    val pillBorderColor = if (isDark) primaryColor.copy(alpha = 0.38f) else primaryColor.copy(alpha = 0.24f)
+    val pillBgColor = if (isDark) primaryColor.copy(alpha = 0.28f) else primaryColor.copy(alpha = 0.16f)
+    val pillBorderColor = if (isDark) primaryColor.copy(alpha = 0.45f) else primaryColor.copy(alpha = 0.30f)
 
-    val dockBgColor = if (isDark) Color(0xF51F1F23) else Color(0xFAFFFFFF)
-    val dockBorderColor = if (isDark) Color(0x26FFFFFF) else Color(0x14000000)
+    // SamsungRootKit 钛金双发丝玻璃设计
+    val frostedFill = if (isDark) TitaniumDark.Card else GlassLight.Card
+    val outerBorder = if (isDark) TitaniumDark.Hairline else GlassLight.Hairline
+    val sheenAlpha = if (isDark) TitaniumDark.SheenAlpha else GlassLight.SheenAlpha
 
     Box(
         Modifier
@@ -100,8 +103,14 @@ fun GlassDockNav(
             .width(284.dp)
             .height(58.dp)
             .clip(dockShape)
-            .background(dockBgColor)
-            .border(0.8.dp, dockBorderColor, dockShape),
+            .background(frostedFill)
+            .background(
+                Brush.verticalGradient(
+                    0f to Color.White.copy(alpha = sheenAlpha),
+                    0.5f to Color.Transparent
+                )
+            )
+            .border(1.dp, outerBorder, dockShape),
         contentAlignment = Alignment.CenterStart
     ) {
         // 1. Miuix 指示器胶囊（纯 GPU 硬件变换层）
