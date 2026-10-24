@@ -47,7 +47,15 @@ import moe.shizuku.manager.home.MiuixRowIcon
 import moe.shizuku.manager.home.MiuixSubPageTopBar
 import moe.shizuku.manager.home.onLongPressToggle
 import moe.shizuku.manager.ktx.toHtml
+import moe.shizuku.manager.maxhz.BackdropProvider
 import moe.shizuku.manager.maxhz.GlassAppTheme
+import moe.shizuku.manager.maxhz.GlassButtonStyle
+import moe.shizuku.manager.maxhz.GlassCard
+import moe.shizuku.manager.maxhz.GlassLight
+import moe.shizuku.manager.maxhz.GlassPillButton
+import moe.shizuku.manager.maxhz.TitaniumBlack
+import moe.shizuku.manager.maxhz.TitaniumDark
+import moe.shizuku.manager.maxhz.getSystemOrAppPrimaryColor
 import moe.shizuku.manager.utils.CustomTabsHelper
 import rikka.html.text.HtmlCompat
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
@@ -113,53 +121,44 @@ class ShellTutorialActivity : AppActivity() {
         window?.let { win ->
             win.setBackgroundDrawable(ColorDrawable(AndroidColor.TRANSPARENT))
             win.setLayout(dialogWidth, ViewGroup.LayoutParams.WRAP_CONTENT)
-            win.setDimAmount(0.55f)
+            win.setDimAmount(0.48f)
             win.setGravity(Gravity.CENTER)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                win.addFlags(android.view.WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+                win.attributes = win.attributes.apply { blurBehindRadius = 56 }
+            }
         }
 
         val isDark = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
         val isBlackNight = isDark && ThemeHelper.isBlackNightTheme(this)
-        val primaryColorInt = runCatching {
-            val tv = TypedValue()
-            if (theme.resolveAttribute(androidx.appcompat.R.attr.colorPrimary, tv, true)) tv.data
-            else if (isDark) 0xFF277AF7.toInt() else 0xFF3482FF.toInt()
-        }.getOrDefault(if (isDark) 0xFF277AF7.toInt() else 0xFF3482FF.toInt())
 
-        val useSystemColor = ThemeHelper.isUsingSystemColor()
-        val dialogBgColor = if (isDark) {
-            if (isBlackNight) Color(0xFF000000)
-            else if (useSystemColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) androidx.compose.material3.dynamicDarkColorScheme(this).surfaceContainerHigh
-            else Color(0xFF181B22)
-        } else {
-            if (useSystemColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) androidx.compose.material3.dynamicLightColorScheme(this).surfaceContainerHigh
-            else Color(0xFFFFFFFF)
+        val dialogBgColor = when {
+            isBlackNight -> TitaniumBlack.Card.copy(alpha = 0.90f)
+            isDark -> Color(0xCC161B22)
+            else -> Color(0xD9FFFDFB)
         }
-        val dialogStrokeColor = if (isDark) {
-            if (isBlackNight) Color(0x26FFFFFF)
-            else if (useSystemColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) androidx.compose.material3.dynamicDarkColorScheme(this).outlineVariant
-            else Color(0x224E5766)
-        } else {
-            if (useSystemColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) androidx.compose.material3.dynamicLightColorScheme(this).outlineVariant
-            else Color(0x12000000)
-        }
+        val dialogStrokeColor = if (isDark) TitaniumDark.Edge else GlassLight.DialogHairline
 
         setContent {
             GlassAppTheme(isDark = isDark) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = maxHeightDp)
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(dialogBgColor)
-                        .border(1.dp, dialogStrokeColor, RoundedCornerShape(24.dp))
-                ) {
-                    ShellTutorialMiuixScreen(
-                        isDark = isDark,
-                        isBlackNightTheme = isBlackNight,
-                        primaryColor = Color(primaryColorInt),
-                        onBackClick = { finish() },
-                        onExportFilesClick = { openDocumentsTree.launch(null) }
-                    )
+                val primaryColor = getSystemOrAppPrimaryColor(isDark)
+                BackdropProvider {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = maxHeightDp)
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(dialogBgColor)
+                            .border(1.dp, dialogStrokeColor, RoundedCornerShape(24.dp))
+                    ) {
+                        ShellTutorialMiuixScreen(
+                            isDark = isDark,
+                            isBlackNightTheme = isBlackNight,
+                            primaryColor = primaryColor,
+                            onBackClick = { finish() },
+                            onExportFilesClick = { openDocumentsTree.launch(null) }
+                        )
+                    }
                 }
             }
         }
@@ -239,12 +238,13 @@ private fun ShellTutorialMiuixScreen(
             item(key = "card-overview") {
                 var cardToggled by remember(groupExpanded) { mutableStateOf(false) }
                 val showSub = groupExpanded xor cardToggled
-                Card(
+                GlassCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .onLongPressToggle(haptic) { cardToggled = !cardToggled },
-                    cornerRadius = 20.dp,
-                    colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+                    isDark = isDark,
+                    isBlackNightTheme = isBlackNightTheme,
+                    cornerRadius = 20.dp
                 ) {
                     Column(Modifier.padding(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -277,8 +277,10 @@ private fun ShellTutorialMiuixScreen(
                             )
                         }
                         Spacer(Modifier.height(12.dp))
-                        TextButton(
+                        GlassPillButton(
                             text = "阅读 rish 官方说明文档",
+                            isDark = isDark,
+                            style = GlassButtonStyle.Regular,
                             onClick = { CustomTabsHelper.launchUrlOrCopy(context, Helps.RISH.get()) },
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -300,12 +302,13 @@ private fun ShellTutorialMiuixScreen(
                     // 步骤 1
                     var step1Toggled by remember(groupExpanded) { mutableStateOf(false) }
                     val showStep1Sub = groupExpanded xor step1Toggled
-                    Card(
+                    GlassCard(
                         modifier = Modifier
                             .fillMaxWidth()
                             .onLongPressToggle(haptic) { step1Toggled = !step1Toggled },
-                        cornerRadius = 20.dp,
-                        colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+                        isDark = isDark,
+                        isBlackNightTheme = isBlackNightTheme,
+                        cornerRadius = 20.dp
                     ) {
                         Column(Modifier.padding(16.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -337,9 +340,10 @@ private fun ShellTutorialMiuixScreen(
                                 )
                             }
                             Spacer(Modifier.height(12.dp))
-                            TextButton(
+                            GlassPillButton(
                                 text = stringResource(R.string.terminal_export_files),
-                                colors = ButtonDefaults.textButtonColorsPrimary(),
+                                isDark = isDark,
+                                style = GlassButtonStyle.Prominent(primaryColor),
                                 onClick = onExportFilesClick,
                                 modifier = Modifier.fillMaxWidth()
                             )
@@ -349,12 +353,13 @@ private fun ShellTutorialMiuixScreen(
                     // 步骤 2
                     var step2Toggled by remember(groupExpanded) { mutableStateOf(false) }
                     val showStep2Sub = groupExpanded xor step2Toggled
-                    Card(
+                    GlassCard(
                         modifier = Modifier
                             .fillMaxWidth()
                             .onLongPressToggle(haptic) { step2Toggled = !step2Toggled },
-                        cornerRadius = 20.dp,
-                        colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+                        isDark = isDark,
+                        isBlackNightTheme = isBlackNightTheme,
+                        cornerRadius = 20.dp
                     ) {
                         Column(Modifier.padding(16.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -391,12 +396,13 @@ private fun ShellTutorialMiuixScreen(
                     // 步骤 3
                     var step3Toggled by remember(groupExpanded) { mutableStateOf(false) }
                     val showStep3Sub = groupExpanded xor step3Toggled
-                    Card(
+                    GlassCard(
                         modifier = Modifier
                             .fillMaxWidth()
                             .onLongPressToggle(haptic) { step3Toggled = !step3Toggled },
-                        cornerRadius = 20.dp,
-                        colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+                        isDark = isDark,
+                        isBlackNightTheme = isBlackNightTheme,
+                        cornerRadius = 20.dp
                     ) {
                         Column(Modifier.padding(16.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {

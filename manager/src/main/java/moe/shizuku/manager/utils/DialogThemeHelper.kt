@@ -19,28 +19,19 @@ object DialogThemeHelper {
     fun createDialogBackground(context: Context): GradientDrawable {
         val isDark = (context.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
         val isBlack = ThemeHelper.isBlackNightTheme(context) && isDark
-        val useSystem = ThemeHelper.isUsingSystemColor()
 
+        // Align 100% with SamsungRootKit GlassDialog translucent glass fill + 1dp hairline border
         val bgColor = if (isDark) {
-            if (isBlack) 0xFF000000.toInt()
-            else if (useSystem && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                dynamicDarkColorScheme(context).surfaceContainerHigh.toArgb()
-            } else 0xFF181B22.toInt()
+            if (isBlack) 0xE60D1117.toInt()
+            else 0xCC161B22.toInt()
         } else {
-            if (useSystem && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                dynamicLightColorScheme(context).surfaceContainerHigh.toArgb()
-            } else 0xFFFFFFFF.toInt()
+            0xD9FFFDFB.toInt()
         }
 
         val strokeColor = if (isDark) {
-            if (isBlack) 0x26FFFFFF.toInt()
-            else if (useSystem && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                dynamicDarkColorScheme(context).outlineVariant.toArgb()
-            } else 0x224E5766.toInt()
+            0x33FFFFFF.toInt()
         } else {
-            if (useSystem && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                dynamicLightColorScheme(context).outlineVariant.toArgb()
-            } else 0x12000000.toInt()
+            0xE6FFFFFF.toInt()
         }
 
         val density = context.resources.displayMetrics.density
@@ -65,18 +56,26 @@ object DialogThemeHelper {
             window.setDimAmount(0.55f)
             window.setGravity(Gravity.CENTER)
             window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                runCatching {
+                    window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+                    window.attributes = window.attributes.apply {
+                        blurBehindRadius = 56
+                    }
+                }
+            }
         }
         if (dialog is AlertDialog) {
             val isDark = (context.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
             val primaryColor = if (ThemeHelper.isUsingSystemColor() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 if (isDark) dynamicDarkColorScheme(context).primary.toArgb() else dynamicLightColorScheme(context).primary.toArgb()
             } else {
-                if (isDark) 0xFF277AF7.toInt() else 0xFF3482FF.toInt()
+                if (isDark) 0xFF10B981.toInt() else 0xFF059669.toInt()
             }
             val onSurfaceVariant = if (ThemeHelper.isUsingSystemColor() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 if (isDark) dynamicDarkColorScheme(context).onSurfaceVariant.toArgb() else dynamicLightColorScheme(context).onSurfaceVariant.toArgb()
             } else {
-                if (isDark) 0xFF949BA8.toInt() else 0xFF5C6370.toInt()
+                if (isDark) 0xFF94A3B8.toInt() else 0xFF64748B.toInt()
             }
             dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(primaryColor)
             dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(onSurfaceVariant)

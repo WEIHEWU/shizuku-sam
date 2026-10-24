@@ -24,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -35,6 +36,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.kyant.backdrop.backdrops.LayerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import com.kyant.backdrop.drawBackdrop
+import com.kyant.backdrop.effects.blur
+import com.kyant.backdrop.effects.lens
 import moe.shizuku.manager.R
 
 /**
@@ -88,20 +94,33 @@ fun GlassDockNav(
     )
 
     val dark = isDark || isBlackNightTheme
+    val glassOn = LocalGlassEnabled.current
     val pillShape = remember { RoundedCornerShape(GlassRadii.Pill) }
-    val primaryColor = top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme.primary
-    val pillBgColor = if (dark) primaryColor.copy(alpha = 0.28f) else primaryColor.copy(alpha = 0.16f)
-    val pillBorderColor = if (dark) primaryColor.copy(alpha = 0.45f) else primaryColor.copy(alpha = 0.30f)
+    val primaryColor = getSystemOrAppPrimaryColor(isDark)
+    val pillGradientBrush = Brush.horizontalGradient(
+        colors = listOf(
+            primaryColor.copy(alpha = 0.35f),
+            primaryColor.copy(alpha = 0.60f),
+            primaryColor.copy(alpha = 0.82f),
+            primaryColor.copy(alpha = 0.62f)
+        )
+    )
+    val pillBorderColor = if (dark) Color(0x59FFFFFF) else Color(0xCCFFFFFF)
 
-    // SamsungRootKit 钛金双发丝玻璃设计
+    // SamsungRootKit 钛金双发丝玻璃设计 + 实时 Backdrop 高斯模糊与光学透镜折射
     val frostedFill = when {
-        isBlackNightTheme -> TitaniumBlack.Card
-        dark -> TitaniumDark.Card
-        else -> GlassLight.Card
+        isBlackNightTheme -> TitaniumBlack.Card.copy(alpha = 0.78f)
+        dark -> Color(0x66161B22)
+        else -> Color(0x73FFFFFF)
     }
     val outerBorder = if (dark) TitaniumDark.Hairline else GlassLight.Hairline
     val innerBorder = if (dark) Color.Transparent else GlassLight.Hairline
     val sheenAlpha = if (dark) TitaniumDark.SheenAlpha else GlassLight.SheenAlpha
+    val sharedSnapshot = SharedGlassBackdrop.snapshot()
+    val actualBackdrop = (backdrop as? LayerBackdrop)
+        ?: LocalBackdrop.current
+        ?: sharedSnapshot.backdrop
+        ?: rememberLayerBackdrop(blurRadius = 0.dp)
 
     Box(
         Modifier
@@ -109,8 +128,26 @@ fun GlassDockNav(
             .padding(bottom = 12.dp + bottomInsetDp)
             .width(284.dp)
             .height(58.dp)
+            .shadow(
+                elevation = 16.dp,
+                shape = dockShape,
+                ambientColor = Color.Black.copy(alpha = if (dark) 0.50f else 0.14f),
+                spotColor = Color.Black.copy(alpha = if (dark) 0.50f else 0.14f)
+            )
+            .drawBackdrop(
+                backdrop = actualBackdrop,
+                shape = { dockShape },
+                effects = {
+                    if (glassOn) {
+                        blur(24.dp.toPx())
+                        lens(28.dp.toPx(), 28.dp.toPx())
+                    }
+                },
+                highlight = null,
+                shadow = null,
+                onDrawSurface = { drawRect(color = frostedFill) }
+            )
             .clip(dockShape)
-            .background(frostedFill)
             .background(
                 Brush.verticalGradient(
                     0f to Color.White.copy(alpha = sheenAlpha),
@@ -126,7 +163,7 @@ fun GlassDockNav(
             ),
         contentAlignment = Alignment.CenterStart
     ) {
-        // 1. Miuix 指示器胶囊（纯 GPU 硬件变换层）
+        // 1. SamsungRootKit 胶囊指示器（横向多层透明度渐变 + 发丝高光描边）
         Box(
             Modifier
                 .graphicsLayer {
@@ -135,8 +172,8 @@ fun GlassDockNav(
                 .width(DOCK_PILL_WIDTH)
                 .height(DOCK_PILL_HEIGHT)
                 .clip(pillShape)
-                .background(pillBgColor)
-                .border(0.8.dp, pillBorderColor, pillShape)
+                .background(pillGradientBrush)
+                .border(1.dp, pillBorderColor, pillShape)
         )
 
         // 2. 3 个页签交互行
@@ -151,7 +188,7 @@ fun GlassDockNav(
                 DockTabButton(
                     label = label,
                     selected = index == clampedIndex,
-                    isDark = isDark,
+                    isDark = dark,
                     primaryColor = primaryColor,
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -164,7 +201,7 @@ fun GlassDockNav(
 }
 
 /**
- * dock 内的单个胶囊按钮：选中时高亮为 Miuix 主色。
+ * dock 内的单个胶囊按钮：选中时在渐变胶囊上高亮为纯白字，未选中时为柔和钛灰。
  */
 @Composable
 private fun RowScope.DockTabButton(
@@ -178,9 +215,9 @@ private fun RowScope.DockTabButton(
 
     val textColor by animateColorAsState(
         targetValue = when {
-            selected -> primaryColor
-            isDark -> Color(0xFF98989F)
-            else -> Color(0xFF6E6E73)
+            selected -> Color.White
+            isDark -> Color(0xFF94A3B8)
+            else -> Color(0xFF64748B)
         },
         animationSpec = tween(durationMillis = 150),
         label = "dockTabText"

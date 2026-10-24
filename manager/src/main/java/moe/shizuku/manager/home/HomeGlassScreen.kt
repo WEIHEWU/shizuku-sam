@@ -74,10 +74,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.withTimeoutOrNull
 import moe.shizuku.manager.R
+import moe.shizuku.manager.maxhz.BackdropProvider
 import moe.shizuku.manager.maxhz.GLASS_DOCK_CLEARANCE_DP
 import moe.shizuku.manager.maxhz.GlassButtonStyle
 import moe.shizuku.manager.maxhz.GlassCard
-import moe.shizuku.manager.maxhz.GlassCard
+import moe.shizuku.manager.maxhz.GlassDockNav
 import moe.shizuku.manager.maxhz.GlassLight
 import moe.shizuku.manager.maxhz.GlassPillButton
 import moe.shizuku.manager.maxhz.IconBadge
@@ -240,6 +241,23 @@ fun ShizukuHomeScreen(
         )
     }
 
+    BackdropProvider(
+        modifier = Modifier.fillMaxSize(),
+        overlay = {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.BottomCenter
+            ) {
+                GlassDockNav(
+                    isDark = isDark,
+                    isBlackNightTheme = isBlackNightTheme,
+                    selectedIndex = currentTab,
+                    bottomInsetDp = bottomInsetDp,
+                    onTabClick = onTabClick
+                )
+            }
+        }
+    ) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -475,20 +493,21 @@ fun ShizukuHomeScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                TextButton(
+                GlassPillButton(
                     text = stringResource(android.R.string.cancel),
+                    isDark = effectiveDark,
+                    style = GlassButtonStyle.Regular,
                     onClick = { showStopConfirmDialog = false },
-                    insideMargin = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
                     modifier = Modifier.weight(1f)
                 )
-                TextButton(
+                GlassPillButton(
                     text = stringResource(android.R.string.ok),
+                    isDark = effectiveDark,
+                    style = GlassButtonStyle.Danger,
                     onClick = {
                         showStopConfirmDialog = false
                         actions.onConfirmStopService()
                     },
-                    colors = ButtonDefaults.textButtonColorsPrimary(),
-                    insideMargin = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -499,7 +518,7 @@ fun ShizukuHomeScreen(
         // ==========================================================
         MiuixBatteryProtectionDialog(
             show = showBatteryProtectionDialog,
-            isDark = isDark,
+            isDark = effectiveDark,
             primaryColor = primaryColor,
             isActive = isBatteryProtectionActive,
             initialLimit = batteryProtectionLimit,
@@ -523,8 +542,9 @@ fun ShizukuHomeScreen(
             onDismiss = { showBatteryInfoDialog = false },
             onFetchBatteryInfo = actions.onFetchBatteryInfo
         )
+        }
     }
-}
+    }
 }
 
 // ==================================================================
@@ -599,12 +619,12 @@ fun GroupHeaderWithToggle(
             color = MiuixTheme.colorScheme.onSurfaceVariantSummary
         )
         val pillBg = if (expanded) {
-            if (isDark) primaryColor.copy(alpha = 0.22f) else Color(0xFFEBF3FF)
+            if (isDark) primaryColor.copy(alpha = 0.22f) else primaryColor.copy(alpha = 0.14f)
         } else {
             Color.Transparent
         }
         val pillFg = if (expanded) {
-            if (isDark) Color(0xFF60A5FA) else primaryColor
+            primaryColor
         } else {
             MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.85f)
         }
@@ -666,7 +686,8 @@ fun MiuixSubPageTopBar(
                 modifier = Modifier
                     .size(38.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(if (isDark) Color(0xFF21242C) else Color(0xFFEFF2F7))
+                    .background(if (isDark) TitaniumDark.Card else GlassLight.Card)
+                    .border(1.dp, if (isDark) TitaniumDark.Hairline else GlassLight.Hairline, RoundedCornerShape(12.dp))
                     .clickable {
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         onBackClick()
@@ -690,12 +711,12 @@ fun MiuixSubPageTopBar(
             )
             if (onToggleExpand != null && expanded != null) {
                 val pillBg = if (expanded) {
-                    if (isDark) primaryColor.copy(alpha = 0.22f) else Color(0xFFEBF3FF)
+                    if (isDark) primaryColor.copy(alpha = 0.22f) else primaryColor.copy(alpha = 0.14f)
                 } else {
-                    if (isDark) Color(0xFF21242C) else Color(0xFFEFF2F7)
+                    if (isDark) TitaniumDark.Card else GlassLight.Card
                 }
                 val pillFg = if (expanded) {
-                    if (isDark) Color(0xFF60A5FA) else primaryColor
+                    primaryColor
                 } else {
                     MiuixTheme.colorScheme.onSurfaceVariantSummary
                 }
@@ -786,7 +807,8 @@ private fun MiuixBatteryProtectionDialog(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
-                    .background(if (isDark) Color(0xFF28282D) else Color(0xFFF0F2F6))
+                    .background(if (isDark) Color(0x28FFFFFF) else Color(0x80FFFFFF))
+                    .border(1.dp, if (isDark) TitaniumDark.Hairline else GlassLight.Hairline, RoundedCornerShape(12.dp))
                     .padding(horizontal = 12.dp, vertical = 9.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
@@ -803,7 +825,7 @@ private fun MiuixBatteryProtectionDialog(
                     text = if (showDesc) "隐藏说明" else "显示说明",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = if (isDark) Color(0xFF60A5FA) else primaryColor,
+                    color = primaryColor,
                     modifier = Modifier
                         .clip(RoundedCornerShape(50))
                         .clickable {
@@ -826,15 +848,14 @@ private fun MiuixBatteryProtectionDialog(
                 )
                 presets.forEach { (label, lim, rec) ->
                     val selected = limitText == lim.toString() && rechargeText == rec.toString()
-                    TextButton(
+                    GlassPillButton(
                         text = label,
+                        isDark = isDark,
+                        style = if (selected) GlassButtonStyle.Prominent(primaryColor) else GlassButtonStyle.Regular,
                         onClick = {
                             limitText = lim.toString()
                             rechargeText = rec.toString()
                         },
-                        colors = if (selected) ButtonDefaults.textButtonColorsPrimary()
-                        else ButtonDefaults.textButtonColors(),
-                        insideMargin = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -876,16 +897,19 @@ private fun MiuixBatteryProtectionDialog(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                TextButton(
+                GlassPillButton(
                     text = "取消",
-                    enabled = !isWorking,
+                    isDark = isDark,
+                    interactive = !isWorking,
+                    style = GlassButtonStyle.Regular,
                     onClick = onDismiss,
-                    insideMargin = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
                     modifier = Modifier.weight(1f)
                 )
-                TextButton(
+                GlassPillButton(
                     text = "恢复默认",
-                    enabled = !isWorking,
+                    isDark = isDark,
+                    interactive = !isWorking,
+                    style = GlassButtonStyle.Regular,
                     onClick = {
                         isWorking = true
                         statusMessage = "正在恢复系统默认充电设置..."
@@ -895,13 +919,13 @@ private fun MiuixBatteryProtectionDialog(
                             if (ok) onDismiss()
                         }
                     },
-                    insideMargin = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
                     modifier = Modifier.weight(1f)
                 )
-                TextButton(
+                GlassPillButton(
                     text = "应用并开启",
-                    enabled = !isWorking,
-                    colors = ButtonDefaults.textButtonColorsPrimary(),
+                    isDark = isDark,
+                    interactive = !isWorking,
+                    style = GlassButtonStyle.Prominent(primaryColor),
                     onClick = {
                         val limit = (limitText.toIntOrNull() ?: 80).coerceIn(50, 100)
                         val recharge = (rechargeText.toIntOrNull() ?: 75).coerceIn(40, (limit - 5).coerceAtLeast(40))
@@ -915,7 +939,6 @@ private fun MiuixBatteryProtectionDialog(
                             if (ok) onDismiss()
                         }
                     },
-                    insideMargin = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -967,7 +990,7 @@ private fun MiuixBatteryInfoDialog(
                     text = if (showDesc) "隐藏说明" else "显示说明",
                     fontSize = 11.5.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = if (isDark) Color(0xFF60A5FA) else primaryColor,
+                    color = primaryColor,
                     modifier = Modifier
                         .clip(RoundedCornerShape(50))
                         .clickable {
@@ -983,7 +1006,8 @@ private fun MiuixBatteryInfoDialog(
                     .fillMaxWidth()
                     .heightIn(max = 320.dp)
                     .clip(RoundedCornerShape(14.dp))
-                    .background(if (isDark) Color(0xFF28282D) else Color(0xFFF0F2F6))
+                    .background(if (isDark) Color(0x22FFFFFF) else Color(0x80FFFFFF))
+                    .border(1.dp, if (isDark) TitaniumDark.Hairline else GlassLight.Hairline, RoundedCornerShape(14.dp))
                     .verticalScroll(rememberScrollState())
                     .padding(14.dp)
             ) {
@@ -1000,9 +1024,11 @@ private fun MiuixBatteryInfoDialog(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                TextButton(
+                GlassPillButton(
                     text = if (isRefreshing) "读取中..." else "刷新数据",
-                    enabled = !isRefreshing,
+                    isDark = isDark,
+                    interactive = !isRefreshing,
+                    style = GlassButtonStyle.Regular,
                     onClick = {
                         isRefreshing = true
                         infoText = "正在刷新最新状态..."
@@ -1011,14 +1037,13 @@ private fun MiuixBatteryInfoDialog(
                             isRefreshing = false
                         }
                     },
-                    insideMargin = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
                     modifier = Modifier.weight(1f)
                 )
-                TextButton(
+                GlassPillButton(
                     text = "关闭",
+                    isDark = isDark,
+                    style = GlassButtonStyle.Prominent(primaryColor),
                     onClick = onDismiss,
-                    colors = ButtonDefaults.textButtonColorsPrimary(),
-                    insideMargin = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -1064,12 +1089,12 @@ private fun SectionHeader(
             )
             if (subtitle != null) {
                 val pillBg = if (showSubtitle) {
-                    if (isDark) primaryColor.copy(alpha = 0.22f) else Color(0xFFEBF3FF)
+                    if (isDark) primaryColor.copy(alpha = 0.22f) else primaryColor.copy(alpha = 0.14f)
                 } else {
                     Color.Transparent
                 }
                 val pillFg = if (showSubtitle) {
-                    if (isDark) Color(0xFF60A5FA) else primaryColor
+                    primaryColor
                 } else {
                     MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.85f)
                 }
@@ -1221,12 +1246,12 @@ private fun HeroCard(
                     )
 
                     val pillBg = if (ok) {
-                        if (isDark) primaryColor.copy(alpha = 0.20f) else Color(0xFFEBF3FF)
+                        if (isDark) primaryColor.copy(alpha = 0.22f) else primaryColor.copy(alpha = 0.14f)
                     } else {
                         if (isDark) Color(0x2EF87171) else Color(0xFFFFECE8)
                     }
                     val pillFg = if (ok) {
-                        if (isDark) Color(0xFF60A5FA) else primaryColor
+                        primaryColor
                     } else {
                         if (isDark) Color(0xFFF87171) else Color(0xFFE5484D)
                     }
@@ -1323,10 +1348,11 @@ private fun HeroCard(
 
                     Spacer(Modifier.height(14.dp))
 
-                    TextButton(
+                    GlassPillButton(
                         text = stringResource(R.string.home_btn_manage_authorized_apps, grantedCount),
+                        isDark = isDark,
+                        style = GlassButtonStyle.Prominent(primaryColor),
                         onClick = actions.onAuthorizedAppsClick,
-                        colors = ButtonDefaults.textButtonColorsPrimary(),
                         modifier = Modifier.fillMaxWidth()
                     )
 
@@ -1336,10 +1362,11 @@ private fun HeroCard(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        TextButton(
+                        GlassPillButton(
                             text = stringResource(R.string.home_btn_terminal_rish),
+                            isDark = isDark,
+                            style = GlassButtonStyle.Regular,
                             onClick = actions.onRishClick,
-                            insideMargin = PaddingValues(horizontal = 12.dp, vertical = 11.dp),
                             modifier = Modifier.weight(1f)
                         )
                         GlassPillButton(
@@ -1351,10 +1378,11 @@ private fun HeroCard(
                         )
                     }
                 } else {
-                    TextButton(
+                    GlassPillButton(
                         text = stringResource(R.string.home_btn_adb_start),
+                        isDark = isDark,
+                        style = GlassButtonStyle.Prominent(primaryColor),
                         onClick = actions.onWirelessStartClick,
-                        colors = ButtonDefaults.textButtonColorsPrimary(),
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -1605,14 +1633,19 @@ private fun PerformanceModeCard(
                     modes.forEach { (mode, label, tag) ->
                         val selected = currentMode == mode
                         val activeBg = when {
-                            !selected -> if (isDark) Color(0xFF21242C) else Color(0xFFF5F7FA)
+                            !selected -> if (isDark) Color(0x22FFFFFF) else Color(0x73FFFFFF)
                             mode == 1 -> if (isDark) Color(0xFF132E24) else Color(0xFFE6F8F0)
-                            else -> if (isDark) Color(0xFF162946) else Color(0xFFEBF3FF)
+                            else -> if (isDark) primaryColor.copy(alpha = 0.24f) else primaryColor.copy(alpha = 0.14f)
+                        }
+                        val activeBorder = when {
+                            !selected -> if (isDark) TitaniumDark.Hairline else GlassLight.Hairline
+                            mode == 1 -> if (isDark) Color(0x5534D399) else Color(0x4410B981)
+                            else -> if (isDark) primaryColor.copy(alpha = 0.48f) else primaryColor.copy(alpha = 0.32f)
                         }
                         val activeFg = when {
                             !selected -> MiuixTheme.colorScheme.onSurface
                             mode == 1 -> if (isDark) Color(0xFF34D399) else Color(0xFF10B981)
-                            else -> if (isDark) Color(0xFF60A5FA) else primaryColor
+                            else -> primaryColor
                         }
                         val subFg = if (selected) activeFg.copy(alpha = 0.85f)
                         else MiuixTheme.colorScheme.onSurfaceVariantSummary
@@ -1622,6 +1655,7 @@ private fun PerformanceModeCard(
                                 .weight(1f)
                                 .clip(RoundedCornerShape(14.dp))
                                 .background(activeBg)
+                                .border(1.dp, activeBorder, RoundedCornerShape(14.dp))
                                 .clickable {
                                     if (currentMode != mode) {
                                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -2162,7 +2196,7 @@ private fun Tile(
         else -> GlassLight.Hairline
     }
     val valueColor = when {
-        isAccent && ok -> if (isDark) Color(0xFF60A5FA) else primaryColor
+        isAccent && ok -> primaryColor
         else -> MiuixTheme.colorScheme.onSurface
     }
 
@@ -2347,10 +2381,11 @@ private fun AppRulesTabContent(
                                             .clickable { cardToggled = !cardToggled }
                                     )
                                 }
-                                TextButton(
+                                GlassPillButton(
                                     text = stringResource(R.string.rules_btn_enable_accessibility),
+                                    isDark = isDark,
+                                    style = GlassButtonStyle.Prominent(primaryColor),
                                     onClick = actions.onOpenAccessibilityClick,
-                                    colors = ButtonDefaults.textButtonColorsPrimary(),
                                     modifier = Modifier.fillMaxWidth()
                                 )
                             }
@@ -2400,18 +2435,25 @@ private fun AppRulesTabContent(
                                 rowPresets.forEach { (name, rates, adaptive) ->
                                     val isSelected = targetMaxHz == rates.first && targetMinHz == rates.second && targetAdaptive == adaptive
                                     val chipBg = when {
-                                        isSelected && isDark -> Color(0xFF162946)
-                                        isSelected && !isDark -> Color(0xFFEBF3FF)
-                                        isDark -> Color(0xFF21242C)
-                                        else -> Color(0xFFF5F7FA)
+                                        isSelected && isDark -> primaryColor.copy(alpha = 0.24f)
+                                        isSelected && !isDark -> primaryColor.copy(alpha = 0.14f)
+                                        isDark -> Color(0x22FFFFFF)
+                                        else -> Color(0x73FFFFFF)
                                     }
-                                    val chipFg = if (isSelected) (if (isDark) Color(0xFF60A5FA) else primaryColor)
+                                    val chipBorder = when {
+                                        isSelected && isDark -> primaryColor.copy(alpha = 0.48f)
+                                        isSelected && !isDark -> primaryColor.copy(alpha = 0.32f)
+                                        isDark -> TitaniumDark.Hairline
+                                        else -> GlassLight.Hairline
+                                    }
+                                    val chipFg = if (isSelected) primaryColor
                                     else MiuixTheme.colorScheme.onSurface
                                     Row(
                                         modifier = Modifier
                                             .weight(1f)
                                             .clip(RoundedCornerShape(14.dp))
                                             .background(chipBg)
+                                            .border(1.dp, chipBorder, RoundedCornerShape(14.dp))
                                             .clickable {
                                                 if (!isInstantSwitchActive) {
                                                     requireAccessibility()
@@ -2598,14 +2640,15 @@ private fun AppRulesTabContent(
                         val pkg = targetPackage
                         val hasExisting = pkg != null && appRules.any { it.packageName == pkg }
 
-                        TextButton(
+                        GlassPillButton(
                             text = stringResource(R.string.rules_btn_save),
-                            colors = ButtonDefaults.textButtonColorsPrimary(),
+                            isDark = isDark,
+                            style = GlassButtonStyle.Prominent(primaryColor),
                             modifier = Modifier.weight(1f),
                             onClick = {
                                 if (!isInstantSwitchActive) {
                                     requireAccessibility()
-                                    return@TextButton
+                                    return@GlassPillButton
                                 }
                                 if (pkg.isNullOrBlank()) {
                                     actions.onSelectAppForAppRule { p, l ->
@@ -2627,8 +2670,10 @@ private fun AppRulesTabContent(
                         )
 
                         if (hasExisting && pkg != null) {
-                            TextButton(
+                            GlassPillButton(
                                 text = stringResource(R.string.rules_btn_delete),
+                                isDark = isDark,
+                                style = GlassButtonStyle.Danger,
                                 modifier = Modifier.weight(1f),
                                 onClick = {
                                     actions.onDeleteAppRule(pkg)
@@ -2715,10 +2760,10 @@ private fun AppRulesTabContent(
                                                 text = ruleTag,
                                                 fontSize = 11.5.sp,
                                                 fontWeight = FontWeight.SemiBold,
-                                                color = if (isDark) Color(0xFF60A5FA) else primaryColor,
+                                                color = primaryColor,
                                                 modifier = Modifier
                                                     .clip(RoundedCornerShape(8.dp))
-                                                    .background(if (isDark) Color(0xFF162946) else Color(0xFFEBF3FF))
+                                                    .background(if (isDark) primaryColor.copy(alpha = 0.22f) else primaryColor.copy(alpha = 0.14f))
                                                     .padding(horizontal = 8.dp, vertical = 3.5.dp)
                                             )
                                             Spacer(Modifier.width(8.dp))
@@ -2750,10 +2795,11 @@ private fun AppRulesTabContent(
                                     .padding(horizontal = 16.dp, vertical = 10.dp),
                                 contentAlignment = Alignment.CenterEnd
                             ) {
-                                TextButton(
+                                GlassPillButton(
                                     text = stringResource(R.string.rules_btn_clear_all),
-                                    onClick = actions.onClearAppRules,
-                                    insideMargin = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                    isDark = isDark,
+                                    style = GlassButtonStyle.Regular,
+                                    onClick = actions.onClearAppRules
                                 )
                             }
                         }
@@ -2805,10 +2851,11 @@ private fun AppRulesTabContent(
                             )
                         }
                         Spacer(Modifier.height(12.dp))
-                        TextButton(
+                        GlassPillButton(
                             text = stringResource(R.string.rules_btn_open_dev_options),
+                            isDark = isDark,
+                            style = GlassButtonStyle.Prominent(primaryColor),
                             onClick = actions.onOpenDisableAppCompatibilityPoliciesClick,
-                            colors = ButtonDefaults.textButtonColorsPrimary(),
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
@@ -2851,10 +2898,11 @@ private fun AppRulesTabContent(
                         )
                     }
                     Spacer(Modifier.height(12.dp))
-                    TextButton(
+                    GlassPillButton(
                         text = stringResource(R.string.rules_btn_calibrate_ltpo),
+                        isDark = isDark,
+                        style = GlassButtonStyle.Prominent(primaryColor),
                         onClick = actions.onCalibrateLtpoAdaptiveClick,
-                        colors = ButtonDefaults.textButtonColorsPrimary(),
                         modifier = Modifier.fillMaxWidth()
                     )
                 }

@@ -62,18 +62,21 @@ import moe.shizuku.manager.home.MiuixRowIcon
 import moe.shizuku.manager.home.MiuixSubPageTopBar
 import moe.shizuku.manager.home.onLongPressToggle
 import moe.shizuku.manager.home.CenteredAppDialog
+import moe.shizuku.manager.maxhz.BackdropProvider
 import moe.shizuku.manager.maxhz.GlassAppTheme
+import moe.shizuku.manager.maxhz.GlassButtonStyle
+import moe.shizuku.manager.maxhz.GlassCard
+import moe.shizuku.manager.maxhz.GlassLight
+import moe.shizuku.manager.maxhz.GlassPillButton
+import moe.shizuku.manager.maxhz.TitaniumBlack
+import moe.shizuku.manager.maxhz.TitaniumDark
+import moe.shizuku.manager.maxhz.getSystemOrAppPrimaryColor
 import moe.shizuku.manager.utils.AccessibilityHelper
 import rikka.compatibility.DeviceCompatibility
-import top.yukonga.miuix.kmp.basic.ButtonDefaults
-import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Scaffold
-import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
-import top.yukonga.miuix.kmp.window.WindowDialog
 import java.net.ConnectException
 
 @RequiresApi(Build.VERSION_CODES.R)
@@ -112,6 +115,14 @@ class AdbPairingTutorialActivity : AppActivity() {
             win.setLayout(dialogWidth, ViewGroup.LayoutParams.WRAP_CONTENT)
             win.setDimAmount(0.55f)
             win.setGravity(Gravity.CENTER)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                runCatching {
+                    win.addFlags(android.view.WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+                    win.attributes = win.attributes.apply {
+                        blurBehindRadius = 56
+                    }
+                }
+            }
         }
 
         val notifEnabled = isNotificationEnabled()
@@ -122,35 +133,25 @@ class AdbPairingTutorialActivity : AppActivity() {
 
         val isDark = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
         val isBlackNight = isDark && ThemeHelper.isBlackNightTheme(this)
-        val primaryColorInt = runCatching {
-            val tv = TypedValue()
-            if (theme.resolveAttribute(androidx.appcompat.R.attr.colorPrimary, tv, true)) tv.data
-            else if (isDark) 0xFF277AF7.toInt() else 0xFF3482FF.toInt()
-        }.getOrDefault(if (isDark) 0xFF277AF7.toInt() else 0xFF3482FF.toInt())
 
         val isMiui = DeviceCompatibility.isMiui()
         val isOppo = isColorOS()
 
-        val useSystemColor = ThemeHelper.isUsingSystemColor()
         val dialogBgColor = if (isDark) {
-            if (isBlackNight) Color(0xFF000000)
-            else if (useSystemColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) androidx.compose.material3.dynamicDarkColorScheme(this).surfaceContainerHigh
-            else Color(0xFF181B22)
+            if (isBlackNight) TitaniumBlack.Card.copy(alpha = 0.90f)
+            else Color(0xCC161B22)
         } else {
-            if (useSystemColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) androidx.compose.material3.dynamicLightColorScheme(this).surfaceContainerHigh
-            else Color(0xFFFFFFFF)
+            Color(0xD9FFFDFB)
         }
         val dialogStrokeColor = if (isDark) {
-            if (isBlackNight) Color(0x26FFFFFF)
-            else if (useSystemColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) androidx.compose.material3.dynamicDarkColorScheme(this).outlineVariant
-            else Color(0x224E5766)
+            TitaniumDark.Edge
         } else {
-            if (useSystemColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) androidx.compose.material3.dynamicLightColorScheme(this).outlineVariant
-            else Color(0x12000000)
+            GlassLight.DialogHairline
         }
 
         setContent {
             GlassAppTheme(isDark = isDark) {
+                val activePrimaryColor = getSystemOrAppPrimaryColor(isDark)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -159,46 +160,48 @@ class AdbPairingTutorialActivity : AppActivity() {
                         .background(dialogBgColor)
                         .border(1.dp, dialogStrokeColor, RoundedCornerShape(24.dp))
                 ) {
-                    AdbPairingTutorialMiuixScreen(
-                        isDark = isDark,
-                        isBlackNightTheme = isBlackNight,
-                        primaryColor = Color(primaryColorInt),
-                        notificationEnabled = notificationEnabledState.value,
-                        isMiui = isMiui,
-                        isColorOs = isOppo,
-                        onBackClick = { finish() },
-                        onOpenDeveloperOptions = {
-                            launchedDeveloperOptions = true
-                            AdbPairingDetector.request()
-                            val intent = Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).apply {
-                                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                                putExtra(":settings:fragment_args_key", "toggle_adb_wireless")
+                    BackdropProvider(modifier = Modifier.fillMaxSize()) {
+                        AdbPairingTutorialMiuixScreen(
+                            isDark = isDark,
+                            isBlackNightTheme = isBlackNight,
+                            primaryColor = activePrimaryColor,
+                            notificationEnabled = notificationEnabledState.value,
+                            isMiui = isMiui,
+                            isColorOs = isOppo,
+                            onBackClick = { finish() },
+                            onOpenDeveloperOptions = {
+                                launchedDeveloperOptions = true
+                                AdbPairingDetector.request()
+                                val intent = Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).apply {
+                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                                    putExtra(":settings:fragment_args_key", "toggle_adb_wireless")
+                                }
+                                try {
+                                    context.startActivity(intent)
+                                } catch (e: ActivityNotFoundException) {
+                                    launchedDeveloperOptions = false
+                                    AdbPairingDetector.cancel()
+                                }
+                            },
+                            onOpenNotificationOptions = {
+                                val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                                    putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                                }
+                                try {
+                                    context.startActivity(intent)
+                                } catch (_: ActivityNotFoundException) {
+                                }
+                            },
+                            onPairingSuccess = {
+                                val intent = Intent(context, HomeActivity::class.java).apply {
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                                    putExtra("EXTRA_AUTO_START_AFTER_PAIRING", true)
+                                }
+                                startActivity(intent)
+                                finish()
                             }
-                            try {
-                                context.startActivity(intent)
-                            } catch (e: ActivityNotFoundException) {
-                                launchedDeveloperOptions = false
-                                AdbPairingDetector.cancel()
-                            }
-                        },
-                        onOpenNotificationOptions = {
-                            val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
-                                putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
-                            }
-                            try {
-                                context.startActivity(intent)
-                            } catch (_: ActivityNotFoundException) {
-                            }
-                        },
-                        onPairingSuccess = {
-                            val intent = Intent(context, HomeActivity::class.java).apply {
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                                putExtra("EXTRA_AUTO_START_AFTER_PAIRING", true)
-                            }
-                            startActivity(intent)
-                            finish()
-                        }
-                    )
+                        )
+                    }
                 }
             }
         }
@@ -358,10 +361,9 @@ private fun AdbPairingTutorialMiuixScreen(
 
             if (!notificationEnabled) {
                 item(key = "card-notif-disabled") {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        cornerRadius = 20.dp,
-                        colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+                    GlassCard(
+                        isDark = isDark,
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(Modifier.padding(16.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -385,9 +387,10 @@ private fun AdbPairingTutorialMiuixScreen(
                                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                             )
                             Spacer(Modifier.height(14.dp))
-                            TextButton(
+                            GlassPillButton(
                                 text = stringResource(R.string.notification_settings),
-                                colors = ButtonDefaults.textButtonColorsPrimary(),
+                                isDark = isDark,
+                                style = GlassButtonStyle.Prominent,
                                 onClick = onOpenNotificationOptions,
                                 modifier = Modifier.fillMaxWidth()
                             )
@@ -399,12 +402,11 @@ private fun AdbPairingTutorialMiuixScreen(
                 item(key = "card-notif-ready") {
                     var cardToggled by remember(groupExpanded) { mutableStateOf(false) }
                     val showSub = groupExpanded xor cardToggled
-                    Card(
+                    GlassCard(
+                        isDark = isDark,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .onLongPressToggle(haptic) { cardToggled = !cardToggled },
-                        cornerRadius = 20.dp,
-                        colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+                            .onLongPressToggle(haptic) { cardToggled = !cardToggled }
                     ) {
                         Column(Modifier.padding(16.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -455,12 +457,11 @@ private fun AdbPairingTutorialMiuixScreen(
                     item(key = "card-miui-tip") {
                         var miuiToggled by remember(groupExpanded) { mutableStateOf(false) }
                         val showSub = groupExpanded xor miuiToggled
-                        Card(
+                        GlassCard(
+                            isDark = isDark,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .onLongPressToggle(haptic) { miuiToggled = !miuiToggled },
-                            cornerRadius = 20.dp,
-                            colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+                                .onLongPressToggle(haptic) { miuiToggled = !miuiToggled }
                         ) {
                             Column(Modifier.padding(16.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -498,12 +499,11 @@ private fun AdbPairingTutorialMiuixScreen(
                     item(key = "card-oppo-tip") {
                         var oppoToggled by remember(groupExpanded) { mutableStateOf(false) }
                         val showSub = groupExpanded xor oppoToggled
-                        Card(
+                        GlassCard(
+                            isDark = isDark,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .onLongPressToggle(haptic) { oppoToggled = !oppoToggled },
-                            cornerRadius = 20.dp,
-                            colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+                                .onLongPressToggle(haptic) { oppoToggled = !oppoToggled }
                         ) {
                             Column(Modifier.padding(16.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -551,12 +551,11 @@ private fun AdbPairingTutorialMiuixScreen(
                         // 步骤 1
                         var step1Toggled by remember(groupExpanded) { mutableStateOf(false) }
                         val showStep1Sub = groupExpanded xor step1Toggled
-                        Card(
+                        GlassCard(
+                            isDark = isDark,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .onLongPressToggle(haptic) { step1Toggled = !step1Toggled },
-                            cornerRadius = 20.dp,
-                            colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+                                .onLongPressToggle(haptic) { step1Toggled = !step1Toggled }
                         ) {
                             Column(Modifier.padding(16.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -598,9 +597,10 @@ private fun AdbPairingTutorialMiuixScreen(
                                     }
                                 }
                                 Spacer(Modifier.height(12.dp))
-                                TextButton(
+                                GlassPillButton(
                                     text = stringResource(R.string.development_settings),
-                                    colors = ButtonDefaults.textButtonColorsPrimary(),
+                                    isDark = isDark,
+                                    style = GlassButtonStyle.Prominent,
                                     onClick = onOpenDeveloperOptions,
                                     modifier = Modifier.fillMaxWidth()
                                 )
@@ -610,12 +610,11 @@ private fun AdbPairingTutorialMiuixScreen(
                         // 步骤 2
                         var step2Toggled by remember(groupExpanded) { mutableStateOf(false) }
                         val showStep2Sub = groupExpanded xor step2Toggled
-                        Card(
+                        GlassCard(
+                            isDark = isDark,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .onLongPressToggle(haptic) { step2Toggled = !step2Toggled },
-                            cornerRadius = 20.dp,
-                            colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+                                .onLongPressToggle(haptic) { step2Toggled = !step2Toggled }
                         ) {
                             Column(Modifier.padding(16.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -647,8 +646,10 @@ private fun AdbPairingTutorialMiuixScreen(
                                     )
                                 }
                                 Spacer(Modifier.height(12.dp))
-                                TextButton(
+                                GlassPillButton(
                                     text = stringResource(R.string.adb_pairing_tutorial_manual_pairing),
+                                    isDark = isDark,
+                                    style = GlassButtonStyle.Regular,
                                     onClick = { showManualPairDialog = true },
                                     modifier = Modifier.fillMaxWidth()
                                 )
@@ -658,12 +659,11 @@ private fun AdbPairingTutorialMiuixScreen(
                         // 步骤 3
                         var step3Toggled by remember(groupExpanded) { mutableStateOf(false) }
                         val showStep3Sub = groupExpanded xor step3Toggled
-                        Card(
+                        GlassCard(
+                            isDark = isDark,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .onLongPressToggle(haptic) { step3Toggled = !step3Toggled },
-                            cornerRadius = 20.dp,
-                            colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+                                .onLongPressToggle(haptic) { step3Toggled = !step3Toggled }
                         ) {
                             Column(Modifier.padding(16.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -792,8 +792,10 @@ private fun MiuixManualPairingDialog(
                 )
             }
 
-            TextButton(
+            GlassPillButton(
                 text = "启用无障碍自动秒配对助手",
+                isDark = isDark,
+                style = GlassButtonStyle.Regular,
                 onClick = {
                     onDismiss()
                     AdbPairingDetector.request()
@@ -839,33 +841,38 @@ private fun MiuixManualPairingDialog(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                TextButton(
+                GlassPillButton(
                     text = stringResource(android.R.string.cancel),
+                    isDark = isDark,
+                    style = GlassButtonStyle.Regular,
                     enabled = !isPairing,
                     onClick = onDismiss,
                     modifier = Modifier.weight(0.9f)
                 )
-                TextButton(
+                GlassPillButton(
                     text = "开发者选项",
+                    isDark = isDark,
+                    style = GlassButtonStyle.Regular,
                     enabled = !isPairing,
                     onClick = onOpenDeveloperOptions,
                     modifier = Modifier.weight(1.1f)
                 )
-                TextButton(
+                GlassPillButton(
                     text = if (isPairing) "配对中..." else stringResource(android.R.string.ok),
+                    isDark = isDark,
+                    style = GlassButtonStyle.Prominent,
                     enabled = !isPairing,
-                    colors = ButtonDefaults.textButtonColorsPrimary(),
                     onClick = {
                         val port = portText.toIntOrNull() ?: -1
                         if (port !in 1..65535) {
                             isError = true
                             statusMsg = context.getString(R.string.dialog_adb_invalid_port)
-                            return@TextButton
+                            return@GlassPillButton
                         }
                         if (codeText.isBlank()) {
                             isError = true
                             statusMsg = context.getString(R.string.dialog_adb_pairing_paring_code)
-                            return@TextButton
+                            return@GlassPillButton
                         }
                         isPairing = true
                         isError = false

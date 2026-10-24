@@ -1828,6 +1828,7 @@ abstract class HomeActivity : MaxHzActivity() {
 
     override fun onResume() {
         super.onResume()
+        moe.shizuku.manager.maxhz.GlassThemeState.sync()
         AdbPairingDetector.cancelIfReturnedToApp()
         val currentThemeKey = computeUserThemeKey()
         if (lastRecordedThemeKey != null && lastRecordedThemeKey != currentThemeKey) {

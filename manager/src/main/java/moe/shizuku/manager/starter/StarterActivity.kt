@@ -66,7 +66,15 @@ import moe.shizuku.manager.home.MiuixRowIcon
 import moe.shizuku.manager.home.MiuixSubPageTopBar
 import moe.shizuku.manager.home.onLongPressToggle
 import moe.shizuku.manager.home.CenteredAppDialog
+import moe.shizuku.manager.maxhz.BackdropProvider
 import moe.shizuku.manager.maxhz.GlassAppTheme
+import moe.shizuku.manager.maxhz.GlassButtonStyle
+import moe.shizuku.manager.maxhz.GlassCard
+import moe.shizuku.manager.maxhz.GlassLight
+import moe.shizuku.manager.maxhz.GlassPillButton
+import moe.shizuku.manager.maxhz.TitaniumBlack
+import moe.shizuku.manager.maxhz.TitaniumDark
+import moe.shizuku.manager.maxhz.getSystemOrAppPrimaryColor
 import moe.shizuku.manager.service.WatchdogService
 import moe.shizuku.manager.utils.AccessibilityHelper
 import moe.shizuku.manager.utils.EnvironmentUtils
@@ -75,14 +83,7 @@ import rikka.lifecycle.Resource
 import rikka.lifecycle.Status
 import rikka.lifecycle.viewModels
 import rikka.shizuku.Shizuku
-import top.yukonga.miuix.kmp.basic.ButtonDefaults
-import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.basic.CardDefaults
-import top.yukonga.miuix.kmp.basic.Scaffold
-import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.utils.overScrollVertical
-import top.yukonga.miuix.kmp.window.WindowDialog
 import java.net.ConnectException
 import java.net.SocketException
 import javax.net.ssl.SSLProtocolException
@@ -144,6 +145,14 @@ class StarterActivity : AppActivity() {
             win.setLayout(dialogWidth, ViewGroup.LayoutParams.WRAP_CONTENT)
             win.setDimAmount(0.55f)
             win.setGravity(Gravity.CENTER)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                runCatching {
+                    win.addFlags(android.view.WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+                    win.attributes = win.attributes.apply {
+                        blurBehindRadius = 56
+                    }
+                }
+            }
         }
 
         Shizuku.addBinderReceivedListener(binderListener)
@@ -191,32 +200,21 @@ class StarterActivity : AppActivity() {
 
         val isDark = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
         val isBlackNight = isDark && ThemeHelper.isBlackNightTheme(this)
-        val primaryColorInt = runCatching {
-            val tv = TypedValue()
-            if (theme.resolveAttribute(androidx.appcompat.R.attr.colorPrimary, tv, true)) tv.data
-            else if (isDark) 0xFF277AF7.toInt() else 0xFF3482FF.toInt()
-        }.getOrDefault(if (isDark) 0xFF277AF7.toInt() else 0xFF3482FF.toInt())
-
-        val useSystemColor = ThemeHelper.isUsingSystemColor()
         val dialogBgColor = if (isDark) {
-            if (isBlackNight) Color(0xFF000000)
-            else if (useSystemColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) androidx.compose.material3.dynamicDarkColorScheme(this).surfaceContainerHigh
-            else Color(0xFF181B22)
+            if (isBlackNight) TitaniumBlack.Card.copy(alpha = 0.90f)
+            else Color(0xCC161B22)
         } else {
-            if (useSystemColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) androidx.compose.material3.dynamicLightColorScheme(this).surfaceContainerHigh
-            else Color(0xFFFFFFFF)
+            Color(0xD9FFFDFB)
         }
         val dialogStrokeColor = if (isDark) {
-            if (isBlackNight) Color(0x26FFFFFF)
-            else if (useSystemColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) androidx.compose.material3.dynamicDarkColorScheme(this).outlineVariant
-            else Color(0x224E5766)
+            TitaniumDark.Edge
         } else {
-            if (useSystemColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) androidx.compose.material3.dynamicLightColorScheme(this).outlineVariant
-            else Color(0x12000000)
+            GlassLight.DialogHairline
         }
 
         setContent {
             GlassAppTheme(isDark = isDark) {
+                val activePrimaryColor = getSystemOrAppPrimaryColor(isDark)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -226,43 +224,45 @@ class StarterActivity : AppActivity() {
                         .background(dialogBgColor)
                         .border(1.dp, dialogStrokeColor, RoundedCornerShape(24.dp))
                 ) {
-                    StarterMiuixScreen(
-                        isDark = isDark,
-                        isBlackNightTheme = isBlackNight,
-                        primaryColor = Color(primaryColorInt),
-                        outputText = outputTextState.value,
-                        isServiceReady = serviceReadyState.value,
-                        error = errorState.value,
-                        onDismissError = { errorState.value = null },
-                        onCloseClick = { finish() },
-                        onOpenDevOptions = {
-                            val devIntent = Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).apply {
-                                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                                putExtra(":settings:fragment_args_key", "toggle_adb_wireless")
-                                if (EnvironmentUtils.isSamsung()) {
-                                    addFlags(Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
-                                    putExtra("android.intent.extra.WINDOW_MODE", 5)
-                                    putExtra("com.samsung.android.intent.extra.LAUNCH_MODE", 4)
+                    BackdropProvider(modifier = Modifier.fillMaxWidth().wrapContentHeight()) {
+                        StarterMiuixScreen(
+                            isDark = isDark,
+                            isBlackNightTheme = isBlackNight,
+                            primaryColor = activePrimaryColor,
+                            outputText = outputTextState.value,
+                            isServiceReady = serviceReadyState.value,
+                            error = errorState.value,
+                            onDismissError = { errorState.value = null },
+                            onCloseClick = { finish() },
+                            onOpenDevOptions = {
+                                val devIntent = Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).apply {
+                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                                    putExtra(":settings:fragment_args_key", "toggle_adb_wireless")
+                                    if (EnvironmentUtils.isSamsung()) {
+                                        addFlags(Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
+                                        putExtra("android.intent.extra.WINDOW_MODE", 5)
+                                        putExtra("com.samsung.android.intent.extra.LAUNCH_MODE", 4)
+                                    }
                                 }
+                                runCatching { startActivity(devIntent) }
+                            },
+                            onRetryPort5555 = {
+                                val retryIntent = Intent(this@StarterActivity, StarterActivity::class.java).apply {
+                                    putExtra(EXTRA_IS_ROOT, false)
+                                    putExtra(EXTRA_HOST, "127.0.0.1")
+                                    putExtra(EXTRA_PORT, 5555)
+                                }
+                                finish()
+                                startActivity(retryIntent)
+                            },
+                            onOpenPairingTutorial = {
+                                startActivity(Intent(this@StarterActivity, AdbPairingTutorialActivity::class.java))
+                            },
+                            onOpenAccessibility = {
+                                AccessibilityHelper.openPairingAssistantSettings(this@StarterActivity)
                             }
-                            runCatching { startActivity(devIntent) }
-                        },
-                        onRetryPort5555 = {
-                            val retryIntent = Intent(this@StarterActivity, StarterActivity::class.java).apply {
-                                putExtra(EXTRA_IS_ROOT, false)
-                                putExtra(EXTRA_HOST, "127.0.0.1")
-                                putExtra(EXTRA_PORT, 5555)
-                            }
-                            finish()
-                            startActivity(retryIntent)
-                        },
-                        onOpenPairingTutorial = {
-                            startActivity(Intent(this@StarterActivity, AdbPairingTutorialActivity::class.java))
-                        },
-                        onOpenAccessibility = {
-                            AccessibilityHelper.openPairingAssistantSettings(this@StarterActivity)
-                        }
-                    )
+                        )
+                    }
                 }
             }
         }
@@ -342,12 +342,11 @@ private fun StarterMiuixScreen(
 
         Spacer(Modifier.height(4.dp))
 
-        Card(
+        GlassCard(
+            isDark = isDark,
             modifier = Modifier
                 .fillMaxWidth()
-                .onLongPressToggle(haptic) { cardToggled = !cardToggled },
-            cornerRadius = 20.dp,
-            colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+                .onLongPressToggle(haptic) { cardToggled = !cardToggled }
         ) {
             Column(Modifier.padding(16.dp)) {
                 Row(
@@ -396,7 +395,8 @@ private fun StarterMiuixScreen(
                         .fillMaxWidth()
                         .heightIn(min = 100.dp, max = 260.dp)
                         .clip(RoundedCornerShape(14.dp))
-                        .background(if (isDark) Color(0xFF21242C) else Color(0xFFF0F2F6))
+                        .background(if (isDark) Color(0x38384850) else Color(0x73FFFFFF))
+                        .border(1.dp, if (isDark) Color(0x26FFFFFF) else Color(0xCCFFFFFF), RoundedCornerShape(14.dp))
                         .verticalScroll(terminalScrollState)
                         .padding(14.dp)
                 ) {
@@ -413,9 +413,10 @@ private fun StarterMiuixScreen(
 
                 if (isServiceReady) {
                     Spacer(Modifier.height(12.dp))
-                    TextButton(
+                    GlassPillButton(
                         text = "完成并返回主页",
-                        colors = ButtonDefaults.textButtonColorsPrimary(),
+                        isDark = isDark,
+                        style = GlassButtonStyle.Prominent,
                         onClick = onCloseClick,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -462,22 +463,27 @@ private fun StarterMiuixScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        TextButton(
+                        GlassPillButton(
                             text = stringResource(android.R.string.cancel),
+                            isDark = isDark,
+                            style = GlassButtonStyle.Regular,
                             onClick = onDismissError,
                             modifier = Modifier.weight(0.8f)
                         )
-                        TextButton(
+                        GlassPillButton(
                             text = "重试 5555",
+                            isDark = isDark,
+                            style = GlassButtonStyle.Regular,
                             onClick = {
                                 onDismissError()
                                 onRetryPort5555()
                             },
                             modifier = Modifier.weight(1f)
                         )
-                        TextButton(
+                        GlassPillButton(
                             text = "开发者选项",
-                            colors = ButtonDefaults.textButtonColorsPrimary(),
+                            isDark = isDark,
+                            style = GlassButtonStyle.Prominent,
                             onClick = {
                                 onDismissError()
                                 onOpenDevOptions()
@@ -491,22 +497,27 @@ private fun StarterMiuixScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        TextButton(
+                        GlassPillButton(
                             text = stringResource(android.R.string.cancel),
+                            isDark = isDark,
+                            style = GlassButtonStyle.Regular,
                             onClick = onDismissError,
                             modifier = Modifier.weight(0.8f)
                         )
-                        TextButton(
+                        GlassPillButton(
                             text = "系统无障碍",
+                            isDark = isDark,
+                            style = GlassButtonStyle.Regular,
                             onClick = {
                                 onDismissError()
                                 onOpenAccessibility()
                             },
                             modifier = Modifier.weight(1f)
                         )
-                        TextButton(
+                        GlassPillButton(
                             text = "重新配对",
-                            colors = ButtonDefaults.textButtonColorsPrimary(),
+                            isDark = isDark,
+                            style = GlassButtonStyle.Prominent,
                             onClick = {
                                 onDismissError()
                                 onOpenPairingTutorial()
@@ -516,9 +527,10 @@ private fun StarterMiuixScreen(
                     }
                 }
                 else -> {
-                    TextButton(
+                    GlassPillButton(
                         text = stringResource(android.R.string.ok),
-                        colors = ButtonDefaults.textButtonColorsPrimary(),
+                        isDark = isDark,
+                        style = GlassButtonStyle.Prominent,
                         onClick = onDismissError,
                         modifier = Modifier.fillMaxWidth()
                     )

@@ -1,10 +1,27 @@
 package moe.shizuku.manager.maxhz
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.kyant.backdrop.backdrops.LayerBackdrop
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 
 /**
  * Glass / "Titanium" 设计规范 Token — 移植自 SamsungRootKit / OdinBox 玻璃架构。
@@ -66,6 +83,49 @@ object GlassLight {
  * 降级为 0 开销的纯色微光卡片，锁定 120Hz 极低功耗。
  */
 val LocalGlassEnabled = compositionLocalOf { true }
+
+val LocalBackdrop = compositionLocalOf<LayerBackdrop?> { null }
+
+@Composable
+fun BackdropProvider(
+    modifier: Modifier = Modifier,
+    overlay: (@Composable BoxScope.() -> Unit)? = null,
+    content: @Composable () -> Unit
+) {
+    val backdrop = rememberLayerBackdrop(blurRadius = 0.dp)
+    var scrollTick by remember { mutableIntStateOf(0) }
+    val nestedScrollConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource
+            ): Offset {
+                if (consumed.y != 0f || consumed.x != 0f) {
+                    scrollTick++
+                }
+                return Offset.Zero
+            }
+        }
+    }
+    PublishBackdrop(backdrop, contentKey = scrollTick)
+    CompositionLocalProvider(LocalBackdrop provides backdrop) {
+        Box(
+            modifier = modifier
+                .fillMaxSize()
+                .nestedScroll(nestedScrollConnection)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .layerBackdrop(backdrop, contentKey = scrollTick)
+            ) {
+                content()
+            }
+            overlay?.invoke(this)
+        }
+    }
+}
 
 fun glassBackgroundBrush(isDark: Boolean, isBlackNightTheme: Boolean = false): Brush {
     return when {

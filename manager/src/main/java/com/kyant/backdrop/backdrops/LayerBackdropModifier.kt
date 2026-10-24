@@ -102,43 +102,24 @@ private class LayerBackdropNode(
                 this@LayerBackdropNode
             ) { backdrop.onDraw(this@draw) }
 
-            // 烘焙模糊版（整屏一次）。背景静态 → 只在内容/尺寸变化时重做，
-            // 之后每张卡片采样它，省掉「每卡每帧一次大半径高斯」这个最大开销。
-            //
-            // 关键：模糊必须挂在**源层**上、录完立刻摘掉。
-            // Compose 的 GraphicsLayer.renderEffect 是在 drawLayer() 时应用的，
-            // 不是 record 时。写过一版把 effect 挂在 blurredGraphicsLayer 上 ——
-            // 结果 record 时没模糊，反而每次 drawLayer(blurred) 都重跑一遍
-            // 全屏高斯（每卡每帧一次，比逐卡小区域模糊还贵）。真机实测：
-            // 直通档与全质量档 jank 都是 ~30%，优化完全没生效。
-            // 烘焙链：**先 vibrancy 再模糊**（与原逐卡滤镜链的执行顺序一致 ——
-            // BackdropEffectScope 的 chain 是「后加的后执行」，原链为
-            // colorControls → blur → lens，故 vibrancy 在 blur 之前）。
-            //
-            // vibrancy 之所以必须在这里烘焙：滚动降级档走的是 renderScale=0 的
-            // 直通路径，**完全不跑 effects** —— 若增艳仍挂在每张卡的滤镜链上，
-            // 静止时玻璃里的壁纸是 saturation ×1.65、一滑就掉回 ×1.0，
-            // 用户看到的就是「滑动时壁纸色彩变了」。背景是静态的，增艳结果也
-            // 是静态的，整屏做一次即可，两档共用同一份背景 → 色彩基线一致，
-            // 而且 Full 档还少了一个每帧 ColorFilter pass，纯赚。
             val radius = backdrop.blurRadius.toPx()
-            val vibrancyInput = backdrop.vibrancy?.let {
-                if (isRenderEffectSupported()) ColorFilterEffect(null, it) else null
-            }
-            backdrop.graphicsLayer.renderEffect =
-                if (radius > 0f && isRenderEffectSupported()) {
-                    BlurEffect(vibrancyInput, radius, radius, TileMode.Clamp)
-                } else {
-                    vibrancyInput
+            if (radius > 0f || backdrop.vibrancy != null) {
+                val vibrancyInput = backdrop.vibrancy?.let {
+                    if (isRenderEffectSupported()) ColorFilterEffect(null, it) else null
                 }
-            recordLayer(
-                backdrop.blurredGraphicsLayer,
-                this@LayerBackdropNode
-            ) { drawLayer(backdrop.graphicsLayer) }
-            // 摘掉：源层保持无 effect，烘焙层也不能带 effect ——
-            // 否则下游每张卡 drawLayer(blurred) 又会各跑一次高斯。
-            backdrop.graphicsLayer.renderEffect = null
-            backdrop.blurredGraphicsLayer.renderEffect = null
+                backdrop.graphicsLayer.renderEffect =
+                    if (radius > 0f && isRenderEffectSupported()) {
+                        BlurEffect(vibrancyInput, radius, radius, TileMode.Clamp)
+                    } else {
+                        vibrancyInput
+                    }
+                recordLayer(
+                    backdrop.blurredGraphicsLayer,
+                    this@LayerBackdropNode
+                ) { drawLayer(backdrop.graphicsLayer) }
+                backdrop.graphicsLayer.renderEffect = null
+                backdrop.blurredGraphicsLayer.renderEffect = null
+            }
 
             // 通知下游玻璃：采样源换了新的，离屏内容得重录
             backdrop.version++

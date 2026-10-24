@@ -31,32 +31,42 @@ import moe.shizuku.manager.app.ThemeHelper
  */
 
 private val GlassLightColors = lightColorScheme(
-    primary = Color(0xFF3F51B5),
+    primary = Color(0xFF059669),
     onPrimary = Color(0xFFFFFFFF),
-    secondary = Color(0xFF3F51B5),
+    secondary = Color(0xFF059669),
     onSecondary = Color(0xFFFFFFFF),
-    background = Color(0xFFF8FBFE),
+    background = Color(0xFFF5F3EE),
     onBackground = Color(0xFF0F172A),
     surface = Color(0xFFFFFFFF),
     onSurface = Color(0xFF0F172A),
-    surfaceVariant = Color(0xFFE4EDFA),
+    surfaceVariant = Color(0xFFF0EDE6),
     onSurfaceVariant = Color(0xFF475569),
     outline = Color(0x1F0F172A)
 )
 
 private val GlassDarkColors = darkColorScheme(
-    primary = Color(0xFF8C9EFF),
+    primary = Color(0xFF10B981),
     onPrimary = Color(0xFF0A0E18),
-    secondary = Color(0xFF8C9EFF),
+    secondary = Color(0xFF10B981),
     onSecondary = Color(0xFF0A0E18),
-    background = Color(0xFF070A12),
+    background = Color(0xFF12131F),
     onBackground = Color(0xFFF8FAFC),
-    surface = Color(0xFF0D121E),
+    surface = Color(0xFF161B22),
     onSurface = Color(0xFFF8FAFC),
-    surfaceVariant = Color(0xFF1A2233),
+    surfaceVariant = Color(0xFF1E2631),
     onSurfaceVariant = Color(0xFFCBD5E1),
     outline = Color(0x2BF8FAFC)
 )
+
+object GlassThemeState {
+    val useSystemColor = androidx.compose.runtime.mutableStateOf(ThemeHelper.isUsingSystemColor())
+    val refreshTick = androidx.compose.runtime.mutableIntStateOf(0)
+
+    fun sync() {
+        useSystemColor.value = ThemeHelper.isUsingSystemColor()
+        refreshTick.intValue++
+    }
+}
 
 private val GlassShapes = Shapes(
     extraSmall = RoundedCornerShape(6.dp),
@@ -76,12 +86,15 @@ private val GlassTypography = Typography(
 @Composable
 fun getSystemOrAppPrimaryColor(isDark: Boolean): Color {
     val context = LocalContext.current
-    return remember(isDark, ThemeHelper.isUsingSystemColor()) {
+    val useSystem = GlassThemeState.useSystemColor.value
+    val tick = GlassThemeState.refreshTick.intValue + MaxHzComposeRefreshBus.tick.value
+    return remember(isDark, useSystem, tick) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && ThemeHelper.isUsingSystemColor()) {
             val scheme = if (isDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
             scheme.primary
         } else {
-            if (isDark) Color(0xFF277AF7) else Color(0xFF3482FF)
+            // SamsungRootKit 默认翡翠绿主题色（关闭系统动态取色时立即切换为 RootKit 标志性绿）
+            if (isDark) Color(0xFF10B981) else Color(0xFF059669)
         }
     }
 }
@@ -92,8 +105,10 @@ fun GlassAppTheme(
     content: @Composable () -> Unit
 ) {
     val context = LocalContext.current
+    val useSystem = GlassThemeState.useSystemColor.value
+    val tick = GlassThemeState.refreshTick.intValue + MaxHzComposeRefreshBus.tick.value
     val primaryColor = getSystemOrAppPrimaryColor(isDark)
-    val colorScheme = remember(isDark, ThemeHelper.isUsingSystemColor()) {
+    val colorScheme = remember(isDark, useSystem, tick, primaryColor) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && ThemeHelper.isUsingSystemColor()) {
             if (isDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         } else {
@@ -101,8 +116,7 @@ fun GlassAppTheme(
         }
     }
 
-    val useSystem = ThemeHelper.isUsingSystemColor()
-    val miuixColors = remember(isDark, useSystem, primaryColor, colorScheme) {
+    val miuixColors = remember(isDark, useSystem, tick, primaryColor, colorScheme) {
         if (isDark) {
             if (useSystem && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 top.yukonga.miuix.kmp.theme.darkColorScheme(
@@ -117,10 +131,10 @@ fun GlassAppTheme(
                 top.yukonga.miuix.kmp.theme.darkColorScheme(
                     primary = primaryColor,
                     primaryVariant = primaryColor,
-                    surface = Color(0xFF0D0F12),
-                    background = Color(0xFF0D0F12),
-                    surfaceContainer = Color(0xFF181A20),
-                    surfaceVariant = Color(0xFF181A20)
+                    surface = TitaniumDark.BackgroundTop,
+                    background = TitaniumDark.BackgroundMid,
+                    surfaceContainer = TitaniumDark.BackgroundTop,
+                    surfaceVariant = TitaniumDark.BackgroundTop
                 )
             }
         } else {
@@ -137,8 +151,8 @@ fun GlassAppTheme(
                 top.yukonga.miuix.kmp.theme.lightColorScheme(
                     primary = primaryColor,
                     primaryVariant = primaryColor,
-                    surface = Color(0xFFF5F6F9),
-                    background = Color(0xFFF5F6F9),
+                    surface = GlassLight.BackgroundTop,
+                    background = GlassLight.BackgroundMid,
                     surfaceContainer = Color(0xFFFFFFFF),
                     surfaceVariant = Color(0xFFFFFFFF)
                 )

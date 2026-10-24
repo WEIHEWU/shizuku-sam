@@ -301,7 +301,8 @@ open class MaxHzActivity : AppBarActivity() {
 
     protected val density by lazy { resources.displayMetrics.density }
     protected val gap by lazy { dp(10) }
-    protected val themeColors by lazy { loadThemeColors() }
+    protected val themeColors: ThemeColors
+        get() = loadThemeColors()
 
     protected enum class Page {
         SHIZUKU,
@@ -767,9 +768,9 @@ open class MaxHzActivity : AppBarActivity() {
         val fpsStateChanged = syncFpsMonitorOverlayPermission()
         syncStatusChangeLogs()
         syncBackgroundErrorLog()
-        // 设置页改过夜间模式后回到这里，快照必须重采：MaxHzActivity 的基类
-        // 不一定走 AppCompatDelegate 的 recreate 链路（见 isDarkMode 注释），
-        // 不主动刷新的话玻璃会继续采样上一个主题的背景。
+        // 设置页改过夜间模式或系统主题色后回到这里，快照与主题状态必须刷新
+        GlassThemeState.sync()
+        LiquidGlassTheme.setAccent(themeColors.primary)
         refreshGlassBackdrop()
         glassRoot?.background = LiquidGlassTheme.createPageBackgroundDrawable(isDarkMode(), isShizukuBlackTheme())
         // 顶栏（状态栏 + 标题栏）也要跟着刷新。
@@ -848,7 +849,7 @@ open class MaxHzActivity : AppBarActivity() {
         if (detailStack.isEmpty()) {
             supportActionBar?.setDisplayHomeAsUpEnabled(false)
             if (::glassDockOverlay.isInitialized) {
-                glassDockOverlay.visibility = View.VISIBLE
+                glassDockOverlay.visibility = View.GONE
             }
         }
         updateSystemBarPadding()
@@ -1301,36 +1302,10 @@ open class MaxHzActivity : AppBarActivity() {
      */
     private fun setupGlassDockOverlay() {
         if (::glassDockOverlay.isInitialized.not()) return
-        val dock = ComposeView(this).apply {
-            setContent {
-                // MaterialTheme 注入 LocalIndication(ripple)，否则按钮按下无任何反馈
-                GlassAppTheme(isDark = isDarkMode()) {
-                    val density = LocalDensity.current
-                    val bottomInsetDp = with(density) { systemBottomInsetState.intValue.toFloat().toDp() }
-                    Box(
-                        Modifier.fillMaxWidth().wrapContentHeight(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        GlassDockNav(
-                            isDark = isDarkMode(),
-                            isBlackNightTheme = isShizukuBlackTheme(),
-                            selectedIndex = dockSelectedTabState.intValue,
-                            bottomInsetDp = bottomInsetDp,
-                            onTabClick = { index -> handleDockTabClick(index) }
-                        )
-                    }
-                }
-            }
-        }
-        glassDockView = dock
-        // glassDockOverlay 现在撑满 pageArea（MATCH_PARENT），因此必须给 dock 自身
-        // 设 gravity=BOTTOM：FrameLayout 子 View 默认靠 TOP|START，不设 gravity 会让
-        // dock 跑到屏幕顶部（实测 ComposeView 落在 [0,0][1440,285]），底部反而空出。
-        // 高度保持 WRAP_CONTENT，dock 只占自身 ~64dp + 底部 inset，不吃掉内容区高度。
-        glassDockOverlay.addView(dock, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            FrameLayout.LayoutParams.WRAP_CONTENT
-        ).also { it.gravity = android.view.Gravity.BOTTOM })
+        // ShizukuHomeScreen 与 MaxHzPageScreen 已在各自的 BackdropProvider(overlay = ...) 内
+        // 直接渲染 GlassDockNav，共享同一 ComposeView 与 GraphicsLayer 实时折射列表内容。
+        // 因此外部 glassDockOverlay 设为 GONE，避免出现双层 Dock 叠加。
+        glassDockOverlay.visibility = View.GONE
     }
 
     /** 通知共享 dock 刷新（tab 选中状态变更后调用） */
@@ -1347,10 +1322,11 @@ open class MaxHzActivity : AppBarActivity() {
         }
         val cv = ComposeView(this).apply {
             setContent {
-                GlassAppTheme(isDark = isDarkMode()) {
+                val dark = isDarkMode()
+                GlassAppTheme(isDark = dark) {
                 MaxHzPageScreen(
-                    isDark = isDarkMode(),
-                    primaryColor = androidx.compose.ui.graphics.Color(themeColors.primary),
+                    isDark = dark,
+                    primaryColor = getSystemOrAppPrimaryColor(dark),
                     topInsetPx = actionBarInset(),
                     bottomInsetPx = systemBottomInsetState.intValue,
                     fullHeightPx = (glassRoot?.height ?: 0).toFloat().takeIf { it > 0f }
@@ -1782,13 +1758,14 @@ open class MaxHzActivity : AppBarActivity() {
 
     protected fun styleOptionBTogglePill(pill: TextView, expanded: Boolean) {
         val isDark = isDarkMode()
+        val accent = themeColors.primary
         pill.text = if (expanded) "隐藏说明" else "显示说明"
         pill.textSize = 11.5f
         pill.includeFontPadding = false
         pill.setTypeface(pill.typeface, android.graphics.Typeface.BOLD)
         pill.setTextColor(
             if (expanded) {
-                if (isDark) 0xFF277AF7.toInt() else 0xFF3482FF.toInt()
+                accent
             } else {
                 themeColors.onSurfaceVariant
             }
@@ -1798,9 +1775,17 @@ open class MaxHzActivity : AppBarActivity() {
             cornerRadius = dp(999).toFloat()
             setColor(
                 if (expanded) {
-                    if (isDark) 0xFF162946.toInt() else 0xFFEBF3FF.toInt()
+                    Color.argb(if (isDark) 56 else 36, Color.red(accent), Color.green(accent), Color.blue(accent))
                 } else {
-                    if (isDark) 0xFF21242C.toInt() else 0xFFF0F2F6.toInt()
+                    if (isDark) 0x22FFFFFF else 0x85FFFFFF.toInt()
+                }
+            )
+            setStroke(
+                maxOf(1, dp(1)),
+                if (expanded) {
+                    Color.argb(115, Color.red(accent), Color.green(accent), Color.blue(accent))
+                } else {
+                    if (isDark) 0x26FFFFFF else 0xCCFFFFFF.toInt()
                 }
             )
         }
@@ -6290,6 +6275,7 @@ open class MaxHzActivity : AppBarActivity() {
     protected fun applyLiquidGlassCardStyle(card: MaterialCardView, radiusDp: Int = CARD_RADIUS_DP) {
         val radiusPx = dp(radiusDp).toFloat()
         val isDark = isDarkMode()
+        val isBlack = isShizukuBlackTheme()
         card.radius = radiusPx
         card.cardElevation = 0f
         card.maxCardElevation = 0f
@@ -6297,10 +6283,16 @@ open class MaxHzActivity : AppBarActivity() {
         card.preventCornerOverlap = false
         card.strokeWidth = 0
         card.setCardBackgroundColor(Color.TRANSPARENT)
-        val cardBgColor = if (isDark) 0xFF181A20.toInt() else 0xFFFFFFFF.toInt()
+        val cardBgColor = when {
+            isBlack -> 0xD90D1117.toInt()
+            isDark -> 0x38384850.toInt()
+            else -> 0x73FFFFFF.toInt()
+        }
+        val strokeColor = if (isDark) 0x26FFFFFF.toInt() else 0xCCFFFFFF.toInt()
         card.background = GradientDrawable().apply {
             cornerRadius = radiusPx
             setColor(cardBgColor)
+            setStroke(maxOf(1, dp(1)), strokeColor)
         }
     }
 
@@ -11465,29 +11457,29 @@ open class MaxHzActivity : AppBarActivity() {
     private fun loadThemeColors(): ThemeColors {
         val blackTheme = isShizukuBlackTheme()
         val useSystem = ThemeHelper.isUsingSystemColor()
+        val dynamicPrimary: Int? = if (useSystem && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            runCatching {
+                if (isDarkMode()) {
+                    androidx.compose.material3.dynamicDarkColorScheme(this).primary.toArgb()
+                } else {
+                    androidx.compose.material3.dynamicLightColorScheme(this).primary.toArgb()
+                }
+            }.getOrNull()
+        } else null
+
         if (isDarkMode()) {
             val pageColor = if (blackTheme) 0xFF000000.toInt()
-                else if (useSystem) resolveColor(android.R.attr.colorBackground, 0xFF0D0F12.toInt())
-                else 0xFF0D0F12.toInt()
-            val shizukuCardColor = if (blackTheme) 0xFF000000.toInt()
-                else if (useSystem) resolveColor(com.google.android.material.R.attr.colorSurfaceContainer, 0xFF181A20.toInt())
-                else 0xFF181A20.toInt()
-            val maxSurfaceHigh = if (blackTheme) 0xFF101216.toInt()
-                else if (useSystem) resolveColor(com.google.android.material.R.attr.colorSurfaceContainerHigh, 0xFF21242C.toInt())
-                else 0xFF21242C.toInt()
-            val primaryColor = if (useSystem) resolveColor(com.google.android.material.R.attr.colorPrimary, 0xFF277AF7.toInt())
-                else 0xFF277AF7.toInt()
-            val onSurfaceColor = if (useSystem) resolveColor(com.google.android.material.R.attr.colorOnSurface, 0xFFECEFF4.toInt())
-                else 0xFFECEFF4.toInt()
-            val onSurfaceVariantColor = if (useSystem) resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant, 0xFF949BA8.toInt())
-                else 0xFF949BA8.toInt()
-            val outlineColor = if (blackTheme) 0x26FFFFFF
-                else if (useSystem) resolveColor(com.google.android.material.R.attr.colorOutlineVariant, 0x1AFFFFFF)
-                else 0x1AFFFFFF
-            val primaryContainerColor = if (useSystem) resolveColor(com.google.android.material.R.attr.colorPrimaryContainer, 0xFF162946.toInt())
-                else 0xFF162946.toInt()
-            val onPrimaryContainerColor = if (useSystem) resolveColor(com.google.android.material.R.attr.colorOnPrimaryContainer, primaryColor)
-                else 0xFF277AF7.toInt()
+                else 0xFF12131F.toInt()
+            val shizukuCardColor = if (blackTheme) 0xD90D1117.toInt()
+                else 0x38384850.toInt()
+            val maxSurfaceHigh = if (blackTheme) 0xFF161B22.toInt()
+                else 0x26FFFFFF
+            val primaryColor = dynamicPrimary ?: 0xFF10B981.toInt()
+            val onSurfaceColor = 0xFFF8FAFC.toInt()
+            val onSurfaceVariantColor = 0xFF94A3B8.toInt()
+            val outlineColor = 0x26FFFFFF
+            val primaryContainerColor = Color.argb(56, Color.red(primaryColor), Color.green(primaryColor), Color.blue(primaryColor))
+            val onPrimaryContainerColor = primaryColor
 
             return ThemeColors(
                 page = pageColor,
@@ -11498,7 +11490,7 @@ open class MaxHzActivity : AppBarActivity() {
                 onSurface = onSurfaceColor,
                 onSurfaceVariant = onSurfaceVariantColor,
                 primary = primaryColor,
-                onPrimary = if (useSystem) resolveColor(com.google.android.material.R.attr.colorOnPrimary, 0xFFFFFFFF.toInt()) else 0xFFFFFFFF.toInt(),
+                onPrimary = 0xFFFFFFFF.toInt(),
                 primaryContainer = primaryContainerColor,
                 onPrimaryContainer = onPrimaryContainerColor,
                 secondaryContainer = shizukuCardColor,
@@ -11509,18 +11501,18 @@ open class MaxHzActivity : AppBarActivity() {
                 onErrorContainer = if (useSystem) resolveColor(com.google.android.material.R.attr.colorOnErrorContainer, 0xFFFFDAD6.toInt()) else 0xFFFFDAD6.toInt(),
                 warningContainer = maxSurfaceHigh,
                 onWarningContainer = onSurfaceVariantColor,
-                error = if (useSystem) resolveColor(com.google.android.material.R.attr.colorError, 0xFFFFB4AB.toInt()) else 0xFFFFB4AB.toInt()
+                error = if (useSystem) resolveColor(com.google.android.material.R.attr.colorError, 0xFFF87171.toInt()) else 0xFFF87171.toInt()
             )
         }
-        val pageColor = if (useSystem) resolveColor(android.R.attr.colorBackground, 0xFFF5F6F9.toInt()) else 0xFFF5F6F9.toInt()
-        val shizukuCardColor = if (useSystem) resolveColor(com.google.android.material.R.attr.colorSurfaceContainer, 0xFFFFFFFF.toInt()) else 0xFFFFFFFF.toInt()
-        val maxSurfaceHigh = if (useSystem) resolveColor(com.google.android.material.R.attr.colorSurfaceContainerHigh, 0xFFF0F2F6.toInt()) else 0xFFF0F2F6.toInt()
-        val primaryColor = if (useSystem) resolveColor(com.google.android.material.R.attr.colorPrimary, 0xFF3482FF.toInt()) else 0xFF3482FF.toInt()
-        val onSurfaceColor = if (useSystem) resolveColor(com.google.android.material.R.attr.colorOnSurface, 0xFF1A1C1E.toInt()) else 0xFF1A1C1E.toInt()
-        val onSurfaceVariantColor = if (useSystem) resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant, 0xFF6B7280.toInt()) else 0xFF6B7280.toInt()
-        val outlineColor = if (useSystem) resolveColor(com.google.android.material.R.attr.colorOutlineVariant, 0x0C000000) else 0x0C000000
-        val primaryContainerColor = if (useSystem) resolveColor(com.google.android.material.R.attr.colorPrimaryContainer, 0xFFEBF3FF.toInt()) else 0xFFEBF3FF.toInt()
-        val onPrimaryContainerColor = if (useSystem) resolveColor(com.google.android.material.R.attr.colorOnPrimaryContainer, primaryColor) else primaryColor
+        val pageColor = 0xFFF0EDE6.toInt()
+        val shizukuCardColor = 0x73FFFFFF.toInt()
+        val maxSurfaceHigh = 0x8CFFFFFF.toInt()
+        val primaryColor = dynamicPrimary ?: 0xFF059669.toInt()
+        val onSurfaceColor = 0xFF0F172A.toInt()
+        val onSurfaceVariantColor = 0xFF64748B.toInt()
+        val outlineColor = 0xCCFFFFFF.toInt()
+        val primaryContainerColor = Color.argb(36, Color.red(primaryColor), Color.green(primaryColor), Color.blue(primaryColor))
+        val onPrimaryContainerColor = primaryColor
 
         return ThemeColors(
             page = pageColor,
@@ -11531,7 +11523,7 @@ open class MaxHzActivity : AppBarActivity() {
             onSurface = onSurfaceColor,
             onSurfaceVariant = onSurfaceVariantColor,
             primary = primaryColor,
-            onPrimary = if (useSystem) resolveColor(com.google.android.material.R.attr.colorOnPrimary, 0xFFFFFFFF.toInt()) else 0xFFFFFFFF.toInt(),
+            onPrimary = 0xFFFFFFFF.toInt(),
             primaryContainer = primaryContainerColor,
             onPrimaryContainer = onPrimaryContainerColor,
             secondaryContainer = shizukuCardColor,
@@ -11542,7 +11534,7 @@ open class MaxHzActivity : AppBarActivity() {
             onErrorContainer = if (useSystem) resolveColor(com.google.android.material.R.attr.colorOnErrorContainer, 0xFF9A2D2D.toInt()) else 0xFF9A2D2D.toInt(),
             warningContainer = maxSurfaceHigh,
             onWarningContainer = onSurfaceVariantColor,
-            error = if (useSystem) resolveColor(com.google.android.material.R.attr.colorError, 0xFFA12A2A.toInt()) else 0xFFA12A2A.toInt()
+            error = if (useSystem) resolveColor(com.google.android.material.R.attr.colorError, 0xFFDC2626.toInt()) else 0xFFDC2626.toInt()
         )
     }
 
@@ -12178,7 +12170,7 @@ open class MaxHzActivity : AppBarActivity() {
         private const val BUTTON_HEIGHT_DP = 42
         private const val COMMAND_BUTTON_TAG = "maxhz_command_button"
         private const val SLOW_COMMAND_NOTICE_MS = 2000L
-        private const val BUTTON_RADIUS_DP = 14
+        private const val BUTTON_RADIUS_DP = 999
         private const val BUTTON_SPACING_DP = 8
         private const val DASHBOARD_TILE_HEIGHT_DP = 64
         private const val DASHBOARD_TILE_SPACING_DP = 8
@@ -12193,7 +12185,7 @@ open class MaxHzActivity : AppBarActivity() {
         private const val BATTERY_INPUT_ITEM_SPACING_DP = 8
         private const val INPUT_LABEL_GAP_DP = 4
         private const val INPUT_FIELD_HEIGHT_DP = 44
-        const val CARD_RADIUS_DP = 18
+        const val CARD_RADIUS_DP = 20
         private const val CARD_PADDING_DP = 12
         private const val CARD_SECTION_SPACING_DP = 8
         private const val BATTERY_PROTECTION_RESULT_KEY = "battery_protection"

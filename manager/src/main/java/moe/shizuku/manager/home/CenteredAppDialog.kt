@@ -1,32 +1,49 @@
 package moe.shizuku.manager.home
 
 import android.os.Build
+import android.view.WindowManager
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import com.kyant.backdrop.drawBackdrop
+import com.kyant.backdrop.effects.blur
+import com.kyant.backdrop.effects.lens
 import moe.shizuku.manager.app.ThemeHelper
+import moe.shizuku.manager.maxhz.GlassLight
+import moe.shizuku.manager.maxhz.GlassRadii
+import moe.shizuku.manager.maxhz.LocalGlassEnabled
+import moe.shizuku.manager.maxhz.TitaniumBlack
+import moe.shizuku.manager.maxhz.TitaniumDark
 
 /**
- * 全局统一居中弹窗组件
- * 
- * 彻底替换 Miuix 移动端默认底部对齐的 WindowDialog，确保在手机、平板及折叠屏上
- * 所有弹窗均强制屏幕垂直与水平居中，并保持统一的圆角、边框、投影与动态主题配色。
+ * SamsungRootKit 光学玻璃全局统一居中弹窗组件
+ *
+ * 结合 Window 级实时高斯模糊 (FLAG_BLUR_BEHIND) + Kyant Backdrop (blur 16dp + lens 24dp)
+ * 边缘光学透镜折射、1dp 钛金发丝描边与顶部微光反光层。
  */
 @Composable
 fun CenteredAppDialog(
@@ -41,29 +58,18 @@ fun CenteredAppDialog(
     val context = LocalContext.current
     val isDark = (context.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
     val isBlackNight = ThemeHelper.isBlackNightTheme(context) && isDark
-    val useSystemColor = ThemeHelper.isUsingSystemColor()
+    val glassOn = LocalGlassEnabled.current
 
-    val dialogBgColor = if (isDark) {
-        if (isBlackNight) Color(0xFF000000)
-        else if (useSystemColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            androidx.compose.material3.dynamicDarkColorScheme(context).surfaceContainerHigh
-        } else Color(0xFF181B22)
-    } else {
-        if (useSystemColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            androidx.compose.material3.dynamicLightColorScheme(context).surfaceContainerHigh
-        } else Color(0xFFFFFFFF)
+    val dialogBgColor = when {
+        isBlackNight -> TitaniumBlack.Card.copy(alpha = 0.88f)
+        isDark -> Color(0xCC161B22)
+        else -> Color(0xD9FFFDFB)
     }
 
-    val dialogStrokeColor = if (isDark) {
-        if (isBlackNight) Color(0x26FFFFFF)
-        else if (useSystemColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            androidx.compose.material3.dynamicDarkColorScheme(context).outlineVariant
-        } else Color(0x224E5766)
-    } else {
-        if (useSystemColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            androidx.compose.material3.dynamicLightColorScheme(context).outlineVariant
-        } else Color(0x12000000)
-    }
+    val dialogStrokeColor = if (isDark) TitaniumDark.Edge else GlassLight.DialogHairline
+    val sheenAlpha = if (isDark) 0.06f else 0.14f
+    val dialogShape = RoundedCornerShape(if (isDark) GlassRadii.Dialog else 28.dp)
+    val dialogBackdrop = rememberLayerBackdrop(blurRadius = 0.dp)
 
     Dialog(
         onDismissRequest = onDismissRequest,
@@ -72,6 +78,19 @@ fun CenteredAppDialog(
             decorFitsSystemWindows = false
         )
     ) {
+        val dialogWindow = (LocalView.current.parent as? DialogWindowProvider)?.window
+        SideEffect {
+            dialogWindow?.let { win ->
+                win.setDimAmount(if (isDark) 0.48f else 0.26f)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    win.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+                    win.attributes = win.attributes.apply {
+                        blurBehindRadius = 56
+                    }
+                }
+            }
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -79,65 +98,97 @@ fun CenteredAppDialog(
                 .padding(horizontal = 20.dp, vertical = 24.dp),
             contentAlignment = Alignment.Center
         ) {
-            Box(
+            Surface(
                 modifier = Modifier
                     .widthIn(max = 500.dp)
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(dialogBgColor)
-                    .border(1.dp, dialogStrokeColor, RoundedCornerShape(24.dp))
-                    .padding(horizontal = 20.dp, vertical = 18.dp)
+                    .shadow(
+                        elevation = 24.dp,
+                        shape = dialogShape,
+                        ambientColor = Color.Black.copy(alpha = if (isDark) 0.55f else 0.18f),
+                        spotColor = Color.Black.copy(alpha = if (isDark) 0.55f else 0.18f)
+                    )
+                    .drawBackdrop(
+                        backdrop = dialogBackdrop,
+                        shape = { dialogShape },
+                        effects = {
+                            if (glassOn) {
+                                blur(16.dp.toPx())
+                                lens(24.dp.toPx(), 24.dp.toPx())
+                            }
+                        },
+                        highlight = null,
+                        shadow = null,
+                        onDrawSurface = { drawRect(color = dialogBgColor) }
+                    )
+                    .layerBackdrop(dialogBackdrop, contentKey = isDark),
+                shape = dialogShape,
+                color = Color.Transparent,
+                border = BorderStroke(1.dp, dialogStrokeColor)
             ) {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    if (title != null) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = title,
-                                fontSize = 17.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isDark) Color(0xFFECEFF4) else Color(0xFF1A1C1E),
-                                modifier = Modifier.weight(1f)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            Brush.verticalGradient(
+                                0f to Color.White.copy(alpha = sheenAlpha),
+                                0.45f to Color.Transparent
                             )
-                            Box(
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .clip(CircleShape)
-                                    .background(if (isDark) Color(0x26FFFFFF) else Color(0x14000000))
-                                    .clickable { onDismissRequest() },
-                                contentAlignment = Alignment.Center
+                        )
+                        .padding(horizontal = 20.dp, vertical = 18.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        if (title != null) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "✕",
-                                    fontSize = 13.sp,
+                                    text = title,
+                                    fontSize = 17.5.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (isDark) Color(0xFF949BA8) else Color(0xFF6B7280)
+                                    color = if (isDark) Color(0xFFF1F5F9) else Color(0xFF0F172A),
+                                    modifier = Modifier.weight(1f)
                                 )
+                                Box(
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clip(CircleShape)
+                                        .background(if (isDark) Color(0x26FFFFFF) else Color(0x14000000))
+                                        .border(0.8.dp, if (isDark) TitaniumDark.Hairline else GlassLight.Hairline, CircleShape)
+                                        .clickable { onDismissRequest() },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "✕",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isDark) Color(0xFFCBD5E1) else Color(0xFF475569)
+                                    )
+                                }
                             }
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(1.dp)
+                                    .background(if (isDark) TitaniumDark.Hairline else Color(0x18000000))
+                            )
                         }
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(1.dp)
-                                .background(if (isDark) Color(0x1FFFFFFF) else Color(0x12000000))
-                        )
+                        if (summary != null) {
+                            Text(
+                                text = summary,
+                                fontSize = 12.5.sp,
+                                color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B),
+                                lineHeight = 17.sp,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                        content()
                     }
-                    if (summary != null) {
-                        Text(
-                            text = summary,
-                            fontSize = 12.5.sp,
-                            color = if (isDark) Color(0xFF949BA8) else Color(0xFF6B7280),
-                            lineHeight = 17.sp,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                    content()
                 }
             }
         }

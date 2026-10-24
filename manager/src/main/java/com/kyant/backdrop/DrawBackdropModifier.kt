@@ -449,6 +449,7 @@ private class DrawBackdropNode(
             }
         }
 
+        val versionBefore = (backdrop as? LayerBackdrop)?.version ?: 0
         onDrawBehind?.invoke(this)
         if (scale > 0f) {
             drawBackdropLayer()
@@ -462,6 +463,11 @@ private class DrawBackdropNode(
         onDrawSurface?.invoke(this)
         drawContent()
         onDrawFront?.invoke(this)
+        val versionAfter = (backdrop as? LayerBackdrop)?.version ?: 0
+        if (versionAfter != versionBefore) {
+            dirty = true
+            invalidateDraw()
+        }
 
         // 停机时整块跳过：保留上一帧的背景层内容，而不是把一张没有玻璃的空图
         // 录进去（否则依赖它的下游表面会突然失去背景）。

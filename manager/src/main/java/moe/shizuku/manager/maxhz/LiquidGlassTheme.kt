@@ -484,8 +484,8 @@ half4 main(float2 coord) {
         accentOverride = color
     }
 
-    /** 强调色，未注入时退回 iOS 蓝 */
-    private val accent: Int get() = accentOverride ?: 0xFF007AFF.toInt()
+    /** 强调色，未注入时退回 SamsungRootKit 翡翠绿 */
+    private val accent: Int get() = accentOverride ?: 0xFF10B981.toInt()
 
     /** 按比例压暗，用于按压态 / 渐变末端，免去再写死一组色值 */
     private fun shade(color: Int, amount: Float): Int {
@@ -692,7 +692,7 @@ half4 main(float2 coord) {
     }
 
     /**
-     * 卡片 Miuix 底板（无描边纯色大圆角卡片，对齐 Miuix Card）。
+     * 卡片 SamsungRootKit 玻璃底板（半透明磨砂底色 + 1dp 玻璃高光描边）。
      */
     @JvmStatic
     fun createCardDrawable(
@@ -702,8 +702,10 @@ half4 main(float2 coord) {
         hasAccentTop: Boolean = false
     ): Drawable = GradientDrawable().apply {
         cornerRadius = cornerRadiusPx
-        val cardBgColor = if (isDark) 0xFF181A20.toInt() else 0xFFFFFFFF.toInt()
+        val cardBgColor = if (isDark) 0x38384850.toInt() else 0x73FFFFFF.toInt()
+        val strokeColor = if (isDark) 0x26FFFFFF.toInt() else 0xCCFFFFFF.toInt()
         setColor(cardBgColor)
+        setStroke(maxOf(1, (1f * density).toInt()), strokeColor)
     }
 
     /**
@@ -761,12 +763,12 @@ half4 main(float2 coord) {
         }
     }
 
-    /** Miuix 风格开关：开启态采用 Miuix 标志性蓝，关闭态采用 Miuix 柔和浅灰/深灰轨道 */
+    /** 开关：开启态采用当前主题强调色（支持系统动态取色与 SamsungRootKit 翡翠绿），关闭态采用半透明玻璃轨道 */
     @JvmStatic
     fun styleIosSwitch(switch: View, isDark: Boolean) {
         if (switch !is MaterialSwitch) return
-        val checkedTrackColor = if (isDark) 0xFF277AF7.toInt() else 0xFF3482FF.toInt()
-        val uncheckedTrackColor = if (isDark) 0xFF2E323D.toInt() else 0xFFE2E6EE.toInt()
+        val checkedTrackColor = accent
+        val uncheckedTrackColor = if (isDark) 0x22FFFFFF.toInt() else 0x1A000000.toInt()
 
         switch.trackTintList = ColorStateList(
             arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
@@ -1303,7 +1305,8 @@ half4 main(float2 coord) {
     }
 
     /**
-     * Miuix 按钮底板：无描边、圆润色块，与 Miuix TextButton 保持同一套语言。
+     * SamsungRootKit 胶囊玻璃按钮（GlassPillButton）：
+     * 半透明玻璃填充 / 主题强调色水平渐变 + 顶部柔和反光 (top-down sheen) + 1dp 玻璃高光描边。
      */
     class LiquidGlassButtonDrawable(
         private val cornerRadiusPx: Float,
@@ -1315,7 +1318,12 @@ half4 main(float2 coord) {
     ) : Drawable() {
 
         private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val sheenPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+        }
         private val rectF = RectF()
+        private val strokeRectF = RectF()
 
         override fun onBoundsChange(bounds: Rect) {
             super.onBoundsChange(bounds)
@@ -1324,49 +1332,96 @@ half4 main(float2 coord) {
             if (w <= 0 || h <= 0) return
 
             rectF.set(bounds)
-            fillPaint.shader = null
-            fillPaint.color = when {
+            val halfStroke = maxOf(0.5f, 0.5f * density)
+            strokeRectF.set(
+                bounds.left + halfStroke,
+                bounds.top + halfStroke,
+                bounds.right - halfStroke,
+                bounds.bottom - halfStroke
+            )
+            strokePaint.strokeWidth = maxOf(1f, 1f * density)
+
+            when {
                 isPrimary -> {
-                    val base = if (isDark) 0xFF277AF7.toInt() else 0xFF3482FF.toInt()
-                    if (isPressed) shade(base, 0.16f) else base
+                    val base = accent
+                    val c1 = Color.argb(
+                        if (isPressed) 245 else 217,
+                        Color.red(base),
+                        Color.green(base),
+                        Color.blue(base)
+                    )
+                    val endColor = shade(base, 0.16f)
+                    val c2 = Color.argb(
+                        if (isPressed) 220 else 180,
+                        Color.red(endColor),
+                        Color.green(endColor),
+                        Color.blue(endColor)
+                    )
+                    fillPaint.shader = LinearGradient(
+                        0f, 0f, w, 0f,
+                        intArrayOf(c1, c2),
+                        null,
+                        Shader.TileMode.CLAMP
+                    )
+                    strokePaint.color = Color.argb(140, Color.red(base), Color.green(base), Color.blue(base))
                 }
                 isDanger -> {
-                    if (isDark) {
+                    fillPaint.shader = null
+                    fillPaint.color = if (isDark) {
                         if (isPressed) 0x44F87171 else 0x2EF87171
                     } else {
-                        if (isPressed) 0xFFFAD8D2.toInt() else 0xFFFFECE8.toInt()
+                        if (isPressed) 0x38EF4444 else 0x22EF4444
                     }
+                    strokePaint.color = if (isDark) 0x59F87171 else 0x4DEF4444
                 }
                 !isDark -> {
-                    when {
-                        isPressed -> 0xFFE2E6EE.toInt()
-                        isEmphasis -> 0xFFE8EBF2.toInt()
-                        else -> 0xFFF0F2F6.toInt()
+                    fillPaint.shader = null
+                    fillPaint.color = when {
+                        isPressed -> 0xB3FFFFFF.toInt()
+                        isEmphasis -> 0x99FFFFFF.toInt()
+                        else -> 0x85FFFFFF.toInt()
                     }
+                    strokePaint.color = 0xCCFFFFFF.toInt()
                 }
                 else -> {
-                    when {
-                        isPressed -> 0xFF2E323D.toInt()
-                        isEmphasis -> 0xFF272B35.toInt()
-                        else -> 0xFF21242C.toInt()
+                    fillPaint.shader = null
+                    fillPaint.color = when {
+                        isPressed -> 0x2EFFFFFF
+                        isEmphasis -> 0x24FFFFFF
+                        else -> 0x1AFFFFFF
                     }
+                    strokePaint.color = 0x26FFFFFF
                 }
             }
+
+            val sheenTop = if (isDark) 0x14FFFFFF else 0x47FFFFFF
+            sheenPaint.shader = LinearGradient(
+                0f, 0f, 0f, h * 0.5f,
+                sheenTop,
+                Color.TRANSPARENT,
+                Shader.TileMode.CLAMP
+            )
         }
 
         override fun draw(canvas: Canvas) {
             if (rectF.isEmpty) return
-            val r = cornerRadiusPx.coerceAtMost(minOf(rectF.width(), rectF.height()) / 2f)
+            val r = (rectF.height() / 2f).coerceAtMost(cornerRadiusPx)
             canvas.drawRoundRect(rectF, r, r, fillPaint)
+            canvas.drawRoundRect(rectF, r, r, sheenPaint)
+            canvas.drawRoundRect(strokeRectF, r, r, strokePaint)
         }
 
         override fun setAlpha(alpha: Int) {
             fillPaint.alpha = alpha
+            sheenPaint.alpha = alpha
+            strokePaint.alpha = alpha
             invalidateSelf()
         }
 
         override fun setColorFilter(colorFilter: ColorFilter?) {
             fillPaint.colorFilter = colorFilter
+            sheenPaint.colorFilter = colorFilter
+            strokePaint.colorFilter = colorFilter
             invalidateSelf()
         }
 

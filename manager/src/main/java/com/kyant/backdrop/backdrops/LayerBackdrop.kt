@@ -96,9 +96,11 @@ class LayerBackdrop internal constructor(
                 }
             translate(-offset.x, -offset.y)
         }) {
-            // 采样的是**预烘焙的模糊背景**（烘焙见 LayerBackdropModifier）。
-            // 模糊在那里整屏做一次，卡片这里只取自己那一块，零滤镜成本。
-            drawLayer(blurredGraphicsLayer)
+            if (blurRadius > 0.dp || vibrancy != null) {
+                drawLayer(blurredGraphicsLayer)
+            } else {
+                drawLayer(graphicsLayer)
+            }
         }
     }
 

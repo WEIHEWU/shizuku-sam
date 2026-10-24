@@ -50,9 +50,18 @@ import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import android.widget.Toast
+import androidx.compose.foundation.border
 import kotlinx.coroutines.launch
 import moe.shizuku.manager.home.CenteredAppDialog
+import moe.shizuku.manager.maxhz.BackdropProvider
+import moe.shizuku.manager.maxhz.GlassButtonStyle
 import moe.shizuku.manager.maxhz.GlassCard
+import moe.shizuku.manager.maxhz.GlassLight
+import moe.shizuku.manager.maxhz.GlassPillButton
+import moe.shizuku.manager.maxhz.GlassThemeState
+import moe.shizuku.manager.maxhz.MaxHzComposeRefreshBus
+import moe.shizuku.manager.maxhz.TitaniumDark
+import moe.shizuku.manager.maxhz.getSystemOrAppPrimaryColor
 import moe.shizuku.manager.maxhz.glassBackgroundBrush
 import moe.shizuku.manager.update.AppUpdateDialog
 import moe.shizuku.manager.update.AppUpdater
@@ -62,7 +71,7 @@ import java.util.Locale
 fun SettingsGlassScreen(
     isDark: Boolean,
     isBlackNightTheme: Boolean,
-    primaryColor: Color = if (isDark) Color(0xFF277AF7) else Color(0xFF3482FF),
+    primaryColor: Color = if (isDark) Color(0xFF10B981) else Color(0xFF059669),
     onBackClick: () -> Unit,
     onRecreate: () -> Unit
 ) {
@@ -71,6 +80,7 @@ fun SettingsGlassScreen(
     val scope = rememberCoroutineScope()
 
     val effectiveDark = isDark || isBlackNightTheme
+    val activePrimaryColor = getSystemOrAppPrimaryColor(effectiveDark)
     val bgBrush = glassBackgroundBrush(isDark = isDark, isBlackNightTheme = isBlackNightTheme)
 
     val bootComponent = remember { ComponentName(context.packageName, BootCompleteReceiver::class.java.name) }
@@ -96,6 +106,7 @@ fun SettingsGlassScreen(
     var languageExpanded by remember { mutableStateOf(false) }
     var aboutExpanded by remember { mutableStateOf(false) }
 
+    BackdropProvider(modifier = Modifier.fillMaxSize()) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -124,7 +135,7 @@ fun SettingsGlassScreen(
                         title = stringResource(R.string.settings_title),
                         subtitle = "管理开机自启、服务进程守护、界面深浅色外观与多语言偏好",
                         isDark = effectiveDark,
-                        primaryColor = primaryColor,
+                        primaryColor = activePrimaryColor,
                         onBackClick = onBackClick
                     )
                 }
@@ -135,7 +146,7 @@ fun SettingsGlassScreen(
                         GroupHeaderWithToggle(
                             text = stringResource(R.string.settings_section_startup),
                             isDark = effectiveDark,
-                            primaryColor = primaryColor,
+                            primaryColor = activePrimaryColor,
                             expanded = startupExpanded,
                             onToggle = { startupExpanded = !startupExpanded }
                         )
@@ -228,7 +239,7 @@ fun SettingsGlassScreen(
                     GroupHeaderWithToggle(
                         text = stringResource(R.string.settings_section_appearance),
                         isDark = effectiveDark,
-                        primaryColor = primaryColor,
+                        primaryColor = activePrimaryColor,
                         expanded = appearanceExpanded,
                         onToggle = { appearanceExpanded = !appearanceExpanded }
                     )
@@ -265,6 +276,8 @@ fun SettingsGlassScreen(
                                 onCheckedChange = { checked ->
                                     ShizukuSettings.getPreferences().edit().putBoolean(ThemeHelper.KEY_BLACK_NIGHT_THEME, checked).apply()
                                     blackNightTheme = checked
+                                    GlassThemeState.sync()
+                                    MaxHzComposeRefreshBus.bump()
                                     onRecreate()
                                 }
                             )
@@ -273,7 +286,7 @@ fun SettingsGlassScreen(
                             SettingsMiuixSwitchRow(
                                 isDark = effectiveDark,
                                 icon = painterResource(R.drawable.ic_system_icon),
-                                iconTint = primaryColor,
+                                iconTint = activePrimaryColor,
                                 title = stringResource(R.string.settings_use_system_color),
                                 subtitle = "提取系统壁纸主色调（Material You）作为界面动态强调色",
                                 checked = useSystemColor,
@@ -281,6 +294,8 @@ fun SettingsGlassScreen(
                                 onCheckedChange = { checked ->
                                     ShizukuSettings.getPreferences().edit().putBoolean(ThemeHelper.KEY_USE_SYSTEM_COLOR, checked).apply()
                                     useSystemColor = checked
+                                    GlassThemeState.sync()
+                                    MaxHzComposeRefreshBus.bump()
                                     onRecreate()
                                 }
                             )
@@ -295,7 +310,7 @@ fun SettingsGlassScreen(
                     GroupHeaderWithToggle(
                         text = stringResource(R.string.settings_section_language),
                         isDark = effectiveDark,
-                        primaryColor = primaryColor,
+                        primaryColor = activePrimaryColor,
                         expanded = languageExpanded,
                         onToggle = { languageExpanded = !languageExpanded }
                     )
@@ -339,7 +354,7 @@ fun SettingsGlassScreen(
                     GroupHeaderWithToggle(
                         text = stringResource(R.string.settings_section_about),
                         isDark = effectiveDark,
-                        primaryColor = primaryColor,
+                        primaryColor = activePrimaryColor,
                         expanded = aboutExpanded,
                         onToggle = { aboutExpanded = !aboutExpanded }
                     )
@@ -436,13 +451,14 @@ fun SettingsGlassScreen(
 
         }
     }
+    }
 }
 
     if (showUpdateDialog && pendingReleaseInfo != null) {
         AppUpdateDialog(
             releaseInfo = pendingReleaseInfo,
             isDark = effectiveDark,
-            primaryColor = primaryColor,
+            primaryColor = activePrimaryColor,
             onDismiss = { showUpdateDialog = false }
         )
     }
@@ -474,14 +490,17 @@ fun SettingsGlassScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                TextButton(
+                GlassPillButton(
                     text = stringResource(android.R.string.cancel),
+                    isDark = effectiveDark,
+                    style = GlassButtonStyle.Regular,
                     onClick = { showPortDialog = false },
                     modifier = Modifier.weight(1f)
                 )
-                TextButton(
+                GlassPillButton(
                     text = stringResource(android.R.string.ok),
-                    colors = ButtonDefaults.textButtonColorsPrimary(),
+                    isDark = effectiveDark,
+                    style = GlassButtonStyle.Prominent(activePrimaryColor),
                     onClick = {
                         val port = inputPort.toIntOrNull()
                         if (port != null && port in 1..65535) {
@@ -514,21 +533,24 @@ fun SettingsGlassScreen(
             nightOptions.forEach { (mode, label) ->
                 val selected = nightMode == mode
                 val itemBg = when {
-                    selected && isDark -> Color(0xFF162946)
-                    selected && !isDark -> Color(0xFFEBF3FF)
-                    isDark -> Color(0xFF28282D)
-                    else -> Color(0xFFF0F2F6)
+                    selected && effectiveDark -> activePrimaryColor.copy(alpha = 0.24f)
+                    selected && !effectiveDark -> activePrimaryColor.copy(alpha = 0.14f)
+                    effectiveDark -> Color(0x22FFFFFF)
+                    else -> Color(0x73FFFFFF)
                 }
-                val itemFg = if (selected) {
-                    if (isDark) Color(0xFF60A5FA) else primaryColor
-                } else {
-                    MiuixTheme.colorScheme.onSurface
+                val itemBorder = when {
+                    selected && effectiveDark -> activePrimaryColor.copy(alpha = 0.48f)
+                    selected && !effectiveDark -> activePrimaryColor.copy(alpha = 0.32f)
+                    effectiveDark -> TitaniumDark.Hairline
+                    else -> GlassLight.Hairline
                 }
+                val itemFg = if (selected) activePrimaryColor else MiuixTheme.colorScheme.onSurface
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(14.dp))
                         .background(itemBg)
+                        .border(1.dp, itemBorder, RoundedCornerShape(14.dp))
                         .clickable {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             if (nightMode != mode) {
@@ -536,6 +558,8 @@ fun SettingsGlassScreen(
                                 AppCompatDelegate.setDefaultNightMode(mode)
                                 nightMode = mode
                                 showNightModeDialog = false
+                                GlassThemeState.sync()
+                                MaxHzComposeRefreshBus.bump()
                                 onRecreate()
                             } else {
                                 showNightModeDialog = false
@@ -562,8 +586,10 @@ fun SettingsGlassScreen(
                 }
             }
             Spacer(Modifier.height(4.dp))
-            TextButton(
+            GlassPillButton(
                 text = stringResource(android.R.string.cancel),
+                isDark = effectiveDark,
+                style = GlassButtonStyle.Regular,
                 onClick = { showNightModeDialog = false },
                 modifier = Modifier.fillMaxWidth()
             )
@@ -592,21 +618,24 @@ fun SettingsGlassScreen(
             locales.forEach { (tag, label) ->
                 val selected = currentConfiguredLang == tag
                 val itemBg = when {
-                    selected && isDark -> Color(0xFF162946)
-                    selected && !isDark -> Color(0xFFEBF3FF)
-                    isDark -> Color(0xFF28282D)
-                    else -> Color(0xFFF0F2F6)
+                    selected && effectiveDark -> activePrimaryColor.copy(alpha = 0.24f)
+                    selected && !effectiveDark -> activePrimaryColor.copy(alpha = 0.14f)
+                    effectiveDark -> Color(0x22FFFFFF)
+                    else -> Color(0x73FFFFFF)
                 }
-                val itemFg = if (selected) {
-                    if (isDark) Color(0xFF60A5FA) else primaryColor
-                } else {
-                    MiuixTheme.colorScheme.onSurface
+                val itemBorder = when {
+                    selected && effectiveDark -> activePrimaryColor.copy(alpha = 0.48f)
+                    selected && !effectiveDark -> activePrimaryColor.copy(alpha = 0.32f)
+                    effectiveDark -> TitaniumDark.Hairline
+                    else -> GlassLight.Hairline
                 }
+                val itemFg = if (selected) activePrimaryColor else MiuixTheme.colorScheme.onSurface
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(14.dp))
                         .background(itemBg)
+                        .border(1.dp, itemBorder, RoundedCornerShape(14.dp))
                         .clickable {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             val locale = if ("SYSTEM" == tag) {
@@ -640,8 +669,10 @@ fun SettingsGlassScreen(
                 }
             }
             Spacer(Modifier.height(4.dp))
-            TextButton(
+            GlassPillButton(
                 text = stringResource(android.R.string.cancel),
+                isDark = effectiveDark,
+                style = GlassButtonStyle.Regular,
                 onClick = { showLanguageDialog = false },
                 modifier = Modifier.fillMaxWidth()
             )

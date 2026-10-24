@@ -1,10 +1,14 @@
 package moe.shizuku.manager.maxhz
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -12,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -32,7 +37,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import android.net.Uri
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import com.kyant.backdrop.drawBackdrop
+import com.kyant.backdrop.effects.blur
 import com.kyant.backdrop.effects.colorControlsColorFilter
+import com.kyant.backdrop.effects.lens
 
 /**
  * 共享 Compose 界面规范组件（方案 A：ShizukuX 极致流畅规范）。
@@ -57,21 +67,23 @@ fun com.kyant.backdrop.BackdropEffectScope.glassEffects(
 }
 
 /**
- * Miuix 风格卡片容器：采用 Miuix `Card` 连续曲率圆角 (16dp) 与 `PressFeedbackType.Sink` 弹性按压反馈。
+ * SamsungRootKit 光学玻璃卡片容器：
+ * 结合 `drawBackdrop(blur(16.dp) + lens(24.dp, 24.dp))` 边缘折射、1dp 钛金发丝高光边框与顶部微光反光层。
  */
 @Composable
 fun GlassCard(
     backdrop: Any? = null,
     isDark: Boolean,
     isBlackNightTheme: Boolean = false,
-    cornerRadius: androidx.compose.ui.unit.Dp = 20.dp,
+    cornerRadius: androidx.compose.ui.unit.Dp = GlassRadii.Card,
     modifier: Modifier = Modifier.fillMaxWidth(),
     interactive: Boolean = false,
     tintColor: Color? = null,
     onClick: (() -> Unit)? = null,
-    content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit
+    content: @Composable ColumnScope.() -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
+    val glassOn = LocalGlassEnabled.current
     val dark = isDark || isBlackNightTheme
     val cardBgColor = when {
         tintColor != null -> tintColor.copy(alpha = if (dark) 0.25f else 0.15f)
@@ -82,12 +94,41 @@ fun GlassCard(
     val cardShape = RoundedCornerShape(cornerRadius)
     val hairline = if (dark) TitaniumDark.Hairline else GlassLight.Hairline
     val sheenAlpha = if (dark) TitaniumDark.SheenAlpha else GlassLight.SheenAlpha
+    val cardBackdrop = rememberLayerBackdrop(blurRadius = 0.dp)
 
-    val cardModifier = modifier
-        .clip(cardShape)
-        .border(1.dp, hairline, cardShape)
+    val surfaceModifier = modifier
+        .fillMaxWidth()
+        .drawBackdrop(
+            backdrop = cardBackdrop,
+            shape = { cardShape },
+            effects = {
+                if (glassOn) {
+                    blur(16.dp.toPx())
+                    lens(24.dp.toPx(), 24.dp.toPx())
+                }
+            },
+            highlight = null,
+            shadow = null,
+            onDrawSurface = { drawRect(color = cardBgColor) }
+        )
+        .layerBackdrop(cardBackdrop, contentKey = dark)
+        .then(
+            if (onClick != null) {
+                Modifier.clickable {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onClick()
+                }
+            } else {
+                Modifier
+            }
+        )
 
-    val innerContent: @Composable () -> Unit = {
+    Surface(
+        modifier = surfaceModifier,
+        shape = cardShape,
+        color = Color.Transparent,
+        border = BorderStroke(1.dp, hairline)
+    ) {
         Box(
             Modifier
                 .fillMaxWidth()
@@ -98,35 +139,11 @@ fun GlassCard(
                     )
                 )
         ) {
-            androidx.compose.foundation.layout.Column(
+            Column(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 content()
             }
-        }
-    }
-
-    if (onClick != null) {
-        top.yukonga.miuix.kmp.basic.Card(
-            modifier = cardModifier,
-            cornerRadius = cornerRadius,
-            colors = top.yukonga.miuix.kmp.basic.CardDefaults.defaultColors(color = cardBgColor),
-            pressFeedbackType = top.yukonga.miuix.kmp.utils.PressFeedbackType.Sink,
-            showIndication = true,
-            onClick = {
-                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                onClick()
-            }
-        ) {
-            innerContent()
-        }
-    } else {
-        top.yukonga.miuix.kmp.basic.Card(
-            modifier = cardModifier,
-            cornerRadius = cornerRadius,
-            colors = top.yukonga.miuix.kmp.basic.CardDefaults.defaultColors(color = cardBgColor)
-        ) {
-            innerContent()
         }
     }
 }
@@ -164,12 +181,15 @@ fun IconBadge(
  */
 sealed interface GlassButtonStyle {
     data object Regular : GlassButtonStyle
-    data class Prominent(val tint: Color) : GlassButtonStyle
+    data class Prominent(val tint: Color = Color.Unspecified) : GlassButtonStyle {
+        companion object : GlassButtonStyle
+    }
     data object Danger : GlassButtonStyle
 }
 
 /**
- * Miuix 风格圆角按钮：采用 `top.yukonga.miuix.kmp.basic.Button` 与 Miuix 配色规范。
+ * SamsungRootKit 风格胶囊毛玻璃按钮：
+ * 采用 `GlassRadii.Pill` (999.dp) 全圆角胶囊造型、半透明玻璃填充、顶部反光高光层与 1dp 发丝边框。
  */
 @Composable
 fun GlassPillButton(
@@ -179,46 +199,85 @@ fun GlassPillButton(
     isDanger: Boolean = false,
     style: GlassButtonStyle = if (isDanger) GlassButtonStyle.Danger else GlassButtonStyle.Regular,
     interactive: Boolean = true,
+    enabled: Boolean = true,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
-    val buttonColors = when (style) {
-        is GlassButtonStyle.Regular -> top.yukonga.miuix.kmp.basic.ButtonDefaults.buttonColors()
-        is GlassButtonStyle.Prominent -> top.yukonga.miuix.kmp.basic.ButtonDefaults.buttonColorsPrimary(
-            color = style.tint,
-            contentColor = Color.White
-        )
-        is GlassButtonStyle.Danger -> {
-            val dangerBg = if (isDark) Color(0xFF3B1818) else Color(0xFFFEE2E2)
-            val dangerFg = if (isDark) Color(0xFFF87171) else Color(0xFFDC2626)
-            top.yukonga.miuix.kmp.basic.ButtonDefaults.buttonColors(
-                color = dangerBg,
-                contentColor = dangerFg
-            )
+    val pillShape = RoundedCornerShape(GlassRadii.Pill)
+    val defaultProminentTint = getSystemOrAppPrimaryColor(isDark)
+    val prominentTint = when (style) {
+        is GlassButtonStyle.Prominent -> if (style.tint != Color.Unspecified) style.tint else defaultProminentTint
+        GlassButtonStyle.Prominent.Companion -> defaultProminentTint
+        else -> null
+    }
+    val isEnabled = interactive && enabled
+    val bgBrush = when {
+        prominentTint != null -> {
+            val alphaScale = if (isEnabled) 1f else 0.45f
+            if (isDark) {
+                Brush.horizontalGradient(
+                    listOf(
+                        prominentTint.copy(alpha = 0.42f * alphaScale),
+                        prominentTint.copy(alpha = 0.72f * alphaScale),
+                        prominentTint.copy(alpha = 0.58f * alphaScale)
+                    )
+                )
+            } else {
+                Brush.horizontalGradient(
+                    listOf(
+                        prominentTint.copy(alpha = 0.82f * alphaScale),
+                        prominentTint.copy(alpha = 0.96f * alphaScale),
+                        prominentTint.copy(alpha = 0.86f * alphaScale)
+                    )
+                )
+            }
+        }
+        style is GlassButtonStyle.Danger -> {
+            val dangerFill = if (isDark) Color(0x38EF4444) else Color(0x22DC2626)
+            Brush.verticalGradient(listOf(dangerFill, dangerFill))
+        }
+        else -> {
+            val regularFill = if (isDark) Color(0x28FFFFFF) else Color(0x99FFFFFF)
+            Brush.verticalGradient(listOf(regularFill, regularFill))
         }
     }
+    val borderColor = when {
+        prominentTint != null -> if (isDark) prominentTint.copy(alpha = if (isEnabled) 0.65f else 0.30f) else Color(0xCCFFFFFF)
+        style is GlassButtonStyle.Danger -> if (isDark) Color(0x66F87171) else Color(0x55DC2626)
+        else -> if (isDark) TitaniumDark.Hairline else GlassLight.Hairline
+    }
+    val textColor = when {
+        prominentTint != null -> Color.White.copy(alpha = if (isEnabled) 1f else 0.55f)
+        style is GlassButtonStyle.Danger -> if (isDark) Color(0xFFFCA5A5) else Color(0xFFDC2626)
+        else -> (if (isDark) Color(0xFFE2E8F0) else Color(0xFF1E293B)).copy(alpha = if (isEnabled) 1f else 0.50f)
+    }
+    val sheenAlpha = if (isDark) 0.08f else 0.22f
 
-    top.yukonga.miuix.kmp.basic.Button(
-        onClick = {
-            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-            onClick()
-        },
-        modifier = modifier,
-        cornerRadius = 14.dp,
-        minHeight = 40.dp,
-        insideMargin = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 9.dp),
-        colors = buttonColors
+    Box(
+        modifier = modifier
+            .defaultMinSize(minHeight = 42.dp)
+            .clip(pillShape)
+            .background(bgBrush)
+            .background(
+                Brush.verticalGradient(
+                    0f to Color.White.copy(alpha = sheenAlpha),
+                    0.6f to Color.Transparent
+                )
+            )
+            .border(1.dp, borderColor, pillShape)
+            .clickable(enabled = isEnabled) {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onClick()
+            }
+            .padding(horizontal = 16.dp, vertical = 9.dp),
+        contentAlignment = Alignment.Center
     ) {
         Text(
             text = text,
             fontSize = 13.5.sp,
             fontWeight = FontWeight.SemiBold,
-            color = when (style) {
-                is GlassButtonStyle.Regular -> top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme.onSecondaryVariant
-                is GlassButtonStyle.Prominent -> Color.White
-                is GlassButtonStyle.Danger -> if (isDark) Color(0xFFF87171) else Color(0xFFDC2626)
-            },
+            color = textColor,
             maxLines = 1
         )
     }

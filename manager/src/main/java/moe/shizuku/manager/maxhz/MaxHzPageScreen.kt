@@ -109,58 +109,76 @@ fun MaxHzPageScreen(
     val bottomInsetDp = with(density) { bottomInsetPx.toDp() }
     val bgBrush = glassBackgroundBrush(isDark = isDark, isBlackNightTheme = isBlackNightTheme)
 
-    Box(Modifier.fillMaxSize().background(bgBrush)) {
-        val expandedStates = remember { mutableStateMapOf<String, Boolean>() }
-        val listState = rememberLazyListState()
+    BackdropProvider(
+        modifier = Modifier.fillMaxSize(),
+        overlay = {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.BottomCenter
+            ) {
+                GlassDockNav(
+                    isDark = isDark,
+                    isBlackNightTheme = isBlackNightTheme,
+                    selectedIndex = selectedTabIndex,
+                    bottomInsetDp = bottomInsetDp,
+                    onTabClick = onTabClick
+                )
+            }
+        }
+    ) {
+        Box(Modifier.fillMaxSize().background(bgBrush)) {
+            val expandedStates = remember { mutableStateMapOf<String, Boolean>() }
+            val listState = rememberLazyListState()
 
-        LazyColumn(
-            Modifier.fillMaxSize().overScrollVertical(),
-            state = listState,
-            contentPadding = PaddingValues(
-                top = with(density) { topInsetPx.toDp() },
-                start = 16.dp, end = 16.dp,
-                bottom = GLASS_DOCK_CLEARANCE_DP + bottomInsetDp
-            ),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            groups.forEach { group ->
-                item(key = "group-${group.label}", contentType = "group") {
-                    GroupGlassCard(
-                        isDark = isDark,
-                        isBlackNightTheme = isBlackNightTheme,
-                        primaryColor = primaryColor,
-                        group = group,
-                        refreshTick = refreshTick,
-                        pageKey = selectedTabIndex,
-                        expanded = expandedStates["$selectedTabIndex/${group.label}"]
-                            ?: !group.collapsedByDefault,
-                        onExpandedChange = {
-                            expandedStates["$selectedTabIndex/${group.label}"] = it
-                        }
-                    )
+            LazyColumn(
+                Modifier.fillMaxSize().overScrollVertical(),
+                state = listState,
+                contentPadding = PaddingValues(
+                    top = with(density) { topInsetPx.toDp() },
+                    start = 16.dp, end = 16.dp,
+                    bottom = GLASS_DOCK_CLEARANCE_DP + bottomInsetDp
+                ),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                groups.forEach { group ->
+                    item(key = "group-${group.label}", contentType = "group") {
+                        GroupGlassCard(
+                            isDark = isDark,
+                            isBlackNightTheme = isBlackNightTheme,
+                            primaryColor = primaryColor,
+                            group = group,
+                            refreshTick = refreshTick,
+                            pageKey = selectedTabIndex,
+                            expanded = expandedStates["$selectedTabIndex/${group.label}"]
+                                ?: !group.collapsedByDefault,
+                            onExpandedChange = {
+                                expandedStates["$selectedTabIndex/${group.label}"] = it
+                            }
+                        )
+                    }
                 }
-            }
-            actionCards.forEachIndexed { ai, card ->
-                item(key = "action-$ai", contentType = "action") {
-                    ActionGlassCard(
-                        isDark = isDark,
-                        isBlackNightTheme = isBlackNightTheme,
-                        primaryColor = primaryColor,
-                        card = card
-                    )
+                actionCards.forEachIndexed { ai, card ->
+                    item(key = "action-$ai", contentType = "action") {
+                        ActionGlassCard(
+                            isDark = isDark,
+                            isBlackNightTheme = isBlackNightTheme,
+                            primaryColor = primaryColor,
+                            card = card
+                        )
+                    }
                 }
-            }
-            extraViewFactories.forEachIndexed { i, factory ->
-                item(key = "view-$i", contentType = "view") {
-                    AndroidView(
-                        factory = { factory() },
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                extraViewFactories.forEachIndexed { i, factory ->
+                    item(key = "view-$i", contentType = "view") {
+                        AndroidView(
+                            factory = { factory() },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
-            }
-            // dock 避让区
-            item(key = "dockClearance", contentType = "spacer") {
-                Spacer(Modifier.height(78.dp))
+                // dock 避让区
+                item(key = "dockClearance", contentType = "spacer") {
+                    Spacer(Modifier.height(78.dp))
+                }
             }
         }
     }

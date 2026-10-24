@@ -2,6 +2,7 @@ package moe.shizuku.manager.update
 
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,11 +31,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import moe.shizuku.manager.home.CenteredAppDialog
+import moe.shizuku.manager.maxhz.GlassButtonStyle
+import moe.shizuku.manager.maxhz.GlassLight
+import moe.shizuku.manager.maxhz.GlassPillButton
+import moe.shizuku.manager.maxhz.TitaniumDark
 import moe.shizuku.manager.utils.CustomTabsHelper
 import rikka.shizuku.Shizuku
-import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -93,8 +96,13 @@ fun AppUpdateDialog(
                     .heightIn(min = 80.dp, max = 220.dp)
                     .clip(RoundedCornerShape(14.dp))
                     .background(
-                        if (isDark) Color.White.copy(alpha = 0.06f)
-                        else Color.Black.copy(alpha = 0.04f)
+                        if (isDark) Color(0x22FFFFFF)
+                        else Color(0x73FFFFFF)
+                    )
+                    .border(
+                        1.dp,
+                        if (isDark) TitaniumDark.Hairline else GlassLight.Hairline,
+                        RoundedCornerShape(14.dp)
                     )
                     .padding(12.dp)
             ) {
@@ -177,25 +185,30 @@ fun AppUpdateDialog(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                TextButton(
+                GlassPillButton(
                     text = if (isDownloading) "下载中..." else "稍后",
-                    enabled = !isDownloading,
+                    isDark = isDark,
+                    interactive = !isDownloading,
+                    style = GlassButtonStyle.Regular,
                     onClick = { onDismiss() },
                     modifier = Modifier.weight(1f)
                 )
-                TextButton(
+                GlassPillButton(
                     text = "浏览器下载",
-                    enabled = !isDownloading,
+                    isDark = isDark,
+                    interactive = !isDownloading,
+                    style = GlassButtonStyle.Regular,
                     onClick = {
                         CustomTabsHelper.launchUrlOrCopy(context, releaseInfo.htmlUrl)
                         onDismiss()
                     },
                     modifier = Modifier.weight(1.1f)
                 )
-                TextButton(
+                GlassPillButton(
                     text = if (isDownloading) "更新中..." else "立即更新",
-                    enabled = !isDownloading,
-                    colors = ButtonDefaults.textButtonColorsPrimary(),
+                    isDark = isDark,
+                    interactive = !isDownloading,
+                    style = GlassButtonStyle.Prominent(primaryColor),
                     onClick = {
                         isDownloading = true
                         errorMessage = null
