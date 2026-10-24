@@ -102,28 +102,15 @@ fun CenteredAppDialog(
                 modifier = Modifier
                     .widthIn(max = 500.dp)
                     .fillMaxWidth()
+                    .clip(dialogShape)
                     .shadow(
                         elevation = 24.dp,
                         shape = dialogShape,
                         ambientColor = Color.Black.copy(alpha = if (isDark) 0.55f else 0.18f),
                         spotColor = Color.Black.copy(alpha = if (isDark) 0.55f else 0.18f)
-                    )
-                    .drawBackdrop(
-                        backdrop = dialogBackdrop,
-                        shape = { dialogShape },
-                        effects = {
-                            if (glassOn) {
-                                blur(16.dp.toPx())
-                                lens(24.dp.toPx(), 24.dp.toPx())
-                            }
-                        },
-                        highlight = null,
-                        shadow = null,
-                        onDrawSurface = { drawRect(color = dialogBgColor) }
-                    )
-                    .layerBackdrop(dialogBackdrop, contentKey = isDark),
+                    ),
                 shape = dialogShape,
-                color = Color.Transparent,
+                color = dialogBgColor,
                 border = BorderStroke(1.dp, dialogStrokeColor)
             ) {
                 Box(

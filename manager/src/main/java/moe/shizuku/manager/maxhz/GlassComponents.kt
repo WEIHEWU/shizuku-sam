@@ -83,7 +83,6 @@ fun GlassCard(
     content: @Composable ColumnScope.() -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
-    val glassOn = LocalGlassEnabled.current
     val dark = isDark || isBlackNightTheme
     val cardBgColor = when {
         tintColor != null -> tintColor.copy(alpha = if (dark) 0.25f else 0.15f)
@@ -94,44 +93,31 @@ fun GlassCard(
     val cardShape = RoundedCornerShape(cornerRadius)
     val hairline = if (dark) TitaniumDark.Hairline else GlassLight.Hairline
     val sheenAlpha = if (dark) TitaniumDark.SheenAlpha else GlassLight.SheenAlpha
-    val cardBackdrop = rememberLayerBackdrop(blurRadius = 0.dp)
-
-    val surfaceModifier = modifier
-        .fillMaxWidth()
-        .drawBackdrop(
-            backdrop = cardBackdrop,
-            shape = { cardShape },
-            effects = {
-                if (glassOn) {
-                    blur(16.dp.toPx())
-                    lens(24.dp.toPx(), 24.dp.toPx())
-                }
-            },
-            highlight = null,
-            shadow = null,
-            onDrawSurface = { drawRect(color = cardBgColor) }
-        )
-        .layerBackdrop(cardBackdrop, contentKey = dark)
-        .then(
-            if (onClick != null) {
-                Modifier.clickable {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    onClick()
-                }
-            } else {
-                Modifier
-            }
-        )
 
     Surface(
-        modifier = surfaceModifier,
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(cardShape)
+            .then(
+                if (onClick != null) {
+                    Modifier.clickable {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onClick()
+                    }
+                } else {
+                    Modifier
+                }
+            ),
         shape = cardShape,
         color = Color.Transparent,
-        border = BorderStroke(1.dp, hairline)
+        border = BorderStroke(1.dp, hairline),
+        shadowElevation = 0.dp,
+        tonalElevation = 0.dp
     ) {
         Box(
-            Modifier
+            modifier = Modifier
                 .fillMaxWidth()
+                .background(cardBgColor)
                 .background(
                     Brush.verticalGradient(
                         0f to Color.White.copy(alpha = sheenAlpha),

@@ -324,8 +324,28 @@ jobs:
           files: |
             releases/Shizuku-Sam-v13.8.27.apk
 
+      - name: "Publish Release v13.8.28 (Fix Card Double-Blur Feedback Smudge & Crystal Clear Glass Cards)"
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/v13.8.28')
+        with:
+          tag_name: v13.8.28
+          name: "Shizuku Sam v13.8.28 — 彻底解决毛玻璃自递归模糊缺陷，还原 SamsungRootKit 晶莹通透钛金玻璃质感"
+          body: |
+            ### Shizuku Sam v13.8.28
+
+            #### 💎 彻底根治卡片「自递归捕获与自模糊」缺陷（内容模糊、开关烟雾光晕与色块污染）
+            - **严格对齐 SamsungRootKit（OdinBox 规范）玻璃分层架构**：
+              - 移除 `GlassCard` 对内部子控件（文字、开关、按钮、状态徽章）的错误自采样模糊，消除自循环模糊反馈回路；
+              - 彻底消除开启状态开关周围大片深蓝晕染烟雾、大按钮上方的暗色脏污色块及文字重影发虚问题；
+              - 还原 SamsungRootKit 官方级通透半透明填充（浅色 `35%` 纯白 `0x59FFFFFF` / 深色 `42%` 钛灰 `0x2A384850` / 纯黑 `0xFF161B22`）+ 顶部 `10%` 微光反光 Sheen + `1dp` 纯白发丝边框（Hairline）。
+            - **精确保留真正的浮层光学模糊（精确打击，不乱模糊）**：
+              - **底部悬浮胶囊 DockNav**：继续保留 `drawBackdrop` 实时折射与模糊，列表内容划过时通透高级；
+              - **二级/三级/四级全局居中弹窗**：保留窗口级 `FLAG_BLUR_BEHIND` 物理背景模糊，内部保持 100% 锐利清晰。
+          files: |
+            releases/Shizuku-Sam-v13.8.28.apk
+
       - name: Publish Future Version Tag Release
-        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2' && github.ref_name != 'v13.8.3' && github.ref_name != 'v13.8.4' && github.ref_name != 'v13.8.5' && github.ref_name != 'v13.8.6' && github.ref_name != 'v13.8.7' && github.ref_name != 'v13.8.8' && github.ref_name != 'v13.8.9' && github.ref_name != 'v13.8.10' && github.ref_name != 'v13.8.11' && github.ref_name != 'v13.8.19' && github.ref_name != 'v13.8.20' && github.ref_name != 'v13.8.21' && github.ref_name != 'v13.8.22' && github.ref_name != 'v13.8.23' && github.ref_name != 'v13.8.27'
+        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2' && github.ref_name != 'v13.8.3' && github.ref_name != 'v13.8.4' && github.ref_name != 'v13.8.5' && github.ref_name != 'v13.8.6' && github.ref_name != 'v13.8.7' && github.ref_name != 'v13.8.8' && github.ref_name != 'v13.8.9' && github.ref_name != 'v13.8.10' && github.ref_name != 'v13.8.11' && github.ref_name != 'v13.8.19' && github.ref_name != 'v13.8.20' && github.ref_name != 'v13.8.21' && github.ref_name != 'v13.8.22' && github.ref_name != 'v13.8.23' && github.ref_name != 'v13.8.27' && github.ref_name != 'v13.8.28'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
