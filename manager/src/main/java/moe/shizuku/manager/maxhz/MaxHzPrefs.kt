@@ -1,10 +1,12 @@
 package moe.shizuku.manager.maxhz
 
 import android.content.Context
+import moe.shizuku.manager.ktx.createDeviceProtectedStorageContextCompatWhenLocked
 
 object MaxHzPrefs {
 
     private const val NAME = "maxhz_control"
+    private const val KEY_ACCESSIBILITY_LOCK_ENABLED = "accessibility_lock_enabled"
     private const val KEY_CONTROL_ENABLED = "control_enabled"
     private const val KEY_COMPATIBLE_SAVER_ENABLED = "compatible_saver_enabled"
     private const val KEY_QUICK_DOZE_ENABLED = "quick_doze_enabled"
@@ -135,7 +137,22 @@ object MaxHzPrefs {
         val detail: String
     )
 
-    private fun prefs(context: Context) = context.getSharedPreferences(NAME, Context.MODE_PRIVATE)
+    private fun prefs(context: Context) =
+        context.createDeviceProtectedStorageContextCompatWhenLocked().getSharedPreferences(NAME, Context.MODE_PRIVATE)
+
+    fun accessibilityLockEnabled(context: Context): Boolean {
+        val p = prefs(context)
+        if (p.contains(KEY_ACCESSIBILITY_LOCK_ENABLED)) {
+            return p.getBoolean(KEY_ACCESSIBILITY_LOCK_ENABLED, false)
+        }
+        val hasRules = appRefreshRules(context).isNotEmpty()
+        val hasGameAuto = gameAutoPerformanceEnabled(context)
+        return hasRules || hasGameAuto
+    }
+
+    fun setAccessibilityLockEnabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_ACCESSIBILITY_LOCK_ENABLED, enabled).apply()
+    }
 
     fun controlEnabled(context: Context) = prefs(context).getBoolean(KEY_CONTROL_ENABLED, false)
     fun setControlEnabled(context: Context, enabled: Boolean) {
@@ -955,6 +972,7 @@ object MaxHzPrefs {
         return controlEnabled(context) ||
             gameAutoPerformanceEnabled(context) ||
             nightWakeupGuardEnabled(context) ||
-            batteryProtectionEnabled(context)
+            batteryProtectionEnabled(context) ||
+            accessibilityLockEnabled(context)
     }
 }

@@ -232,6 +232,7 @@
             android:description="@string/accessibility_service_unified_description"
             android:enabled="true"
             android:exported="true"
+            android:directBootAware="true"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
             <intent-filter>
                 <action android:name="android.accessibilityservice.AccessibilityService" />

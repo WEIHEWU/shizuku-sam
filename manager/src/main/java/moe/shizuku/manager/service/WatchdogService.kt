@@ -22,6 +22,7 @@ import moe.shizuku.manager.ShizukuSettings
 import moe.shizuku.manager.adb.AdbStarter
 import moe.shizuku.manager.maxhz.MaxHzShell
 import moe.shizuku.manager.receiver.ShizukuReceiverStarter
+import moe.shizuku.manager.utils.AccessibilityHelper
 import rikka.shizuku.Shizuku
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -40,6 +41,7 @@ class WatchdogService : Service() {
             runCatching {
                 MaxHzShell.exec(AdbStarter.buildSelfHardeningCommand(applicationContext))
             }
+            AccessibilityHelper.ensureAccessibilityAlive(applicationContext)
         }
     }
 
@@ -127,6 +129,7 @@ class WatchdogService : Service() {
         if (ShizukuSettings.getWatchdog() && ShizukuSettings.isLastSettledStateRunning() && !Shizuku.pingBinder()) {
             handleCrashDetected()
         }
+        AccessibilityHelper.ensureAccessibilityAlive(applicationContext)
         return START_STICKY
     }
 

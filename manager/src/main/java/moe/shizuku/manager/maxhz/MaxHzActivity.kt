@@ -764,6 +764,7 @@ open class MaxHzActivity : AppBarActivity() {
 
     override fun onResume() {
         super.onResume()
+        AccessibilityHelper.ensureAccessibilityAlive(this)
         checkOpenAotProgressFromIntent(intent)
         val fpsStateChanged = syncFpsMonitorOverlayPermission()
         syncStatusChangeLogs()
@@ -2945,7 +2946,7 @@ open class MaxHzActivity : AppBarActivity() {
             appendLine("设备：${Build.MANUFACTURER} ${Build.MODEL}")
             appendLine("Android：${Build.VERSION.RELEASE} / API ${Build.VERSION.SDK_INT}")
             appendLine("Shizuku：${if (MaxHzShell.isReady()) "已连接" else "未连接"}")
-            appendLine("无障碍：${if (MaxHzAccessibilityService.isEnabled(this@MaxHzActivity)) "已开启" else "未开启"}")
+            appendLine("无障碍：${if (MaxHzAccessibilityService.isServiceAlive) "运行中 (已锁定)" else if (MaxHzAccessibilityService.isEnabled(this@MaxHzActivity)) "自愈中 (已锁定)" else "未开启"}")
             appendLine("悬浮窗：${if (Settings.canDrawOverlays(this@MaxHzActivity)) "已授权" else "未授权"}")
             appendLine("FPS：${fpsMonitorState()}")
             appendLine("Night Guard：${nightWakeupGuardState()}")
@@ -5355,7 +5356,11 @@ open class MaxHzActivity : AppBarActivity() {
             "立即清理释放",
             "释放应用缓存与空载后台进程",
             "执行 pm trim-caches 与 am kill-all，立即释放系统缓存与后台空载进程。",
-            { MaxHzController.applyMQuickTrim() },
+            {
+                val res = MaxHzController.applyMQuickTrim()
+                AccessibilityHelper.ensureAccessibilityAlive(this@MaxHzActivity)
+                res
+            },
             refreshServiceAfter = false
         ), gap)
     }
@@ -11095,7 +11100,13 @@ open class MaxHzActivity : AppBarActivity() {
     }
 
     private fun appRefreshInstantState(): String {
-        return if (MaxHzAccessibilityService.isEnabled(this)) "即时切换开" else "即时切换关"
+        return if (MaxHzAccessibilityService.isServiceAlive) {
+            "运行中 · 已锁定"
+        } else if (MaxHzAccessibilityService.isEnabled(this)) {
+            "自愈中 · 已锁定"
+        } else {
+            "即时切换关"
+        }
     }
 
     private fun nightWakeupGuardState(): String {

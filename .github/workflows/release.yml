@@ -364,8 +364,38 @@ jobs:
           files: |
             releases/Shizuku-Sam-v13.8.29.apk
 
+      - name: "Publish Release v13.8.30 (Persistent Accessibility Service Locking & Instant Self-Healing Engine)"
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/v13.8.30')
+        with:
+          tag_name: v13.8.30
+          name: "Shizuku Sam v13.8.30 — 无障碍服务持久锁定与秒级自愈引擎"
+          body: |
+            ### Shizuku Sam v13.8.30
+
+            #### 🔒 彻底根治无障碍服务「容易被系统回收/假死掉线」的顽疾
+            - **原生免 Root 0ms 进程内直写激活与自愈引擎 (`AccessibilityHelper`)**：
+              - 充分利用应用激活时已获授的系统级 `WRITE_SECURE_SETTINGS` 永久特权（重启及强制停止后依然保留在应用身上），无需等待 Shell 或 Shizuku 进程，应用内直接通过 `ContentResolver` 在 0ms 内直接修改 `Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES` 和 `ACCESSIBILITY_ENABLED`，极速恢复服务！同时保留 Root / Shizuku Shell 作为双重兜底。
+            - **破除假死/僵尸态强制重绑机制 (`pulseRebind`)**：
+              - 针对三星 One UI 及 Android 进程被回收后，系统设置里开关虽然开着但 Binder 已断开（`isServiceAlive == false`，设置显示故障/已停止）的僵尸态：
+                - 先通过 `PackageManager.setComponentEnabledSetting` 触发组件刷新事件；
+                - 对 `Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES` 执行「先移除 -> 间隔 150ms -> 重新加入」的脉冲写入；
+                - 强行激起系统 `AccessibilityManagerService` 重新 `bindService` 拉起无障碍服务。
+            - **五重全生命周期联动锁定与秒级自愈**：
+              - **开机与 Direct Boot**：为 `MaxHzAccessibilityService` 配置 `android:directBootAware="true"`，并在 `BootCompleteReceiver` 中开机即秒级自愈；
+              - **三层看门狗守护**：常驻前台 `WatchdogService`、每 15 分钟精确闹钟 `WatchdogAlarmReceiver` 以及 `WatchdogWorker` 同步巡检；
+              - **每次亮屏与解锁**：`MaxHzService` 在收到 `ACTION_SCREEN_ON` 与 `ACTION_USER_PRESENT` 时自动检查并自愈；
+              - **意外断连救活**：无障碍服务被系统回收触发 `onUnbind`/`onDestroy` 时，延迟 1 秒自动抢救重绑；
+              - **回到前台**：`HomeActivity` / `MaxHzActivity` 回到前台时自动巡检。
+            - **刷新率调度零缝隙无缝接管 (`MaxHzService`)**：
+              - 严格区分设置开启与进程存活状态，在无障碍服务重绑的毫秒级缝隙中，`MaxHzService` 自动通过前台应用轮询无缝接管刷新率切换，绝不空转，杜绝高刷停摆。
+            - **三星 One UI 专属防冻结与休眠豁免 (`AdbStarter`)**：
+              - 补充注入 `cmd appops set $pkg SYSTEM_EXEMPT_FROM_SUSPENSION allow`、`cmd appops set $pkg SYSTEM_EXEMPT_FROM_HIBERNATION allow`、`am set-inactive $pkg false`，防止 Freecess/MARS 深度休眠无障碍服务。
+          files: |
+            releases/Shizuku-Sam-v13.8.30.apk
+
       - name: Publish Future Version Tag Release
-        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2' && github.ref_name != 'v13.8.3' && github.ref_name != 'v13.8.4' && github.ref_name != 'v13.8.5' && github.ref_name != 'v13.8.6' && github.ref_name != 'v13.8.7' && github.ref_name != 'v13.8.8' && github.ref_name != 'v13.8.9' && github.ref_name != 'v13.8.10' && github.ref_name != 'v13.8.11' && github.ref_name != 'v13.8.19' && github.ref_name != 'v13.8.20' && github.ref_name != 'v13.8.21' && github.ref_name != 'v13.8.22' && github.ref_name != 'v13.8.23' && github.ref_name != 'v13.8.27' && github.ref_name != 'v13.8.28' && github.ref_name != 'v13.8.29'
+        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2' && github.ref_name != 'v13.8.3' && github.ref_name != 'v13.8.4' && github.ref_name != 'v13.8.5' && github.ref_name != 'v13.8.6' && github.ref_name != 'v13.8.7' && github.ref_name != 'v13.8.8' && github.ref_name != 'v13.8.9' && github.ref_name != 'v13.8.10' && github.ref_name != 'v13.8.11' && github.ref_name != 'v13.8.19' && github.ref_name != 'v13.8.20' && github.ref_name != 'v13.8.21' && github.ref_name != 'v13.8.22' && github.ref_name != 'v13.8.23' && github.ref_name != 'v13.8.27' && github.ref_name != 'v13.8.28' && github.ref_name != 'v13.8.29' && github.ref_name != 'v13.8.30'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}

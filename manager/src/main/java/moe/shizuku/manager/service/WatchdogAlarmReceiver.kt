@@ -8,6 +8,7 @@ import android.content.Intent
 import android.os.Build
 import android.util.Log
 import moe.shizuku.manager.ShizukuSettings
+import moe.shizuku.manager.utils.AccessibilityHelper
 
 /**
  * External, process-independent re-arm for the Watchdog (aligned with upstream ShizukuPlus #415, #417).
@@ -30,6 +31,7 @@ class WatchdogAlarmReceiver : BroadcastReceiver() {
             }
         }
         WatchdogService.syncWithCurrentState(context.applicationContext)
+        AccessibilityHelper.ensureAccessibilityAlive(context.applicationContext)
 
         scheduleNext(context.applicationContext)
     }

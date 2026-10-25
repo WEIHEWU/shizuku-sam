@@ -1830,6 +1830,7 @@ abstract class HomeActivity : MaxHzActivity() {
 
     override fun onResume() {
         super.onResume()
+        AccessibilityHelper.ensureAccessibilityAlive(this)
         moe.shizuku.manager.maxhz.GlassThemeState.sync()
         AdbPairingDetector.cancelIfReturnedToApp()
         lastRecordedThemeKey = computeUserThemeKey()

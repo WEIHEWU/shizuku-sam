@@ -11,6 +11,7 @@ import moe.shizuku.manager.maxhz.MaxHzPrefs
 import moe.shizuku.manager.maxhz.MaxHzService
 import moe.shizuku.manager.service.WatchdogAlarmReceiver
 import moe.shizuku.manager.service.WatchdogService
+import moe.shizuku.manager.utils.AccessibilityHelper
 
 class BootCompleteReceiver : BroadcastReceiver() {
 
@@ -46,6 +47,12 @@ class BootCompleteReceiver : BroadcastReceiver() {
             }
         } catch (e: Exception) {
             Log.w(AppConstants.TAG, "Watchdog start skipped", e)
+        }
+
+        try {
+            AccessibilityHelper.ensureAccessibilityAlive(context)
+        } catch (e: Exception) {
+            Log.w(AppConstants.TAG, "Accessibility auto-restore skipped", e)
         }
     }
 

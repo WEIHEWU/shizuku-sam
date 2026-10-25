@@ -21,6 +21,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import moe.shizuku.manager.R
 import moe.shizuku.manager.ShizukuSettings
+import moe.shizuku.manager.utils.AccessibilityHelper
 import java.util.concurrent.TimeUnit
 
 /**
@@ -65,6 +66,7 @@ class WatchdogWorker(
         }
 
         WatchdogService.syncWithCurrentState(applicationContext)
+        AccessibilityHelper.ensureAccessibilityAlive(applicationContext)
 
         return Result.success()
     }

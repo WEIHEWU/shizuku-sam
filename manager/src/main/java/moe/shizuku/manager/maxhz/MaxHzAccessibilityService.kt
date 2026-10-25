@@ -18,6 +18,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import moe.shizuku.manager.adb.AdbPairingDetector
+import moe.shizuku.manager.utils.AccessibilityHelper
 
 class MaxHzAccessibilityService : AccessibilityService() {
 
@@ -84,6 +85,7 @@ class MaxHzAccessibilityService : AccessibilityService() {
         isServiceAlive = true
         cachedEnabledState = true
         lastCheckTime = SystemClock.uptimeMillis()
+        AccessibilityHelper.onServiceConnected(this)
         activeGameAutoPackage = MaxHzPrefs.gameAutoActivePackage(this)
         if (activeGameAutoPackage != null) {
             lastAppliedGameAutoTarget = "$GAME_AUTO_TARGET_ENTRY:${MaxHzPrefs.gameAutoActiveProfile(this)}"
@@ -181,6 +183,7 @@ class MaxHzAccessibilityService : AccessibilityService() {
         AdbPairingDetector.reset()
         CompatSettingsAutoScroller.cancel()
         scope.cancel()
+        AccessibilityHelper.onServiceUnboundOrDied(applicationContext)
         super.onDestroy()
     }
 
@@ -191,6 +194,7 @@ class MaxHzAccessibilityService : AccessibilityService() {
         lastCheckTime = SystemClock.uptimeMillis()
         AdbPairingDetector.reset()
         CompatSettingsAutoScroller.cancel()
+        AccessibilityHelper.onServiceUnboundOrDied(applicationContext)
         return super.onUnbind(intent)
     }
 
@@ -1307,9 +1311,9 @@ class MaxHzAccessibilityService : AccessibilityService() {
         @Volatile
         private var lastCheckTime = 0L
 
-        fun isEnabled(context: Context): Boolean {
-            if (isServiceAlive) return true
+        fun isRunning(): Boolean = isServiceAlive
 
+        fun isSettingEnabled(context: Context): Boolean {
             val now = SystemClock.uptimeMillis()
             val cached = cachedEnabledState
             if (cached != null && now - lastCheckTime < 2000L) {
@@ -1327,14 +1331,23 @@ class MaxHzAccessibilityService : AccessibilityService() {
                 val manager = context.getSystemService(AccessibilityManager::class.java)
                 manager?.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
                     ?.any {
-                        it.resolveInfo.serviceInfo.packageName == context.packageName &&
-                            it.resolveInfo.serviceInfo.name == MaxHzAccessibilityService::class.java.name
+                        it.resolveInfo?.serviceInfo?.packageName == context.packageName &&
+                            it.resolveInfo?.serviceInfo?.name == MaxHzAccessibilityService::class.java.name
                     } ?: false
             }
 
             cachedEnabledState = enabled
             lastCheckTime = now
             return enabled
+        }
+
+        fun isEnabled(context: Context): Boolean {
+            if (isServiceAlive) return true
+            val settingEnabled = isSettingEnabled(context)
+            if (settingEnabled && AccessibilityHelper.isAccessibilityLocked(context)) {
+                AccessibilityHelper.ensureAccessibilityAlive(context)
+            }
+            return settingEnabled
         }
 
         fun invalidateCache() {

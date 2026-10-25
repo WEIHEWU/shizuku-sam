@@ -22,6 +22,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import moe.shizuku.manager.R
+import moe.shizuku.manager.utils.AccessibilityHelper
 
 class MaxHzService : Service() {
 
@@ -62,8 +63,10 @@ class MaxHzService : Service() {
                                 applyNightWakeupGuardIfDue(force = true)
                             }
                         }
-                        Intent.ACTION_SCREEN_ON -> {
+                        Intent.ACTION_SCREEN_ON,
+                        Intent.ACTION_USER_PRESENT -> {
                             lastAppliedRefreshMode = null
+                            AccessibilityHelper.ensureAccessibilityAlive(context)
                             reconcileRefresh(force = true)
                         }
                     }
@@ -80,6 +83,7 @@ class MaxHzService : Service() {
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_SCREEN_OFF)
             addAction(Intent.ACTION_SCREEN_ON)
+            addAction(Intent.ACTION_USER_PRESENT)
         }
         androidx.core.content.ContextCompat.registerReceiver(
             this,
@@ -91,6 +95,9 @@ class MaxHzService : Service() {
             while (isActive) {
                 val appRules = appRefreshRules()
                 val screenInteractive = isScreenInteractive()
+                if (screenInteractive && !MaxHzAccessibilityService.isServiceAlive && AccessibilityHelper.isAccessibilityLocked(this@MaxHzService)) {
+                    AccessibilityHelper.ensureAccessibilityAlive(this@MaxHzService)
+                }
                 if (hasRefreshControlEnabled()) {
                     reconcileRefresh(force = false, appRules)
                 } else {
@@ -229,7 +236,7 @@ class MaxHzService : Service() {
     }
 
     private fun reconcileRefresh(force: Boolean, appRules: Map<String, MaxHzPrefs.AppRefreshRule> = appRefreshRules()) {
-        if (MaxHzAccessibilityService.isEnabled(this)) {
+        if (MaxHzAccessibilityService.isServiceAlive) {
             val gameAutoBusy = MaxHzPrefs.gameAutoPerformanceEnabled(this) &&
                 (MaxHzPrefs.gameAutoSessionActive(this) ||
                     MaxHzPrefs.gameAutoActivePackage(this) != null ||
@@ -326,7 +333,7 @@ class MaxHzService : Service() {
 
     private fun foregroundRefreshRule(appRules: Map<String, MaxHzPrefs.AppRefreshRule>): MaxHzPrefs.AppRefreshRule? {
         if (appRules.isEmpty()) return null
-        if (MaxHzAccessibilityService.isEnabled(this)) return null
+        if (MaxHzAccessibilityService.isServiceAlive) return null
         val packageName = foregroundPackageForAppRules()?.takeIf { it.isNotBlank() } ?: return null
         val rule = appRules[packageName] ?: return null
         if (!MaxHzPackagePolicy.isRefreshRateTargetApp(this, packageName)) return null
@@ -384,14 +391,15 @@ class MaxHzService : Service() {
     }
 
     private fun appRefreshRules(force: Boolean = false): Map<String, MaxHzPrefs.AppRefreshRule> {
-        if (!MaxHzAccessibilityService.isEnabled(this)) {
+        val configured = MaxHzPrefs.appRefreshRules(this)
+        if (configured.isEmpty()) {
             cachedAppRules = emptyMap()
             cachedAppRulesAt = System.currentTimeMillis()
             return cachedAppRules
         }
         val now = System.currentTimeMillis()
         if (!force && now - cachedAppRulesAt < APP_RULE_CACHE_MS) return cachedAppRules
-        cachedAppRules = MaxHzPrefs.appRefreshRules(this).associateBy { it.packageName }
+        cachedAppRules = configured.associateBy { it.packageName }
         cachedAppRulesAt = now
         return cachedAppRules
     }
