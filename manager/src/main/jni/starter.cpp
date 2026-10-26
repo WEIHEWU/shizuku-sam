@@ -215,14 +215,14 @@ int main(int argc, char *argv[]) {
     }
 
     uid_t uid = getuid();
-    if (uid != 0 && uid != 2000) {
+    if (uid != 0 && uid != 1000 && uid != 2000) {
         perrorf("fatal: run Shizuku from non root nor adb user (uid=%d).\n", uid);
         exit(EXIT_FATAL_UID);
     }
 
     se::init();
 
-    if (uid == 0 || uid == 2000) {
+    if (uid == 0 || uid == 1000) {
         switch_cgroup();
     }
 
@@ -266,11 +266,19 @@ int main(int argc, char *argv[]) {
         if (strcmp(SERVER_NAME, name) != 0)
             return;
 
-        if (kill(pid, SIGKILL) == 0)
+        if (kill(pid, SIGKILL) == 0) {
             printf("info: killed %d (%s)\n", pid, name);
-        else if (errno == EPERM) {
-            perrorf("fatal: can't kill %d, please try to stop existing Shizuku from app first.\n", pid);
-            exit(EXIT_FATAL_KILL);
+        } else if (errno == EPERM) {
+            char cmd[128];
+            snprintf(cmd, sizeof(cmd), "su -c 'kill -9 %d' >/dev/null 2>&1", pid);
+            system(cmd);
+            usleep(50000);
+            if (kill(pid, 0) != 0 && errno == ESRCH) {
+                printf("info: killed %d (%s) via su\n", pid, name);
+            } else {
+                perrorf("fatal: can't kill %d, please try to stop existing Shizuku from app first.\n", pid);
+                exit(EXIT_FATAL_KILL);
+            }
         } else {
             printf("warn: failed to kill %d (%s)\n", pid, name);
         }
@@ -279,6 +287,22 @@ int main(int argc, char *argv[]) {
     if (access(apk_path.c_str(), R_OK) == 0) {
         printf("info: use apk path from argv\n");
         fflush(stdout);
+    }
+
+    if (apk_path.empty()) {
+        char buf[PATH_MAX];
+        ssize_t len = readlink("/proc/self/exe", buf, sizeof(buf) - 1);
+        if (len > 0) {
+            buf[len] = '\0';
+            std::string exe_path(buf);
+            size_t lib_pos = exe_path.find("/lib/");
+            if (lib_pos != std::string::npos) {
+                std::string candidate = exe_path.substr(0, lib_pos) + "/base.apk";
+                if (access(candidate.c_str(), R_OK) == 0) {
+                    apk_path = candidate;
+                }
+            }
+        }
     }
 
     if (apk_path.empty()) {

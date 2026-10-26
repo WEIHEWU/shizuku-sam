@@ -5,15 +5,18 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.provider.Settings
 import android.widget.Toast
+import com.topjohnwu.superuser.Shell
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import moe.shizuku.manager.R
 import moe.shizuku.manager.ShizukuSettings
 import moe.shizuku.manager.service.WatchdogService
 import moe.shizuku.manager.starter.Starter
 import moe.shizuku.manager.utils.EnvironmentUtils
+import rikka.shizuku.Shizuku
 import java.io.EOFException
 import java.io.File
 import java.net.SocketException
@@ -71,6 +74,8 @@ object AdbStarter {
                     }
                 }
 
+                stopExistingServer()
+
                 AdbClient("127.0.0.1", activePort, key).use { client ->
                     connectWithRetry(client)
                     client.command("shell:${Starter.internalCommand}") { log?.invoke(String(it)) }
@@ -124,6 +129,26 @@ object AdbStarter {
                 }
             }
         }
+    }
+
+    /**
+     * 在以 shell(uid 2000) 拉起新服务前，清理可能残留的旧 shizuku_server
+     * （例如开机 Root 脚本以 uid 0 拉起的进程），避免 starter 因 EPERM 无法 kill 而失败。
+     */
+    private suspend fun stopExistingServer() {
+        val wasAlive = runCatching { Shizuku.pingBinder() }.getOrDefault(false)
+        if (wasAlive) {
+            runCatching { Shizuku.exit() }
+        }
+        val cached = Shell.getCachedShell()
+        if (cached != null && cached.isRoot) {
+            runCatching {
+                withTimeoutOrNull(3000L) {
+                    Shell.cmd("killall -9 shizuku_server 2>/dev/null || pkill -9 -f shizuku_server 2>/dev/null || true").exec()
+                }
+            }
+        }
+        if (wasAlive) delay(300)
     }
 
     private suspend fun connectWithRetry(client: AdbClient) {

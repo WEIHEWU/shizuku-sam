@@ -21,9 +21,12 @@ import kotlin.collections.ArraysKt;
 import rikka.hidden.compat.ActivityManagerApis;
 import rikka.hidden.compat.PackageManagerApis;
 import rikka.hidden.compat.PermissionManagerApis;
+import rikka.hidden.compat.UserManagerApis;
 import rikka.hidden.compat.adapter.ProcessObserverAdapter;
 import rikka.hidden.compat.adapter.UidObserverAdapter;
 import rikka.shizuku.server.util.Android17Compat;
+import rikka.shizuku.server.util.HandlerUtil;
+import rikka.shizuku.server.util.InstalledPackagesCompat;
 import rikka.shizuku.server.util.Logger;
 
 public class BinderSender {
@@ -32,6 +35,7 @@ public class BinderSender {
 
     private static final String PERMISSION_MANAGER = "moe.shizuku.manager.permission.MANAGER";
     private static final String PERMISSION = "moe.shizuku.manager.permission.API_V23";
+    private static final int PROCESS_STATE_NONEXISTENT = 20;
 
     private static ShizukuService sShizukuService;
 
@@ -50,7 +54,11 @@ public class BinderSender {
                 PID_LIST.add(pid);
             }
 
-            sendBinder(uid, pid);
+            if (!sendBinder(uid, pid)) {
+                synchronized (PID_LIST) {
+                    PID_LIST.remove(Integer.valueOf(pid));
+                }
+            }
         }
 
         @Override
@@ -76,7 +84,11 @@ public class BinderSender {
                 PID_LIST.add(pid);
             }
 
-            sendBinder(uid, pid);
+            if (!sendBinder(uid, pid)) {
+                synchronized (PID_LIST) {
+                    PID_LIST.remove(Integer.valueOf(pid));
+                }
+            }
         }
     }
 
@@ -125,7 +137,11 @@ public class BinderSender {
                 LOGGER.v("Uid %d starts", uid);
             }
 
-            sendBinder(uid, -1);
+            if (!sendBinder(uid, -1)) {
+                synchronized (UID_LIST) {
+                    UID_LIST.remove(Integer.valueOf(uid));
+                }
+            }
         }
 
         private void uidGone(int uid) {
@@ -139,10 +155,10 @@ public class BinderSender {
         }
     }
 
-    private static void sendBinder(int uid, int pid) throws RemoteException {
+    private static boolean sendBinder(int uid, int pid) throws RemoteException {
         List<String> packages = PackageManagerApis.getPackagesForUidNoThrow(uid);
         if (packages.isEmpty())
-            return;
+            return true;
 
         LOGGER.d("sendBinder to uid %d: packages=%s", uid, TextUtils.join(", ", packages));
 
@@ -153,21 +169,25 @@ public class BinderSender {
                 continue;
 
             if (ArraysKt.contains(pi.requestedPermissions, PERMISSION_MANAGER)) {
-                boolean granted;
-                if (pid == -1)
-                    granted = Android17Compat.checkPermission(PERMISSION_MANAGER, uid) == PackageManager.PERMISSION_GRANTED;
-                else
-                    granted = ActivityManagerApis.checkPermission(PERMISSION_MANAGER, pid, uid) == PackageManager.PERMISSION_GRANTED;
+                boolean granted = false;
+                try {
+                    if (pid == -1)
+                        granted = Android17Compat.checkPermission(PERMISSION_MANAGER, uid) == PackageManager.PERMISSION_GRANTED;
+                    else
+                        granted = ActivityManagerApis.checkPermission(PERMISSION_MANAGER, pid, uid) == PackageManager.PERMISSION_GRANTED;
+                } catch (Throwable e) {
+                    LOGGER.e("checkPermission failed for manager");
+                }
 
                 if (granted) {
-                    ShizukuService.sendBinderToManger(sShizukuService, userId);
-                    return;
+                    ShizukuService.sendBinderToManager(sShizukuService, userId);
+                    return true;
                 }
             } else if (ArraysKt.contains(pi.requestedPermissions, PERMISSION)) {
-                ShizukuService.sendBinderToUserApp(sShizukuService, packageName, userId);
-                return;
+                return ShizukuService.sendBinderToUserApp(sShizukuService, packageName, userId, false);
             }
         }
+        return true;
     }
 
     public static void register(ShizukuService shizukuService) {
@@ -191,6 +211,52 @@ public class BinderSender {
             } catch (Throwable tr) {
                 LOGGER.e(tr, "registerUidObserver");
             }
+        }
+
+        HandlerUtil.getMainHandler().postDelayed(
+                () -> new Thread(BinderSender::catchUpAlreadyRunningClients, "ShizukuCatchUp").start(),
+                2000);
+    }
+
+    private static void catchUpAlreadyRunningClients() {
+        try {
+            for (int userId : UserManagerApis.getUserIdsNoThrow()) {
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O && userId != 0) {
+                    continue;
+                }
+
+                for (PackageInfo pi : InstalledPackagesCompat.getInstalledPackagesNoThrow(PackageManager.GET_PERMISSIONS, userId)) {
+                    if (pi == null || pi.applicationInfo == null || pi.requestedPermissions == null) continue;
+
+                    if (!ArraysKt.contains(pi.requestedPermissions, PERMISSION_MANAGER) &&
+                            !ArraysKt.contains(pi.requestedPermissions, PERMISSION)) {
+                        continue;
+                    }
+
+                    int state;
+                    try {
+                        state = ActivityManagerApis.getPackageProcessState(pi.packageName, userId, "com.android.shell");
+                    } catch (Throwable e) {
+                        continue;
+                    }
+                    if (state < 0 || state >= PROCESS_STATE_NONEXISTENT) continue;
+
+                    try {
+                        if (ArraysKt.contains(pi.requestedPermissions, PERMISSION_MANAGER)) {
+                            ShizukuService.sendBinderToManager(sShizukuService, userId);
+                        } else {
+                            boolean sent = ShizukuService.sendBinderToUserApp(sShizukuService, pi.packageName, userId, false);
+                            if (!sent) {
+                                LOGGER.w("catch-up delivery failed for %s in user %d", pi.packageName, userId);
+                            }
+                        }
+                    } catch (Throwable e) {
+                        LOGGER.w(e, "catch-up sendBinder failed for %s in user %d", pi.packageName, userId);
+                    }
+                }
+            }
+        } catch (Throwable tr) {
+            LOGGER.e(tr, "catchUpAlreadyRunningClients failed");
         }
     }
 }

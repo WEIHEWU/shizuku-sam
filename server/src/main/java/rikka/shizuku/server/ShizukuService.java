@@ -492,24 +492,48 @@ public class ShizukuService extends Service<ShizukuUserServiceManager, ShizukuCl
     }
 
     void sendBinderToManager() {
-        sendBinderToManger(this);
+        sendBinderToManager(this);
     }
 
-    private static void sendBinderToManger(Binder binder) {
+    private static void sendBinderToManager(Binder binder) {
         for (int userId : UserManagerApis.getUserIdsNoThrow()) {
-            sendBinderToManger(binder, userId);
+            sendBinderToManager(binder, userId);
         }
     }
 
     static void sendBinderToManger(Binder binder, int userId) {
-        sendBinderToUserApp(binder, MANAGER_APPLICATION_ID, userId);
+        sendBinderToManager(binder, userId);
     }
 
-    static void sendBinderToUserApp(Binder binder, String packageName, int userId) {
-        sendBinderToUserApp(binder, packageName, userId, true);
+    static void sendBinderToManager(Binder binder, int userId) {
+        boolean success = sendBinderToUserApp(binder, MANAGER_APPLICATION_ID, userId);
+        if (!success) {
+            // For unknown reason, sometimes this could happens
+            // Kill Shizuku app and try again could work
+            try {
+                LOGGER.e("kill %s in user %d and try again", MANAGER_APPLICATION_ID, userId);
+                ActivityManagerApis.forceStopPackageNoThrow(MANAGER_APPLICATION_ID, userId);
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException ignored) {
+                }
+                success = sendBinderToUserApp(binder, MANAGER_APPLICATION_ID, userId);
+                if (success) {
+                    LOGGER.e("retry succeeded");
+                } else {
+                    LOGGER.e("retry failed");
+                }
+            } catch (Throwable tr) {
+                LOGGER.e(tr, "retry failed");
+            }
+        }
     }
 
-    static void sendBinderToUserApp(Binder binder, String packageName, int userId, boolean retry) {
+    static boolean sendBinderToUserApp(Binder binder, String packageName, int userId) {
+        return sendBinderToUserApp(binder, packageName, userId, true);
+    }
+
+    static boolean sendBinderToUserApp(Binder binder, String packageName, int userId, boolean retry) {
         try {
             DeviceIdleControllerApis.addPowerSaveTempWhitelistApp(packageName, 30 * 1000, userId,
                     316/* PowerExemptionManager#REASON_SHELL */, "shell");
@@ -537,7 +561,7 @@ public class ShizukuService extends Service<ShizukuUserServiceManager, ShizukuCl
             provider = ActivityManagerApis.getContentProviderExternal(name, userId, token, name);
             if (provider == null) {
                 LOGGER.e("provider is null %s %d", name, userId);
-                return;
+                return false;
             }
             if (!provider.asBinder().pingBinder()) {
                 LOGGER.e("provider is dead %s %d", name, userId);
@@ -548,9 +572,9 @@ public class ShizukuService extends Service<ShizukuUserServiceManager, ShizukuCl
                     ActivityManagerApis.forceStopPackageNoThrow(packageName, userId);
                     LOGGER.e("kill %s in user %d and try again", packageName, userId);
                     Thread.sleep(1000);
-                    sendBinderToUserApp(binder, packageName, userId, false);
+                    return sendBinderToUserApp(binder, packageName, userId, false);
                 }
-                return;
+                return false;
             }
 
             if (!retry) {
@@ -563,11 +587,14 @@ public class ShizukuService extends Service<ShizukuUserServiceManager, ShizukuCl
             Bundle reply = IContentProviderUtils.callCompat(provider, null, name, "sendBinder", null, extra);
             if (reply != null) {
                 LOGGER.i("send binder to user app %s in user %d", packageName, userId);
+                return true;
             } else {
                 LOGGER.w("failed to send binder to user app %s in user %d", packageName, userId);
+                return false;
             }
         } catch (Throwable tr) {
             LOGGER.e(tr, "failed send binder to user app %s in user %d", packageName, userId);
+            return false;
         } finally {
             if (provider != null) {
                 try {
