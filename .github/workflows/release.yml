@@ -433,8 +433,37 @@ jobs:
           files: |
             releases/Shizuku-Sam-v13.8.32.apk
 
+      - name: "Publish Release v13.8.33 (Fix Game Partial-Screen Viewport Bug & Upgrade Shell Pool + Miuix Dialogs)"
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/v13.8.33')
+        with:
+          tag_name: v13.8.33
+          name: "Shizuku Sam v13.8.33 — 彻底修复游戏小窗/左上角 75% 黑边 Bug、常驻 Shell 会话池与 Miuix 诊断中心"
+          body: |
+            ### Shizuku Sam v13.8.33
+
+            #### 🛠 彻底修复打开游戏偶发「左上角约 75% 小窗显示 + 右侧/底部黑边」问题
+            - **移除游戏冷启动/横竖屏切换期的实时 `cmd game downscale` 干预**：
+              - 彻底移除了 `MaxHzController` 在前台应用切换热路径中实时下发的 `cmd game mode ... downscale` 与 `cmd game set --downscale`，杜绝在 SurfaceFlinger 旋转与 Engine 首帧初始化窗口期触发 Configuration 竞态导致 Viewport 停留在缩放尺寸；
+              - 游戏超采样/降分辨率改为仅在配置面板用户保存时静态下发。
+            - **残留缩放配置自检与自动修复 (`sanitizeCorruptedGameDownscaleStates`)**：
+              - 服务启动及前台进入未开启主动缩放的游戏时，自动巡检 `device_config get game_overlay` 与 `compat_scale`，若发现历史残留的 `< 1.0` 缩放因子立即静默重置为原生全屏。
+            - **三星自适应刷新率重载防黑边 (`reload_samsung_adaptive_refresh`)**：
+              - 优先读取 `Override size`（如 WQHD+ 切 FHD+ 场景）而非盲目使用 `Physical size`，并使用 `clear-user-preferred-display-mode 0` 替代硬编码 mode 1。
+
+            #### ⚡️ 架构与体验全面升级
+            - **常驻 Shell 会话池 (`MaxHzShell`)**：
+              - 引入长连接 `sh` 会话池（Root / Shizuku 双通道独立复用），指令通过 `stdin` 管道 + 唯一回显 Token 同步读取，彻底告别高频 `fork/exec` 进程风暴。
+            - **前台切换单次脚本合并与 180ms 防抖**：
+              - `MaxHzAccessibilityService` 增加 180ms 窗口切换防抖与游戏全屏过渡期保护；`applyForegroundTransitionMerged` 将刷新率写入与关联进程唤醒/冻结收敛为单次 Shell 事务。
+            - **Miuix 原生弹窗统一与「状态诊断与安全恢复中心」**：
+              - 游戏智能识别、极速 Doze、应用启动加速全部升级为 Miuix `WindowDialog`；
+              - 新增「状态诊断与安全恢复中心」与开机/崩溃安全兜底，支持实时查看分辨率/刷新率/动画/Doze/游戏缩放状态并一键恢复系统默认。
+          files: |
+            releases/Shizuku-Sam-v13.8.33.apk
+
       - name: Publish Future Version Tag Release
-        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2' && github.ref_name != 'v13.8.3' && github.ref_name != 'v13.8.4' && github.ref_name != 'v13.8.5' && github.ref_name != 'v13.8.6' && github.ref_name != 'v13.8.7' && github.ref_name != 'v13.8.8' && github.ref_name != 'v13.8.9' && github.ref_name != 'v13.8.10' && github.ref_name != 'v13.8.11' && github.ref_name != 'v13.8.19' && github.ref_name != 'v13.8.20' && github.ref_name != 'v13.8.21' && github.ref_name != 'v13.8.22' && github.ref_name != 'v13.8.23' && github.ref_name != 'v13.8.27' && github.ref_name != 'v13.8.28' && github.ref_name != 'v13.8.29' && github.ref_name != 'v13.8.30' && github.ref_name != 'v13.8.31' && github.ref_name != 'v13.8.32'
+        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2' && github.ref_name != 'v13.8.3' && github.ref_name != 'v13.8.4' && github.ref_name != 'v13.8.5' && github.ref_name != 'v13.8.6' && github.ref_name != 'v13.8.7' && github.ref_name != 'v13.8.8' && github.ref_name != 'v13.8.9' && github.ref_name != 'v13.8.10' && github.ref_name != 'v13.8.11' && github.ref_name != 'v13.8.19' && github.ref_name != 'v13.8.20' && github.ref_name != 'v13.8.21' && github.ref_name != 'v13.8.22' && github.ref_name != 'v13.8.23' && github.ref_name != 'v13.8.27' && github.ref_name != 'v13.8.28' && github.ref_name != 'v13.8.29' && github.ref_name != 'v13.8.30' && github.ref_name != 'v13.8.31' && github.ref_name != 'v13.8.32' && github.ref_name != 'v13.8.33'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
