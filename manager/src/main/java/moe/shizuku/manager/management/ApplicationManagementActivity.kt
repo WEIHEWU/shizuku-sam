@@ -79,8 +79,8 @@ import java.util.Objects
 class ApplicationManagementActivity : AppActivity() {
 
     private val viewModel by appsViewModel()
-    private val packagesState = mutableStateOf<List<PackageInfo>>(emptyList())
-    private val isLoadingState = mutableStateOf(true)
+    private val packagesState = mutableStateOf<List<PackageInfo>>(AppsRepository.cachedPackages ?: emptyList())
+    private val isLoadingState = mutableStateOf(AppsRepository.cachedPackages == null)
     private val refreshTickState = mutableIntStateOf(0)
 
     private val binderDeadListener = Shizuku.OnBinderDeadListener {
@@ -127,11 +127,16 @@ class ApplicationManagementActivity : AppActivity() {
                     LOGGER.w(tr, "load packages error")
                 }
                 Status.LOADING -> {
-                    isLoadingState.value = true
+                    if (packagesState.value.isEmpty()) {
+                        isLoadingState.value = true
+                    }
                 }
             }
         }
-        if (viewModel.packages.value == null) {
+        if (AppsRepository.cachedPackages == null) {
+            viewModel.load(force = true)
+        } else if (!AppsRepository.isFresh(8000L)) {
+            // 已有内存缓存：首帧 0ms 秒开无感渲染，后台静默刷新
             viewModel.load()
         }
 
@@ -168,7 +173,7 @@ class ApplicationManagementActivity : AppActivity() {
                             refreshTick = refreshTickState.intValue,
                             onBackClick = { finish() },
                             onReloadCount = {
-                                viewModel.load(true)
+                                viewModel.load(onlyCount = true, force = true)
                                 refreshTickState.intValue++
                             }
                         )
@@ -185,9 +190,8 @@ class ApplicationManagementActivity : AppActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (Shizuku.pingBinder()) {
-            viewModel.load()
-        }
+        // 对齐上游 thedjchi / Shizuku Plus：严禁在 onResume 盲目并发触发全盘 load()
+        // 仅驱动列表视图刷新 tick，消除 Binder 与 PMS 争抢
         refreshTickState.intValue++
     }
 }

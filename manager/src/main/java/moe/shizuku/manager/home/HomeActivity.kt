@@ -85,11 +85,12 @@ abstract class HomeActivity : MaxHzActivity() {
 
     private val binderReceivedListener = Shizuku.OnBinderReceivedListener {
         checkServerStatus()
-        appsModel.load()
+        appsModel.load(force = true)
     }
 
     private val binderDeadListener = Shizuku.OnBinderDeadListener {
         checkServerStatus()
+        moe.shizuku.manager.management.AppsRepository.clear()
     }
 
     private val homeModel by viewModels { HomeViewModel() }

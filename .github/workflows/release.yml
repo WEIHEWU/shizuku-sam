@@ -411,8 +411,30 @@ jobs:
           files: |
             releases/Shizuku-Sam-v13.8.31.apk
 
+      - name: "Publish Release v13.8.32 (Instant 0ms App Management with AppsRepository & Lifecycle Deduplication)"
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/v13.8.32')
+        with:
+          tag_name: v13.8.32
+          name: "Shizuku Sam v13.8.32 — 应用管理 0ms 秒开与全局内存预热缓存"
+          body: |
+            ### Shizuku Sam v13.8.32
+
+            #### ⚡️ 彻底根治「管理已授权应用」每次点击都弹出「正在读取已安装应用列表...」与长时间等待
+            - **全局预热单例缓存仓库 (`AppsRepository`)**：
+              - 消除 Activity 之间的数据孤岛，主页启动时扫描到的授权应用直接常驻内存；
+              - 点击「管理已授权应用」时首帧 **0ms 秒开**，直接渲染既有授权列表，彻底消灭全屏 Loading 卡片与等待白屏；
+              - 仅在内存无缓存或缓存过期时在后台静默发起增量同步，平滑刷新。
+            - **对齐上游消除生命周期并发竞争 (`ApplicationManagementActivity`)**：
+              - 彻底移除 `onResume()` 中盲目重复触发的 `viewModel.load()`，只保留 UI 渲染 Tick，杜绝并发两次向系统 PMS 索取数百个应用全量清单造成的 Binder 拥堵与卡顿；
+              - 开关切换时采用 `onlyCount = true` 局部定向刷新授权数字。
+            - **原子代际防抖机制 (`loadGeneration`)**：
+              - 对齐 Shizuku Plus #317 / #424，引入原子自增代号，废弃滞后的旧请求回调，避免列表闪烁，并对服务存活时的瞬态异常做缓存保护。
+          files: |
+            releases/Shizuku-Sam-v13.8.32.apk
+
       - name: Publish Future Version Tag Release
-        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2' && github.ref_name != 'v13.8.3' && github.ref_name != 'v13.8.4' && github.ref_name != 'v13.8.5' && github.ref_name != 'v13.8.6' && github.ref_name != 'v13.8.7' && github.ref_name != 'v13.8.8' && github.ref_name != 'v13.8.9' && github.ref_name != 'v13.8.10' && github.ref_name != 'v13.8.11' && github.ref_name != 'v13.8.19' && github.ref_name != 'v13.8.20' && github.ref_name != 'v13.8.21' && github.ref_name != 'v13.8.22' && github.ref_name != 'v13.8.23' && github.ref_name != 'v13.8.27' && github.ref_name != 'v13.8.28' && github.ref_name != 'v13.8.29' && github.ref_name != 'v13.8.30' && github.ref_name != 'v13.8.31'
+        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2' && github.ref_name != 'v13.8.3' && github.ref_name != 'v13.8.4' && github.ref_name != 'v13.8.5' && github.ref_name != 'v13.8.6' && github.ref_name != 'v13.8.7' && github.ref_name != 'v13.8.8' && github.ref_name != 'v13.8.9' && github.ref_name != 'v13.8.10' && github.ref_name != 'v13.8.11' && github.ref_name != 'v13.8.19' && github.ref_name != 'v13.8.20' && github.ref_name != 'v13.8.21' && github.ref_name != 'v13.8.22' && github.ref_name != 'v13.8.23' && github.ref_name != 'v13.8.27' && github.ref_name != 'v13.8.28' && github.ref_name != 'v13.8.29' && github.ref_name != 'v13.8.30' && github.ref_name != 'v13.8.31' && github.ref_name != 'v13.8.32'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
