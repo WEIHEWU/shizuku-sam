@@ -332,7 +332,8 @@ object MaxHzController {
           settings put system peak_refresh_rate 120 >/dev/null 2>&1 || true
           settings put system user_refresh_rate 120 >/dev/null 2>&1 || true
           settings put system min_refresh_rate 10 >/dev/null 2>&1 || true
-          display_size="$(wm size 2>/dev/null | sed -n 's/Physical size: //p' | head -n 1)"
+          display_size="${'$'}(wm size 2>/dev/null | sed -n 's/Override size: //p' | head -n 1)"
+          [ -z "${'$'}display_size" ] && display_size="${'$'}(wm size 2>/dev/null | sed -n 's/Physical size: //p' | head -n 1)"
           width="${'$'}{display_size%x*}"
           height="${'$'}{display_size#*x}"
           case "${'$'}width:${'$'}height" in
@@ -2816,7 +2817,7 @@ object MaxHzController {
               settings put system min_refresh_rate 0.0 >/dev/null 2>&1 || true
               settings delete system custom_refresh_rate >/dev/null 2>&1 || true
               settings delete system display_min_refresh_rate >/dev/null 2>&1 || true
-              cmd display set-user-preferred-display-mode 0 1 >/dev/null 2>&1 || true
+              cmd display clear-user-preferred-display-mode 0 >/dev/null 2>&1 || true
               echo "已清理刷新率覆盖项，恢复 1Hz~120Hz 硬件级自适应降频。"
             fi
             """.trimIndent()
@@ -2848,7 +2849,7 @@ object MaxHzController {
             settings put system peak_refresh_rate 120.0 >/dev/null 2>&1 || true
             settings put system user_refresh_rate 120 >/dev/null 2>&1 || true
             settings put system min_refresh_rate 0.0 >/dev/null 2>&1 || true
-            cmd display set-user-preferred-display-mode 0 1 >/dev/null 2>&1 || true
+            cmd display clear-user-preferred-display-mode 0 >/dev/null 2>&1 || true
             echo "已成功校准屏幕自适应刷新率！已突破省电模式限制，激活 1Hz~120Hz 硬件级自适应降频。"
             """.trimIndent()
         )
@@ -3427,6 +3428,10 @@ object MaxHzController {
         return "'" + value.replace("'", "'\\''") + "'"
     }
 
+    /**
+     * 释放非托管游戏的显示刷新率覆盖项（仅清理本应用刷新率参数，绝不在游戏冷启动途中调用
+     * cmd game set --downscale 或 cmd game reset，彻底根治游戏启动时分辨率错位/左上角 75% 小窗黑边问题）。
+     */
     fun restoreGameDisplayDefaults(packageName: String): MaxHzShell.Result {
         val safePackage = shellQuote(packageName)
         return MaxHzShell.exec(
@@ -3449,9 +3454,6 @@ object MaxHzController {
             settings delete global pms_settings_refresh_rate_cover_enabled >/dev/null 2>&1
             settings delete global sem_power_mode_refresh_rate >/dev/null 2>&1
             settings delete global sem_power_mode_refresh_rate_cover >/dev/null 2>&1
-            cmd game set --downscale disable --fps 0 "${'$'}target_pkg" >/dev/null 2>&1 || true
-            cmd game reset "${'$'}target_pkg" >/dev/null 2>&1 || true
-            cmd game mode standard "${'$'}target_pkg" >/dev/null 2>&1 || true
             for key in max_fps min_fps psm_refresh_rate_tag psm_refresh_rate_cover_tag psm_refresh_rate_tag_power_mode_state pms_settings_refresh_rate_enabled pms_settings_refresh_rate_cover_enabled sem_power_mode_refresh_rate sem_power_mode_refresh_rate_cover; do
               value="${'$'}(settings get global "${'$'}key" 2>/dev/null)"
               if [ "${'$'}value" != "null" ]; then
@@ -3462,6 +3464,34 @@ object MaxHzController {
             echo "已释放游戏显示设置：${'$'}target_pkg 交回系统/Game Booster 接管"
             """.trimIndent()
         )
+    }
+
+    /**
+     * 在用户在 UI 中静态添加/移除受管游戏时（非游戏冷启动途中）预先配置或重置 GameManager 策略，
+     * 避免游戏启动瞬间触发 Surface 重建导致视口错位。
+     */
+    fun configureGameStaticIntervention(packageName: String, enable: Boolean): MaxHzShell.Result {
+        val safePkg = shellPackageList(listOf(packageName))
+        if (safePkg.isBlank()) return MaxHzShell.Result(0, "", "")
+        return if (enable) {
+            MaxHzShell.exec(
+                """
+                cmd game mode performance "$safePkg" >/dev/null 2>&1 || true
+                cmd game set --downscale disable --fps 120 "$safePkg" >/dev/null 2>&1 || true
+                echo "已静态预配置游戏免降分辨率与高帧率：$safePkg"
+                """.trimIndent(),
+                timeoutSeconds = 5
+            )
+        } else {
+            MaxHzShell.exec(
+                """
+                cmd game mode standard "$safePkg" >/dev/null 2>&1 || true
+                cmd game reset "$safePkg" >/dev/null 2>&1 || true
+                echo "已重置游戏静态干预配置：$safePkg"
+                """.trimIndent(),
+                timeoutSeconds = 5
+            )
+        }
     }
 
     fun isSamsungGamePackage(packageName: String): Boolean {
@@ -3476,15 +3506,21 @@ object MaxHzController {
 
     /**
      * 磁贴与自动游戏模式专用极速切换：系统默认
-     * 单进程原子 Shell 极速执行（~30ms），杜绝多条命令串行造成的阻塞与卡顿。
+     * 单进程原子 Shell 极速执行，不在运行期调用 cmd game reset 或硬编码物理分辨率模式 ID，
+     * 防止窗口尺寸与逻辑分辨率失配。
      */
-    fun quickSwitchGameDefault(packageName: String? = null): MaxHzShell.Result {
+    fun quickSwitchGameDefault(
+        packageName: String? = null,
+        restoreBypassCharge: Boolean = false
+    ): MaxHzShell.Result {
         val safePkg = packageName?.let { shellPackageList(listOf(it)) }.orEmpty()
         val gameResetCommands = if (safePkg.isNotBlank()) {
             """
             cmd game mode standard "$safePkg" >/dev/null 2>&1 || true
-            cmd game reset "$safePkg" >/dev/null 2>&1 || true
             """.trimIndent()
+        } else ""
+        val bypassRestoreCommand = if (restoreBypassCharge) {
+            "settings put system pass_through 0 >/dev/null 2>&1 || true"
         } else ""
 
         return MaxHzShell.exec(
@@ -3493,6 +3529,7 @@ object MaxHzController {
             settings delete system sem_enhanced_cpu_responsiveness >/dev/null 2>&1 || true
             settings delete global sem_enhanced_cpu_responsiveness >/dev/null 2>&1 || true
             $gameResetCommands
+            $bypassRestoreCommand
             cmd power set-mode 0 >/dev/null 2>&1 || true
             settings put global low_power 0 >/dev/null 2>&1 || true
             settings put global restricted_device_performance 0,0 >/dev/null 2>&1 || true
@@ -3508,7 +3545,7 @@ object MaxHzController {
             settings delete system user_refresh_rate >/dev/null 2>&1 || true
             settings delete system custom_refresh_rate >/dev/null 2>&1 || true
             settings delete system display_min_refresh_rate >/dev/null 2>&1 || true
-            cmd display set-user-preferred-display-mode 0 1 >/dev/null 2>&1 || true
+            cmd display clear-user-preferred-display-mode 0 >/dev/null 2>&1 || true
             settings delete global device_idle_constants >/dev/null 2>&1 || true
             settings delete global battery_saver_constants >/dev/null 2>&1 || true
             dumpsys deviceidle unforce >/dev/null 2>&1 || true
@@ -3535,19 +3572,23 @@ object MaxHzController {
      * 100% 真实 Android / One UI 接口：
      * 1. PowerManagerService Fixed Performance Mode (Power HAL Mode.FIXED_PERFORMANCE)
      * 2. 三星 One UI 增强处理 (sem_enhanced_cpu_responsiveness=1)
-     * 3. Android GameManagerService 原生游戏性能模式 (cmd game mode performance)
+     * 3. Android GameManagerService 原生游戏性能模式 (cmd game mode performance，不在启动期改写 downscale)
      * 4. 解除省电降频与 60Hz 限制，保持 120Hz 高刷
+     * 5. 可选联动开启三星游戏旁路供电 (pass_through=1)
      */
     fun quickSwitchGamePerformance(
         thermalRelaxed: Boolean = false,
-        packageName: String? = null
+        packageName: String? = null,
+        bypassCharge: Boolean = false
     ): MaxHzShell.Result {
         val safePkg = packageName?.let { shellPackageList(listOf(it)) }.orEmpty()
         val gameModeCommands = if (safePkg.isNotBlank()) {
             """
             cmd game mode performance "$safePkg" >/dev/null 2>&1 || true
-            cmd game set --downscale disable --fps 120 "$safePkg" >/dev/null 2>&1 || true
             """.trimIndent()
+        } else ""
+        val bypassCommand = if (bypassCharge) {
+            "settings put system pass_through 1 >/dev/null 2>&1 || true"
         } else ""
 
         return MaxHzShell.exec(
@@ -3561,6 +3602,7 @@ object MaxHzController {
             settings put system sem_enhanced_cpu_responsiveness 1 >/dev/null 2>&1 || true
             settings put global sem_enhanced_cpu_responsiveness 1 >/dev/null 2>&1 || true
             $gameModeCommands
+            $bypassCommand
             settings put global pms_settings_refresh_rate_enabled 0 >/dev/null 2>&1 || true
             settings put global psm_refresh_rate_tag 0 >/dev/null 2>&1 || true
             settings delete global sem_power_mode_refresh_rate >/dev/null 2>&1 || true

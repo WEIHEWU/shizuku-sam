@@ -66,6 +66,8 @@ object MaxHzPrefs {
 
     /** 进入游戏时是否放宽温控（取代了原来的三档档位） */
     private const val KEY_GAME_AUTO_THERMAL_RELAXED = "game_auto_thermal_relaxed"
+    /** 进入游戏时是否自动开启旁路供电（直供电降发热） */
+    private const val KEY_GAME_AUTO_BYPASS_CHARGE = "game_auto_bypass_charge"
 
     /**
      * 游戏模式三档目标档位常量：
@@ -89,6 +91,8 @@ object MaxHzPrefs {
     private const val KEY_GAME_AUTO_SNAP_SAVER = "game_auto_snap_saver"
     /** 进入游戏前的温控方向（快照三项之一：protect / relaxed / 空） */
     private const val KEY_GAME_AUTO_SNAP_THERMAL = "game_auto_snap_thermal"
+    /** 进入游戏前的全局旁路供电状态 */
+    private const val KEY_GAME_AUTO_SNAP_PASSTHROUGH = "game_auto_snap_passthrough"
     /** 快照是否已拍。没有快照时退出游戏不能瞎还原，只能回系统默认 */
     private const val KEY_GAME_AUTO_SNAP_VALID = "game_auto_snap_valid"
 
@@ -582,6 +586,7 @@ object MaxHzPrefs {
                     else -> ""
                 }
             )
+            .putBoolean(KEY_GAME_AUTO_SNAP_PASSTHROUGH, passThroughEnabled(context))
             .putBoolean(KEY_GAME_AUTO_SNAP_VALID, true)
             .apply()
     }
@@ -593,7 +598,8 @@ object MaxHzPrefs {
         return GameAutoSnapshot(
             superPerformance = p.getBoolean(KEY_GAME_AUTO_SNAP_SUPER, false),
             saver = p.getBoolean(KEY_GAME_AUTO_SNAP_SAVER, false),
-            thermal = p.getString(KEY_GAME_AUTO_SNAP_THERMAL, "") ?: ""
+            thermal = p.getString(KEY_GAME_AUTO_SNAP_THERMAL, "") ?: "",
+            passThrough = p.getBoolean(KEY_GAME_AUTO_SNAP_PASSTHROUGH, false)
         )
     }
 
@@ -603,6 +609,7 @@ object MaxHzPrefs {
             .remove(KEY_GAME_AUTO_SNAP_SUPER)
             .remove(KEY_GAME_AUTO_SNAP_SAVER)
             .remove(KEY_GAME_AUTO_SNAP_THERMAL)
+            .remove(KEY_GAME_AUTO_SNAP_PASSTHROUGH)
             .apply()
     }
 
@@ -611,7 +618,8 @@ object MaxHzPrefs {
         val superPerformance: Boolean,
         val saver: Boolean,
         /** "protect" / "relaxed" / ""（未设置温控） */
-        val thermal: String
+        val thermal: String,
+        val passThrough: Boolean = false
     )
 
     fun mTombstoneEnabled(context: Context) = prefs(context).getBoolean(KEY_M_TOMBSTONE_ENABLED, false)
@@ -799,6 +807,14 @@ object MaxHzPrefs {
 
     fun setGameAutoThermalRelaxed(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_GAME_AUTO_THERMAL_RELAXED, enabled).apply()
+    }
+
+    fun gameAutoBypassCharge(context: Context): Boolean {
+        return prefs(context).getBoolean(KEY_GAME_AUTO_BYPASS_CHARGE, false)
+    }
+
+    fun setGameAutoBypassCharge(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_GAME_AUTO_BYPASS_CHARGE, enabled).apply()
     }
 
     /**

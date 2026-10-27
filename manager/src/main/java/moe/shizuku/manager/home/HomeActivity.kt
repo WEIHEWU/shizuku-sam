@@ -576,7 +576,137 @@ abstract class HomeActivity : MaxHzActivity() {
         onNightWakeupGuardClick = {
             pushDetail("待机异常唤醒排查") { nightWakeupGuardSection() }
         },
-        onCalibrateLtpoAdaptiveClick = { handleCalibrateLtpoAdaptiveClick() }
+        onCalibrateLtpoAdaptiveClick = { handleCalibrateLtpoAdaptiveClick() },
+        onSelectAppForGameAuto = { callback ->
+            val hasPrivilege = isServiceRunning() || isRootAvailableState.value
+            if (!hasPrivilege) {
+                Toast.makeText(this, R.string.toast_service_not_running_start_first, Toast.LENGTH_SHORT).show()
+            } else {
+                showUserAppPicker { pkg, label ->
+                    callback(pkg, label)
+                }
+            }
+        },
+        onStaticGameIntervention = { pkg, enable ->
+            lifecycleScope.launch(Dispatchers.IO) {
+                runCatching { MaxHzController.configureGameStaticIntervention(pkg, enable) }
+            }
+        },
+        onApplyQuickDozeConfig = { enabled, minutes, noMaint, onResult ->
+            val hasPrivilege = isServiceRunning() || isRootAvailableState.value
+            if (!hasPrivilege) {
+                Toast.makeText(this, R.string.toast_service_not_running_start_first, Toast.LENGTH_SHORT).show()
+                onResult(false, getString(R.string.toast_service_not_running_start_first))
+            } else {
+                MaxHzPrefs.setQuickDozeMaintenanceMinutes(this, minutes)
+                MaxHzPrefs.setQuickDozeNoMaintenance(this, noMaint)
+                lifecycleScope.launch {
+                    val r = withContext(Dispatchers.IO) {
+                        if (enabled) MaxHzController.applyQuickDoze(minutes, noMaint)
+                        else MaxHzController.restoreQuickDoze()
+                    }
+                    if (r.code == 0) {
+                        MaxHzPrefs.setQuickDozeEnabled(this@HomeActivity, enabled)
+                        quickDozeState.value = enabled
+                        updateMaxHzServiceState()
+                        val msg = if (enabled) "熄屏深度休眠参数已生效" else "已恢复默认 Doze 步进参数"
+                        Toast.makeText(this@HomeActivity, msg, Toast.LENGTH_SHORT).show()
+                        onResult(true, msg)
+                    } else {
+                        val err = r.err.ifBlank { r.out }.ifBlank { "(${r.code})" }
+                        onResult(false, "写入失败：$err")
+                    }
+                }
+            }
+        },
+        onReadQuickDozeStatus = { onResult ->
+            val hasPrivilege = isServiceRunning() || isRootAvailableState.value
+            if (!hasPrivilege) {
+                onResult(getString(R.string.toast_service_not_running_start_first))
+            } else {
+                lifecycleScope.launch {
+                    val text = withContext(Dispatchers.IO) {
+                        val r = MaxHzController.readQuickDozeStatus()
+                        val out = r.out.ifBlank { r.err }.trim()
+                        if (out.isEmpty()) "未能读取到 deviceidle 状态" else out.lines().take(8).joinToString("\n")
+                    }
+                    onResult(text)
+                }
+            }
+        },
+        onRunAppLaunchBoostAction = { actionType, onResult ->
+            val hasPrivilege = isServiceRunning() || isRootAvailableState.value
+            if (!hasPrivilege) {
+                Toast.makeText(this, R.string.toast_service_not_running_start_first, Toast.LENGTH_SHORT).show()
+                onResult(false, getString(R.string.toast_service_not_running_start_first))
+            } else {
+                lifecycleScope.launch {
+                    val (ok, msg) = withContext(Dispatchers.IO) {
+                        when (actionType) {
+                            0 -> {
+                                val r = MaxHzController.applyMDexopt()
+                                if (r.code == 0) {
+                                    MaxHzPrefs.setMDexoptEnabled(this@HomeActivity, true)
+                                    true to "✅ 核心桌面与系统组件 Speed-Profile 预编译完成"
+                                } else {
+                                    false to "执行失败：${r.err.ifBlank { r.out }}"
+                                }
+                            }
+                            1 -> {
+                                val r = MaxHzController.applyMFullDexopt()
+                                if (r.code == 0) {
+                                    MaxHzPrefs.setMDexoptEnabled(this@HomeActivity, true)
+                                    true to "✅ 全量应用 AOT Speed-Profile 预编译已完成"
+                                } else {
+                                    false to "执行失败：${r.err.ifBlank { r.out }}"
+                                }
+                            }
+                            2 -> {
+                                val r = MaxHzController.applyMQuickTrim()
+                                if (r.code == 0) {
+                                    true to "✅ 系统冗余缓存与空载进程已清理释放"
+                                } else {
+                                    false to "缓存回收失败：${r.err.ifBlank { r.out }}"
+                                }
+                            }
+                            else -> {
+                                val r = MaxHzController.restoreMDexopt()
+                                MaxHzPrefs.setMDexoptEnabled(this@HomeActivity, false)
+                                (r.code == 0) to "✅ 已恢复系统默认编译状态与缓存标记"
+                            }
+                        }
+                    }
+                    appLaunchBoostState.value = MaxHzPrefs.mDexoptEnabled(this@HomeActivity)
+                    updateMaxHzServiceState()
+                    onResult(ok, msg)
+                }
+            }
+        },
+        onSyncStates = {
+            syncSchemeAStates()
+            updateMaxHzServiceState()
+        },
+        onExecuteRestoreAllDefaults = { onResult ->
+            val hasPrivilege = isServiceRunning() || isRootAvailableState.value
+            if (!hasPrivilege) {
+                Toast.makeText(this, R.string.toast_service_not_running_start_first, Toast.LENGTH_SHORT).show()
+                onResult(false, getString(R.string.toast_service_not_running_start_first))
+            } else {
+                lifecycleScope.launch {
+                    val r = withContext(Dispatchers.IO) {
+                        restoreAllSystemDefaults()
+                    }
+                    if (r.code == 0) {
+                        syncSchemeAStates()
+                        Toast.makeText(this@HomeActivity, R.string.restore_defaults_success, Toast.LENGTH_LONG).show()
+                        onResult(true, "✅ 已撤销全部覆盖项并恢复系统默认设置")
+                    } else {
+                        val err = r.err.ifBlank { r.out }.ifBlank { "(${r.code})" }
+                        onResult(false, "恢复失败：$err")
+                    }
+                }
+            }
+        }
     )
 
     private fun handleOpenDevSettingsClick() {

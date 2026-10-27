@@ -269,6 +269,12 @@ class MaxHzService : Service() {
         if (isGameAutoSessionBusy()) {
             return null
         }
+        val hasRefreshOverride = MaxHzPrefs.controlEnabled(this) ||
+            appRules.isNotEmpty() ||
+            MaxHzPrefs.compatibleSaverEnabled(this)
+        if (!hasRefreshOverride) {
+            return null
+        }
         if (!foregroundPackage.isNullOrBlank() &&
             (MaxHzPackagePolicy.isGameApp(this, foregroundPackage) || MaxHzController.isSamsungGamePackage(foregroundPackage))
         ) {

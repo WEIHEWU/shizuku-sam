@@ -841,6 +841,8 @@ class MaxHzAccessibilityService : AccessibilityService() {
         }
         val gamePkg = activeGameAutoPackage
         val targetProfile = MaxHzPrefs.gamePackageTargetProfile(this, gamePkg)
+        val thermalRelaxed = MaxHzPrefs.gameAutoThermalRelaxed(this)
+        val bypassCharge = MaxHzPrefs.gameAutoBypassCharge(this)
         val steps = mutableListOf<GameAutoStep>()
         when (targetProfile) {
             MaxHzPrefs.GAME_PROFILE_DEFAULT -> {
@@ -856,7 +858,11 @@ class MaxHzAccessibilityService : AccessibilityService() {
             }
             else -> {
                 steps += GameAutoStep("quick_performance") {
-                    MaxHzController.quickSwitchGamePerformance(packageName = gamePkg)
+                    MaxHzController.quickSwitchGamePerformance(
+                        thermalRelaxed = thermalRelaxed,
+                        packageName = gamePkg,
+                        bypassCharge = bypassCharge
+                    )
                 }
                 steps += GameAutoStep("verify_system") {
                     MaxHzController.verifyGameAutoPerformance(MaxHzPrefs.GAME_AUTO_PROFILE_SUPER)
@@ -872,21 +878,32 @@ class MaxHzAccessibilityService : AccessibilityService() {
     private fun applyGameAutoExit(): GameAutoOperation {
         val snapshot = MaxHzPrefs.gameAutoSnapshot(this)
         val gamePkg = activeGameAutoPackage
+        val restoreBypass = MaxHzPrefs.gameAutoBypassCharge(this) && snapshot?.passThrough != true
         val steps = mutableListOf<GameAutoStep>()
         when {
             snapshot == null || !snapshot.superPerformance && !snapshot.saver -> {
                 steps += GameAutoStep("quick_default") {
-                    MaxHzController.quickSwitchGameDefault(packageName = gamePkg)
+                    MaxHzController.quickSwitchGameDefault(
+                        packageName = gamePkg,
+                        restoreBypassCharge = restoreBypass
+                    )
                 }
             }
             snapshot.superPerformance -> {
                 steps += GameAutoStep("quick_performance") {
-                    MaxHzController.quickSwitchGamePerformance(packageName = null)
+                    MaxHzController.quickSwitchGamePerformance(
+                        thermalRelaxed = snapshot.thermal == "relaxed",
+                        packageName = null,
+                        bypassCharge = snapshot.passThrough
+                    )
                 }
             }
             snapshot.saver -> {
                 steps += GameAutoStep("quick_default") {
-                    MaxHzController.quickSwitchGameDefault(packageName = gamePkg)
+                    MaxHzController.quickSwitchGameDefault(
+                        packageName = gamePkg,
+                        restoreBypassCharge = restoreBypass
+                    )
                 }
                 steps += GameAutoStep("apply_daily_saver") { applyGameAutoDailySaverWithRetry() }
             }
@@ -1126,14 +1143,18 @@ class MaxHzAccessibilityService : AccessibilityService() {
     }
 
     private fun desiredMode(foregroundPackage: String): RefreshMode? {
+        val currentRules = appRules()
+        val saverMode = dailySaverAdaptiveMode()
+        val hasRefreshOverride = currentRules.isNotEmpty() || saverMode != null || MaxHzPrefs.controlEnabled(this)
+        if (!hasRefreshOverride) return null
+
         if (MaxHzPackagePolicy.isGameApp(this, foregroundPackage)) {
             return RefreshMode("game_passthrough:$foregroundPackage", 0L) {
                 MaxHzController.restoreGameDisplayDefaults(foregroundPackage)
             }
         }
 
-        val currentRules = appRules()
-        if (currentRules.isEmpty()) return dailySaverAdaptiveMode()
+        if (currentRules.isEmpty()) return saverMode
         val rule = currentRules[foregroundPackage]
         if (rule != null && MaxHzPackagePolicy.isRefreshRateTargetApp(this, foregroundPackage)) {
             return if (rule.adaptive) {

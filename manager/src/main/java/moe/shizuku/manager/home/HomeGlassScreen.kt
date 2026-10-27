@@ -83,6 +83,7 @@ import moe.shizuku.manager.maxhz.GlassLight
 import moe.shizuku.manager.maxhz.GlassPillButton
 import moe.shizuku.manager.maxhz.IconBadge
 import moe.shizuku.manager.maxhz.MaxHzPrefs
+import moe.shizuku.manager.maxhz.MaxHzShell
 import moe.shizuku.manager.maxhz.TitaniumDark
 import moe.shizuku.manager.maxhz.glassBackgroundBrush
 import moe.shizuku.manager.model.ServiceStatus
@@ -159,7 +160,14 @@ class HomeActions(
     val onClearAppRules: () -> Unit = {},
     val onOpenAccessibilityClick: () -> Unit = {},
     val onNightWakeupGuardClick: () -> Unit = {},
-    val onCalibrateLtpoAdaptiveClick: () -> Unit = {}
+    val onCalibrateLtpoAdaptiveClick: () -> Unit = {},
+    val onSelectAppForGameAuto: ((onSelected: (packageName: String, label: String) -> Unit) -> Unit) = {},
+    val onStaticGameIntervention: (packageName: String, enable: Boolean) -> Unit = { _, _ -> },
+    val onApplyQuickDozeConfig: (enabled: Boolean, minutes: Int, noMaintenance: Boolean, onResult: (Boolean, String) -> Unit) -> Unit = { _, _, _, _ -> },
+    val onReadQuickDozeStatus: (onResult: (String) -> Unit) -> Unit = { _ -> },
+    val onRunAppLaunchBoostAction: (actionType: Int, onResult: (Boolean, String) -> Unit) -> Unit = { _, _ -> },
+    val onSyncStates: () -> Unit = {},
+    val onExecuteRestoreAllDefaults: (onResult: (Boolean, String) -> Unit) -> Unit = { _ -> }
 )
 
 @Composable
@@ -219,6 +227,10 @@ fun ShizukuHomeScreen(
     var showStopConfirmDialog by remember { mutableStateOf(false) }
     var showBatteryProtectionDialog by remember { mutableStateOf(false) }
     var showBatteryInfoDialog by remember { mutableStateOf(false) }
+    var showGameAutoDialog by remember { mutableStateOf(false) }
+    var showQuickDozeDialog by remember { mutableStateOf(false) }
+    var showAppLaunchBoostDialog by remember { mutableStateOf(false) }
+    var showDiagnosticsDialog by remember { mutableStateOf(false) }
     var autoUpdateReleaseInfo by remember { mutableStateOf<moe.shizuku.manager.update.AppUpdater.ReleaseInfo?>(null) }
 
     LaunchedEffect(Unit) {
@@ -418,9 +430,9 @@ fun ShizukuHomeScreen(
                             onToggleFpsMonitor = actions.onToggleFpsMonitor,
                             onToggleOutdoorMode = actions.onToggleOutdoorMode,
                             onToggleQuickDoze = actions.onToggleQuickDoze,
-                            onOpenGameAutoConfigClick = actions.onOpenGameAutoConfigClick,
+                            onOpenGameAutoConfigClick = { showGameAutoDialog = true },
                             onOpenBatteryInfoDialog = { showBatteryInfoDialog = true },
-                            onOpenAppLaunchBoostClick = actions.onOpenAppLaunchBoostClick
+                            onOpenAppLaunchBoostClick = { showAppLaunchBoostDialog = true }
                         )
                     }
 
@@ -436,7 +448,7 @@ fun ShizukuHomeScreen(
                             isScanGuardActive = isScanGuardActive,
                             onToggleTombstone = actions.onToggleTombstone,
                             onToggleQuickDoze = actions.onToggleQuickDoze,
-                            onOpenQuickDozeConfigClick = actions.onOpenQuickDozeConfigClick,
+                            onOpenQuickDozeConfigClick = { showQuickDozeDialog = true },
                             onToggleAutostartLimit = actions.onToggleAutostartLimit,
                             onToggleLocationThrottle = actions.onToggleLocationThrottle,
                             onToggleScanGuard = actions.onToggleScanGuard
@@ -452,6 +464,7 @@ fun ShizukuHomeScreen(
                             isForceResizableActive = isForceResizableActive,
                             holdDownBatteryInfo = showBatteryInfoDialog,
                             onOpenBatteryInfoDialog = { showBatteryInfoDialog = true },
+                            onOpenDiagnosticsDialog = { showDiagnosticsDialog = true },
                             actions = actions
                         )
                     }
@@ -541,6 +554,69 @@ fun ShizukuHomeScreen(
             primaryColor = primaryColor,
             onDismiss = { showBatteryInfoDialog = false },
             onFetchBatteryInfo = actions.onFetchBatteryInfo
+        )
+
+        // ==========================================================
+        // Miuix WindowDialog 4：游戏自动高刷加速配置弹窗（替代旧版 pushDetail 二级页）
+        // ==========================================================
+        MiuixGameAutoConfigDialog(
+            show = showGameAutoDialog,
+            isDark = effectiveDark,
+            primaryColor = primaryColor,
+            isInstantSwitchActive = isInstantSwitchActive,
+            actions = actions,
+            onDismiss = { showGameAutoDialog = false }
+        )
+
+        // ==========================================================
+        // Miuix WindowDialog 5：熄屏深度休眠参数弹窗（替代旧版 pushDetail 二级页）
+        // ==========================================================
+        MiuixQuickDozeConfigDialog(
+            show = showQuickDozeDialog,
+            isDark = effectiveDark,
+            isActive = isQuickDozeActive,
+            actions = actions,
+            onDismiss = { showQuickDozeDialog = false }
+        )
+
+        // ==========================================================
+        // Miuix WindowDialog 6：应用冷启动加速与清理弹窗（替代旧版 pushDetail 二级页）
+        // ==========================================================
+        MiuixAppLaunchBoostDialog(
+            show = showAppLaunchBoostDialog,
+            isDark = effectiveDark,
+            isActive = isAppLaunchBoostActive,
+            actions = actions,
+            onDismiss = { showAppLaunchBoostDialog = false }
+        )
+
+        // ==========================================================
+        // Miuix WindowDialog 7：运行状态与覆盖项诊断中心弹窗
+        // ==========================================================
+        MiuixDiagnosticsCenterDialog(
+            show = showDiagnosticsDialog,
+            isDark = effectiveDark,
+            primaryColor = primaryColor,
+            gameTileMode = gameTileMode,
+            isPassThroughActive = isPassThroughActive,
+            isBatteryProtectionActive = isBatteryProtectionActive,
+            batteryProtectionLimit = batteryProtectionLimit,
+            batteryProtectionRecharge = batteryProtectionRecharge,
+            isGameAutoSwitchActive = isGameAutoSwitchActive,
+            gameAutoPackageCount = gameAutoPackageCount,
+            isFpsMonitorActive = isFpsMonitorActive,
+            isOutdoorModeActive = isOutdoorModeActive,
+            isTombstoneActive = isTombstoneActive,
+            isQuickDozeActive = isQuickDozeActive,
+            isAutostartLimitActive = isAutostartLimitActive,
+            isLocationThrottleActive = isLocationThrottleActive,
+            isScanGuardActive = isScanGuardActive,
+            isAppLaunchBoostActive = isAppLaunchBoostActive,
+            isForceResizableActive = isForceResizableActive,
+            isInstantSwitchActive = isInstantSwitchActive,
+            appRulesCount = appRules.size,
+            actions = actions,
+            onDismiss = { showDiagnosticsDialog = false }
         )
         }
     }
@@ -1045,6 +1121,805 @@ private fun MiuixBatteryInfoDialog(
                     style = GlassButtonStyle.Prominent(primaryColor),
                     onClick = onDismiss,
                     modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MiuixGameAutoConfigDialog(
+    show: Boolean,
+    isDark: Boolean,
+    primaryColor: Color,
+    isInstantSwitchActive: Boolean,
+    actions: HomeActions,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val pm = context.packageManager
+    val haptic = LocalHapticFeedback.current
+
+    var enabled by remember(show) { mutableStateOf(MaxHzPrefs.gameAutoPerformanceEnabled(context)) }
+    var targetProfile by remember(show) { mutableStateOf(MaxHzPrefs.gameAutoTargetProfile(context)) }
+    var exitDelaySec by remember(show) { mutableIntStateOf(MaxHzPrefs.gameAutoPerformanceExitDelaySeconds(context)) }
+    var thermalRelaxed by remember(show) { mutableStateOf(MaxHzPrefs.gameAutoThermalRelaxed(context)) }
+    var bypassCharge by remember(show) { mutableStateOf(MaxHzPrefs.gameAutoBypassCharge(context)) }
+    var packages by remember(show) { mutableStateOf(MaxHzPrefs.gameAutoPerformancePackages(context).sorted()) }
+    var profileMap by remember(show) { mutableStateOf(MaxHzPrefs.gameAutoPackageProfiles(context)) }
+
+    WindowDialog(
+        show = show,
+        title = "游戏自动高刷加速与旁路供电",
+        summary = "识别前台名单游戏自动切换满血/省电档位与旁路供电，退出游戏后按设定延迟自动恢复原状态（不在冷启动中途重置 cmd game，彻底避免画面仅显示左上角 75% 的分辨率错位问题）。",
+        onDismissRequest = onDismiss
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 460.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            if (!isInstantSwitchActive) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (isDark) Color(0x22EF4444) else Color(0xFFFFF2F0))
+                        .padding(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "需开启「即时切换无障碍」以感知前台游戏",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = if (isDark) Color(0xFFFCA5A5) else Color(0xFFD9383A),
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        TextButton(
+                            text = "去开启",
+                            onClick = actions.onOpenAccessibilityClick,
+                            colors = ButtonDefaults.textButtonColorsPrimary(),
+                            insideMargin = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                        )
+                    }
+                }
+            }
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                cornerRadius = 16.dp,
+                colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+            ) {
+                SwitchPreference(
+                    title = "启用游戏自动接管",
+                    summary = "前台进入下方名单中的游戏时自动触发性能与供电策略",
+                    checked = enabled,
+                    onCheckedChange = { on ->
+                        enabled = on
+                        actions.onToggleGameAutoSwitch(on)
+                        actions.onSyncStates()
+                    }
+                )
+
+                val profileValues = listOf(
+                    MaxHzPrefs.GAME_PROFILE_PERFORMANCE,
+                    MaxHzPrefs.GAME_PROFILE_SAVER,
+                    MaxHzPrefs.GAME_PROFILE_DEFAULT
+                )
+                val profileOptions = listOf(
+                    "满血游戏模式 (120Hz + 高采样)",
+                    "省电护航模式 (低温持久)",
+                    "系统默认 (仅还原不加压)"
+                )
+                val selectedProfileIdx = profileValues.indexOf(targetProfile).coerceAtLeast(0)
+                WindowDropdownPreference(
+                    title = "默认目标档位",
+                    summary = "未单独指定档位的游戏默认应用的模式",
+                    items = profileOptions,
+                    selectedIndex = selectedProfileIdx,
+                    onSelectedIndexChange = { idx ->
+                        val next = profileValues.getOrElse(idx) { MaxHzPrefs.GAME_PROFILE_PERFORMANCE }
+                        targetProfile = next
+                        MaxHzPrefs.setGameAutoTargetProfile(context, next)
+                    }
+                )
+
+                val delayValues = listOf(30, 60, 120)
+                val delayLabels = listOf("30 秒防抖恢复", "60 秒防抖恢复 (推荐)", "120 秒防抖恢复")
+                val selectedDelayIdx = delayValues.indexOf(exitDelaySec).let { if (it >= 0) it else 1 }
+                WindowDropdownPreference(
+                    title = "退出游戏恢复延迟",
+                    summary = "切回桌面或回复消息时延迟恢复，防止短暂切出导致模式频繁闪烁",
+                    items = delayLabels,
+                    selectedIndex = selectedDelayIdx,
+                    onSelectedIndexChange = { idx ->
+                        val sec = delayValues.getOrElse(idx) { 60 }
+                        exitDelaySec = sec
+                        MaxHzPrefs.setGameAutoPerformanceExitDelaySeconds(context, sec)
+                    }
+                )
+
+                SwitchPreference(
+                    title = "温和控温策略 (推荐)",
+                    summary = "保留三星 GameService 合理温控阈值，避免长时间机身过热骤降频",
+                    checked = thermalRelaxed,
+                    onCheckedChange = { on ->
+                        thermalRelaxed = on
+                        MaxHzPrefs.setGameAutoThermalRelaxed(context, on)
+                    }
+                )
+
+                SwitchPreference(
+                    title = "进入游戏自动开启旁路供电",
+                    summary = "游戏前台且连接充电器时直供主板降发热，退出游戏后恢复原充电状态",
+                    checked = bypassCharge,
+                    onCheckedChange = { on ->
+                        bypassCharge = on
+                        MaxHzPrefs.setGameAutoBypassCharge(context, on)
+                    }
+                )
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "已配置游戏名单 (${packages.size} 款)",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MiuixTheme.colorScheme.onSurface
+                )
+                if (packages.isNotEmpty()) {
+                    Text(
+                        text = "点击档位标签可单独切换",
+                        fontSize = 11.5.sp,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                    )
+                }
+            }
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                cornerRadius = 16.dp,
+                colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+            ) {
+                if (packages.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(18.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "尚未添加任何游戏，点击下方「+ 添加游戏应用」选择需要自动接管的游戏。",
+                            fontSize = 12.5.sp,
+                            lineHeight = 18.sp,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                        )
+                    }
+                } else {
+                    Column {
+                        packages.forEach { pkg ->
+                            val label = remember(pkg) {
+                                runCatching {
+                                    pm.getApplicationInfo(pkg, 0).loadLabel(pm).toString()
+                                }.getOrDefault(pkg)
+                            }
+                            val customProf = profileMap[pkg]
+                            val profTag = when (customProf) {
+                                MaxHzPrefs.GAME_PROFILE_PERFORMANCE -> "满血"
+                                MaxHzPrefs.GAME_PROFILE_SAVER -> "省电"
+                                MaxHzPrefs.GAME_PROFILE_DEFAULT -> "默认"
+                                else -> "跟随默认"
+                            }
+                            BasicComponent(
+                                title = label,
+                                summary = pkg,
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    val nextProf = when (customProf) {
+                                        null -> MaxHzPrefs.GAME_PROFILE_PERFORMANCE
+                                        MaxHzPrefs.GAME_PROFILE_PERFORMANCE -> MaxHzPrefs.GAME_PROFILE_SAVER
+                                        MaxHzPrefs.GAME_PROFILE_SAVER -> MaxHzPrefs.GAME_PROFILE_DEFAULT
+                                        else -> null
+                                    }
+                                    MaxHzPrefs.setGamePackageCustomProfile(context, pkg, nextProf)
+                                    profileMap = MaxHzPrefs.gameAutoPackageProfiles(context)
+                                },
+                                endActions = {
+                                    Text(
+                                        text = profTag,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (isDark) Color(0xFF60A5FA) else primaryColor,
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(7.dp))
+                                            .background(if (isDark) Color(0xFF162946) else Color(0xFFEBF3FF))
+                                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .clickable {
+                                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                MaxHzPrefs.removeGameAutoPerformancePackage(context, pkg)
+                                                packages = MaxHzPrefs.gameAutoPerformancePackages(context).sorted()
+                                                profileMap = MaxHzPrefs.gameAutoPackageProfiles(context)
+                                                actions.onStaticGameIntervention(pkg, false)
+                                                actions.onSyncStates()
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "✕",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isDark) Color(0xFFF87171) else Color(0xFFF54A45)
+                                        )
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (packages.isNotEmpty()) {
+                    TextButton(
+                        text = "清空名单",
+                        onClick = {
+                            val oldList = packages
+                            MaxHzPrefs.setGameAutoPerformancePackages(context, emptySet())
+                            packages = emptyList()
+                            profileMap = emptyMap()
+                            oldList.forEach { pkg -> actions.onStaticGameIntervention(pkg, false) }
+                            actions.onSyncStates()
+                        },
+                        modifier = Modifier.weight(0.9f)
+                    )
+                }
+                TextButton(
+                    text = "+ 添加游戏应用",
+                    colors = ButtonDefaults.textButtonColorsPrimary(),
+                    onClick = {
+                        actions.onSelectAppForGameAuto { pkg, _ ->
+                            MaxHzPrefs.addGameAutoPerformancePackage(context, pkg)
+                            if (!enabled) {
+                                enabled = true
+                                MaxHzPrefs.setGameAutoPerformanceEnabled(context, true)
+                            }
+                            packages = MaxHzPrefs.gameAutoPerformancePackages(context).sorted()
+                            profileMap = MaxHzPrefs.gameAutoPackageProfiles(context)
+                            actions.onStaticGameIntervention(pkg, true)
+                            actions.onSyncStates()
+                        }
+                    },
+                    modifier = Modifier.weight(1.3f)
+                )
+                TextButton(
+                    text = "完成",
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(0.8f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MiuixQuickDozeConfigDialog(
+    show: Boolean,
+    isDark: Boolean,
+    isActive: Boolean,
+    actions: HomeActions,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    var enabled by remember(show, isActive) { mutableStateOf(isActive) }
+    var noMaintenance by remember(show) { mutableStateOf(MaxHzPrefs.quickDozeNoMaintenance(context)) }
+    var maintMinutes by remember(show) { mutableIntStateOf(MaxHzPrefs.quickDozeMaintenanceMinutes(context)) }
+    var statusText by remember(show, isActive) {
+        mutableStateOf(
+            if (isActive) "当前状态：熄屏深度休眠已开启（锁屏后快速收紧 Doze 步进窗口）"
+            else "当前状态：未开启（使用 Android 默认 Doze 休眠步进参数）"
+        )
+    }
+    var isWorking by remember(show) { mutableStateOf(false) }
+
+    WindowDialog(
+        show = show,
+        title = "熄屏深度休眠参数 (Quick Doze)",
+        summary = "调整 Android DeviceIdle 步进参数，使手机熄屏后迅速进入 Deep Doze 深度休眠以降低夜间与待机掉电。",
+        onDismissRequest = { if (!isWorking) onDismiss() }
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (isDark) Color(0xFF28282D) else Color(0xFFF0F2F6))
+                    .padding(horizontal = 14.dp, vertical = 10.dp)
+            ) {
+                Text(
+                    text = statusText,
+                    fontSize = 12.sp,
+                    lineHeight = 17.sp,
+                    color = if (enabled) Color(0xFF10B981) else MiuixTheme.colorScheme.onSurface
+                )
+            }
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                cornerRadius = 16.dp,
+                colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
+            ) {
+                SwitchPreference(
+                    title = "开启熄屏快速深度休眠",
+                    summary = "熄屏后数秒内进入 Deep Doze，大幅压制后台唤醒",
+                    checked = enabled,
+                    onCheckedChange = { enabled = it }
+                )
+
+                val intervalOptions = listOf(30, 60, 80, 120)
+                val intervalLabels = listOf("每 30 分钟唤醒维护", "每 60 分钟唤醒维护", "每 80 分钟唤醒维护 (推荐)", "每 120 分钟唤醒维护")
+                val selectedIdx = intervalOptions.indexOf(maintMinutes).let { if (it >= 0) it else 2 }
+                WindowDropdownPreference(
+                    title = "Doze 维护窗口间隔",
+                    summary = "深度休眠期间允许系统短暂同步通知的时间间隔",
+                    items = intervalLabels,
+                    selectedIndex = selectedIdx,
+                    enabled = !noMaintenance,
+                    onSelectedIndexChange = { idx ->
+                        maintMinutes = intervalOptions.getOrElse(idx) { 80 }
+                    }
+                )
+
+                SwitchPreference(
+                    title = "禁用周期维护窗口（极致待机）",
+                    summary = "熄屏期间完全推迟维护窗口，待机最省电，但可能延缓非高优推送",
+                    checked = noMaintenance,
+                    onCheckedChange = { noMaintenance = it }
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TextButton(
+                    text = "读取实时状态",
+                    enabled = !isWorking,
+                    onClick = {
+                        isWorking = true
+                        statusText = "正在读取系统 deviceidle 状态..."
+                        actions.onReadQuickDozeStatus { res ->
+                            isWorking = false
+                            statusText = res
+                        }
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+                TextButton(
+                    text = "异常唤醒排查",
+                    enabled = !isWorking,
+                    onClick = {
+                        onDismiss()
+                        actions.onNightWakeupGuardClick()
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TextButton(
+                    text = "取消",
+                    enabled = !isWorking,
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f)
+                )
+                TextButton(
+                    text = "应用配置",
+                    enabled = !isWorking,
+                    colors = ButtonDefaults.textButtonColorsPrimary(),
+                    onClick = {
+                        isWorking = true
+                        statusText = "正在写入 Doze 深度休眠参数..."
+                        actions.onApplyQuickDozeConfig(enabled, maintMinutes, noMaintenance) { ok, msg ->
+                            isWorking = false
+                            statusText = msg
+                            if (ok) onDismiss()
+                        }
+                    },
+                    modifier = Modifier.weight(1.3f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MiuixAppLaunchBoostDialog(
+    show: Boolean,
+    isDark: Boolean,
+    isActive: Boolean,
+    actions: HomeActions,
+    onDismiss: () -> Unit
+) {
+    var statusText by remember(show, isActive) {
+        mutableStateOf(
+            if (isActive) "当前状态：已完成 Speed-Profile AOT 预编译优化"
+            else "通过 Android ART 原生 dexopt 预编译热点代码，提升冷启动与滑动流畅度，并可一键回收冗余缓存。"
+        )
+    }
+    var isWorking by remember(show) { mutableStateOf(false) }
+
+    WindowDialog(
+        show = show,
+        title = "应用冷启动加速与清理",
+        summary = "调用系统级 cmd package bg-dexopt-job 与 pm trim-caches，零后台常驻开销。",
+        onDismissRequest = { if (!isWorking) onDismiss() }
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (isDark) Color(0xFF28282D) else Color(0xFFF0F2F6))
+                    .padding(horizontal = 14.dp, vertical = 10.dp)
+            ) {
+                Text(
+                    text = statusText,
+                    fontSize = 12.sp,
+                    lineHeight = 17.sp,
+                    color = if (isActive && !isWorking) Color(0xFF10B981) else MiuixTheme.colorScheme.onSurface
+                )
+            }
+
+            TextButton(
+                text = if (isWorking) "正在执行系统优化..." else "⚡ 核心与常用应用 Speed-Profile 加速 (推荐)",
+                enabled = !isWorking,
+                colors = ButtonDefaults.textButtonColorsPrimary(),
+                onClick = {
+                    isWorking = true
+                    statusText = "正在为核心与常用应用执行 Speed-Profile 编译，请稍候..."
+                    actions.onRunAppLaunchBoostAction(0) { _, msg ->
+                        isWorking = false
+                        statusText = msg
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            TextButton(
+                text = "🚀 全量应用后台深度编译 (耗时 1~3 分钟)",
+                enabled = !isWorking,
+                onClick = {
+                    isWorking = true
+                    statusText = "正在触发全量应用后台 dexopt 编译任务..."
+                    actions.onRunAppLaunchBoostAction(1) { _, msg ->
+                        isWorking = false
+                        statusText = msg
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TextButton(
+                    text = "🧹 回收系统缓存",
+                    enabled = !isWorking,
+                    onClick = {
+                        isWorking = true
+                        statusText = "正在回收系统冗余应用缓存 (pm trim-caches)..."
+                        actions.onRunAppLaunchBoostAction(2) { _, msg ->
+                            isWorking = false
+                            statusText = msg
+                        }
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+                TextButton(
+                    text = "恢复默认状态",
+                    enabled = !isWorking,
+                    onClick = {
+                        isWorking = true
+                        statusText = "正在恢复默认标记..."
+                        actions.onRunAppLaunchBoostAction(3) { _, msg ->
+                            isWorking = false
+                            statusText = msg
+                        }
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            TextButton(
+                text = "关闭",
+                enabled = !isWorking,
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
+
+@Composable
+private fun MiuixDiagnosticsCenterDialog(
+    show: Boolean,
+    isDark: Boolean,
+    primaryColor: Color,
+    gameTileMode: Int,
+    isPassThroughActive: Boolean,
+    isBatteryProtectionActive: Boolean,
+    batteryProtectionLimit: Int,
+    batteryProtectionRecharge: Int,
+    isGameAutoSwitchActive: Boolean,
+    gameAutoPackageCount: Int,
+    isFpsMonitorActive: Boolean,
+    isOutdoorModeActive: Boolean,
+    isTombstoneActive: Boolean,
+    isQuickDozeActive: Boolean,
+    isAutostartLimitActive: Boolean,
+    isLocationThrottleActive: Boolean,
+    isScanGuardActive: Boolean,
+    isAppLaunchBoostActive: Boolean,
+    isForceResizableActive: Boolean,
+    isInstantSwitchActive: Boolean,
+    appRulesCount: Int,
+    actions: HomeActions,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    var logRefreshTick by remember(show) { mutableIntStateOf(0) }
+    var isRestoring by remember(show) { mutableStateOf(false) }
+    var restoreBanner by remember(show) { mutableStateOf<String?>(null) }
+
+    val channelLabel = remember(show, logRefreshTick) {
+        runCatching { MaxHzShell.activePrivilegeChannelLabel() }.getOrDefault("未就绪")
+    }
+    val activeOverrides = remember(
+        show,
+        logRefreshTick,
+        gameTileMode,
+        isPassThroughActive,
+        isBatteryProtectionActive,
+        isGameAutoSwitchActive,
+        isFpsMonitorActive,
+        isOutdoorModeActive,
+        isTombstoneActive,
+        isQuickDozeActive,
+        isAutostartLimitActive,
+        isLocationThrottleActive,
+        isScanGuardActive,
+        isForceResizableActive,
+        appRulesCount
+    ) {
+        buildList {
+            when (gameTileMode) {
+                1 -> add("• 全局性能模式：省电续航模式 (轻度性能配置 + 60Hz)")
+                2 -> add("• 全局性能模式：满血游戏模式 (120Hz + 高触控采样)")
+            }
+            if (MaxHzPrefs.controlEnabled(context)) {
+                add("• 全局常驻刷新率控制：已开启")
+            }
+            if (appRulesCount > 0) {
+                add("• 分应用刷新率规则：已配置 $appRulesCount 款应用 (${if (isInstantSwitchActive) "即时切换生效中" else "无障碍未开启，已暂停"})")
+            }
+            if (isPassThroughActive) {
+                add("• 旁路供电 (暂停 USB PD 充电)：已开启")
+            }
+            if (isBatteryProtectionActive) {
+                add("• 充电上限保护：已开启 (${batteryProtectionLimit}% 停充 / ${batteryProtectionRecharge}% 复充)")
+            }
+            if (isGameAutoSwitchActive) {
+                val activePkg = MaxHzPrefs.gameAutoActivePackage(context)
+                val suffix = if (!activePkg.isNullOrBlank()) " [当前接管: $activePkg]" else ""
+                add("• 游戏自动高刷加速：已开启 ($gameAutoPackageCount 款游戏)$suffix")
+            }
+            if (isFpsMonitorActive) add("• 实时 FPS 帧率浮窗：运行中")
+            if (isOutdoorModeActive) add("• 户外阳光激发亮度：已开启")
+            if (isTombstoneActive) add("• 后台进程休眠 (Cached Apps Freezer)：已开启")
+            if (isQuickDozeActive) add("• 熄屏快速深度休眠 (Quick Doze)：已开启")
+            if (isAutostartLimitActive) add("• 限制后台自启与关联唤醒：已开启")
+            if (isLocationThrottleActive) add("• 限制后台定位频率 (30分钟)：已开启")
+            if (isScanGuardActive) add("• 限制后台扫描与自动同步：已开启")
+            if (isForceResizableActive) add("• 强制所有应用支持分屏/小窗：已开启")
+        }
+    }
+
+    val combinedLogs = remember(show, logRefreshTick) {
+        val errLogs = MaxHzPrefs.resultText(context, "background_error").orEmpty().trim()
+        val gameLogs = MaxHzPrefs.resultText(context, "game_auto_runtime").orEmpty().trim()
+        buildString {
+            if (errLogs.isNotEmpty()) {
+                append("【后台守护自愈与异常记录】\n")
+                append(errLogs).append('\n')
+            }
+            if (gameLogs.isNotEmpty()) {
+                if (isNotEmpty()) append('\n')
+                append("【游戏自动接管状态流转日志】\n")
+                append(gameLogs)
+            }
+            if (isEmpty()) {
+                append("暂无异常记录或游戏切换日志，所有后台任务运行正常。")
+            }
+        }
+    }
+
+    WindowDialog(
+        show = show,
+        title = "运行状态与覆盖项诊断中心",
+        summary = "透明展示本应用当前对系统改写的所有持久化/运行时开关、Shell 会话池复用通道及自愈日志。",
+        onDismissRequest = { if (!isRestoring) onDismiss() }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 460.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            if (restoreBanner != null) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (isDark) Color(0xFF132E24) else Color(0xFFE6F8F0))
+                        .padding(12.dp)
+                ) {
+                    Text(
+                        text = restoreBanner!!,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = if (isDark) Color(0xFF34D399) else Color(0xFF10B981)
+                    )
+                }
+            }
+
+            // 1. 特权通道状态
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (isDark) Color(0xFF28282D) else Color(0xFFF0F2F6))
+                    .padding(12.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = "特权执行通道：$channelLabel",
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MiuixTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "前台即时切换无障碍：${if (isInstantSwitchActive) "🟢 已启用（仅在配置了刷新率规则或游戏名单时介入）" else "⚪ 未启用（零前台窗口干预）"}",
+                        fontSize = 11.5.sp,
+                        lineHeight = 16.sp,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                    )
+                }
+            }
+
+            // 2. 当前活跃的系统覆盖项
+            Text(
+                text = "当前生效的系统级覆盖项 (${activeOverrides.size} 项)",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MiuixTheme.colorScheme.onSurface
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (isDark) Color(0xFF21242C) else Color(0xFFF5F7FA))
+                    .padding(12.dp)
+            ) {
+                if (activeOverrides.isEmpty()) {
+                    Text(
+                        text = "🟢 当前无任何系统级覆盖项生效（纯粹原生状态，零后台干预）",
+                        fontSize = 12.sp,
+                        color = Color(0xFF10B981),
+                        fontWeight = FontWeight.Medium
+                    )
+                } else {
+                    Text(
+                        text = activeOverrides.joinToString("\n"),
+                        fontSize = 12.sp,
+                        lineHeight = 18.sp,
+                        color = MiuixTheme.colorScheme.onSurface
+                    )
+                }
+            }
+
+            // 3. 诊断与运行日志
+            Text(
+                text = "最近运行与自愈诊断日志",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MiuixTheme.colorScheme.onSurface
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 80.dp, max = 180.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (isDark) Color(0xFF21242C) else Color(0xFFF5F7FA))
+                    .verticalScroll(rememberScrollState())
+                    .padding(12.dp)
+            ) {
+                Text(
+                    text = combinedLogs,
+                    fontSize = 11.5.sp,
+                    lineHeight = 17.sp,
+                    fontFamily = FontFamily.Monospace,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                )
+            }
+
+            // 操作按钮行
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TextButton(
+                    text = "清空日志",
+                    enabled = !isRestoring,
+                    onClick = {
+                        MaxHzPrefs.clearResult(context, "background_error")
+                        MaxHzPrefs.clearResult(context, "game_auto_runtime")
+                        logRefreshTick++
+                    },
+                    modifier = Modifier.weight(0.9f)
+                )
+                TextButton(
+                    text = if (isRestoring) "正在恢复..." else "一键恢复全部默认",
+                    enabled = !isRestoring,
+                    colors = ButtonDefaults.textButtonColorsPrimary(),
+                    onClick = {
+                        isRestoring = true
+                        restoreBanner = "正在撤销全部覆盖项并恢复三星/Android 原生默认设置..."
+                        actions.onExecuteRestoreAllDefaults { ok, msg ->
+                            isRestoring = false
+                            restoreBanner = msg
+                            logRefreshTick++
+                        }
+                    },
+                    modifier = Modifier.weight(1.4f)
+                )
+                TextButton(
+                    text = "关闭",
+                    enabled = !isRestoring,
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(0.8f)
                 )
             }
         }
@@ -1763,7 +2638,7 @@ private fun QuickSwitchesCard(
                 icon = painterResource(R.drawable.ic_maxhz_battery_24),
                 iconTint = if (isDark) Color(0xFF34D399) else Color(0xFF10B981),
                 title = stringResource(R.string.home_switch_passthrough_title),
-                subtitle = stringResource(R.string.home_switch_passthrough_subtitle),
+                subtitle = "连接充电器时电流直供主板（同步接管三星 Game Booster「游戏时暂停 USB PD 充电」）",
                 checked = isPassThroughActive,
                 groupExpanded = groupExpanded,
                 onCheckedChange = onTogglePassThrough
@@ -1773,7 +2648,7 @@ private fun QuickSwitchesCard(
                 icon = painterResource(R.drawable.ic_maxhz_shield_24),
                 iconTint = if (isDark) Color(0xFF60A5FA) else Color(0xFF277AF6),
                 title = "充电上限保护 (${batteryProtectionLimit}% / ${batteryProtectionRecharge}%)",
-                subtitle = "点击此行设置停充与恢复阈值，右侧开关直接启停充电保护",
+                subtitle = "同步接管三星 One UI「电池保护」阈值，点击此行调参，右侧开关直接启停",
                 badgeText = "调参 ›",
                 holdDownState = holdDownBatteryProtection,
                 checked = isBatteryProtectionActive,
@@ -1790,7 +2665,7 @@ private fun QuickSwitchesCard(
                 } else {
                     "游戏自动高刷加速"
                 },
-                subtitle = "识别前台游戏自动接管高刷与触控采样，点击此行配置加速名单",
+                subtitle = "进入名单游戏自动切换满血/省电与旁路供电（不破坏三星 Game Booster 画质比例）",
                 badgeText = "选游戏 ›",
                 checked = isGameAutoSwitchActive,
                 groupExpanded = groupExpanded,
@@ -2028,6 +2903,7 @@ private fun QuickActionsCard(
     isForceResizableActive: Boolean = false,
     holdDownBatteryInfo: Boolean = false,
     onOpenBatteryInfoDialog: () -> Unit = {},
+    onOpenDiagnosticsDialog: () -> Unit = {},
     actions: HomeActions
 ) {
     var groupExpanded by remember { mutableStateOf(false) }
@@ -2054,6 +2930,15 @@ private fun QuickActionsCard(
                 checked = isForceResizableActive,
                 groupExpanded = groupExpanded,
                 onCheckedChange = actions.onToggleForceResizable
+            )
+            AdbActionRow(
+                isDark = isDark,
+                icon = painterResource(R.drawable.ic_maxhz_speed_24),
+                iconTint = if (isDark) Color(0xFF34D399) else Color(0xFF10B981),
+                title = "运行状态与覆盖项诊断中心",
+                subtitle = "实时透视当前生效的系统级覆盖项、特权通道复用状态与异常恢复日志",
+                badgeText = "安全透明",
+                onClick = onOpenDiagnosticsDialog
             )
             AdbActionRow(
                 isDark = isDark,
