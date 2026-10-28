@@ -82,6 +82,7 @@ class MaxHzAccessibilityService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        instance = this
         isServiceAlive = true
         cachedEnabledState = true
         lastCheckTime = SystemClock.uptimeMillis()
@@ -176,6 +177,10 @@ class MaxHzAccessibilityService : AccessibilityService() {
             gameAutoJob?.cancel()
             transientGameAutoReconcileJob?.cancel()
         }
+        val manualDisableLikely = lastSeenPackage?.contains("settings", ignoreCase = true) == true
+        if (instance === this) {
+            instance = null
+        }
         isServiceAlive = false
         isGameAutoExitPending = false
         cachedEnabledState = false
@@ -183,18 +188,22 @@ class MaxHzAccessibilityService : AccessibilityService() {
         AdbPairingDetector.reset()
         CompatSettingsAutoScroller.cancel()
         scope.cancel()
-        AccessibilityHelper.onServiceUnboundOrDied(applicationContext)
+        AccessibilityHelper.onServiceUnboundOrDied(applicationContext, manualDisableLikely)
         super.onDestroy()
     }
 
     override fun onUnbind(intent: android.content.Intent?): Boolean {
+        val manualDisableLikely = lastSeenPackage?.contains("settings", ignoreCase = true) == true
+        if (instance === this) {
+            instance = null
+        }
         isServiceAlive = false
         isGameAutoExitPending = false
         cachedEnabledState = false
         lastCheckTime = SystemClock.uptimeMillis()
         AdbPairingDetector.reset()
         CompatSettingsAutoScroller.cancel()
-        AccessibilityHelper.onServiceUnboundOrDied(applicationContext)
+        AccessibilityHelper.onServiceUnboundOrDied(applicationContext, manualDisableLikely)
         return super.onUnbind(intent)
     }
 
@@ -1320,6 +1329,9 @@ class MaxHzAccessibilityService : AccessibilityService() {
         private const val GAME_AUTO_WAKE_LOCK_TIMEOUT_MS = 5 * 60 * 1_000L
 
         @Volatile
+        private var instance: MaxHzAccessibilityService? = null
+
+        @Volatile
         var isServiceAlive = false
             internal set
 
@@ -1334,6 +1346,18 @@ class MaxHzAccessibilityService : AccessibilityService() {
         private var lastCheckTime = 0L
 
         fun isRunning(): Boolean = isServiceAlive
+
+        fun disableSelfIfRunning(): Boolean {
+            val current = instance ?: return false
+            return runCatching {
+                current.disableSelf()
+                instance = null
+                isServiceAlive = false
+                cachedEnabledState = false
+                lastCheckTime = SystemClock.uptimeMillis()
+                true
+            }.getOrDefault(false)
+        }
 
         fun isSettingEnabled(context: Context): Boolean {
             val now = SystemClock.uptimeMillis()

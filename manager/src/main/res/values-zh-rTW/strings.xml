@@ -365,13 +365,20 @@
     <string name="toast_auto_pairing_ready">配對助手已就緒！請點選「使用配對碼配對裝置」，將自動完成配對</string>
 
     <!-- Tab 2: App Rules (應用規則) -->
-    <string name="home_header_rules_title">分應用更新率規則</string>
-    <string name="home_header_rules_subtitle">針對前台獨立應用設定專屬自適應或固定更新率，離開後自動恢復</string>
+    <string name="home_header_rules_title">單應用獨立更新率</string>
+    <string name="home_header_rules_subtitle">僅為個別指定應用自訂更新率，打開該應用時自動切換，離開即恢復全局</string>
+    <string name="rules_banner_scope_notice">💡 功能說明：此頁面不是全局更新率開關！僅對您在下方清單單獨新增的應用生效（例如：讓閱讀軟體限頻省電、讓串流媒體解鎖 120Hz）。未新增的應用一律維持系統全局更新率。</string>
     <string name="rules_card_accessibility_title">前台感知與即時切換</string>
     <string name="rules_card_accessibility_subtitle">基於無障礙服務即時檢測前台使用中的應用並即時切換對應規則</string>
     <string name="rules_badge_service_running">服務運作中</string>
+    <string name="rules_badge_service_disabled">服務未開啟 (功能鎖定)</string>
     <string name="rules_btn_enable_accessibility">前往開啟無障礙</string>
-    <string name="rules_warning_accessibility">無障礙即時切換服務未開啟，分應用規則無法在前台自動切換生效。</string>
+    <string name="rules_btn_disable_accessibility">關閉服務</string>
+    <string name="rules_toast_accessibility_disabled">已關閉無障礙前台感知服務</string>
+    <string name="rules_warning_accessibility">無障礙即時切換服務未開啟，單應用規則無法在前台自動切換生效。</string>
+    <string name="rules_warning_accessibility_locked">單應用更新率規則依賴無障礙服務檢測當前開啟的應用。您仍可先在下方預設和儲存應用規則，開啟服務後即可自動生效。</string>
+    <string name="rules_toast_accessibility_required">請先開啟無障礙服務以使單應用更新率自動生效</string>
+    <string name="rules_rule_status_paused">已暫停 (無障礙未開啟)</string>
     <string name="rules_compat_policy_tip_title">為什麼抖音等串流媒體鎖定 60Hz？</string>
     <string name="rules_compat_policy_tip_desc">Android 系統內建了應用程式相容性限頻策略，預設將抖音、B站等串流媒體強制鎖定在 60Hz。三星設備請前往「開發人員選項」滑至最底部點擊「更多設定」，開啟「Disable app compatibility policies（停用應用程式相容性策略）」即可徹底解鎖 120Hz 高刷。</string>
     <string name="rules_btn_open_dev_options">前往開發人員選項</string>
@@ -380,26 +387,29 @@
     <string name="rules_btn_calibrate_ltpo">啟動自適應降頻</string>
     <string name="toast_calibrate_ltpo_success">已成功啟動 1Hz~120Hz 硬體級自適應降頻！畫面靜止時將瞬間跌入最低功耗。</string>
     <string name="toast_calibrate_ltpo_failed">校準失敗：%1$s</string>
-    <string name="rules_card_presets_title">常用場景預設</string>
+    <string name="rules_card_presets_title">第二步：選擇該應用的更新率方案</string>
     <string name="rules_preset_daily">日常自適應 (10~120Hz)</string>
     <string name="rules_preset_video">影片節能 (60Hz)</string>
     <string name="rules_preset_reading">閱讀護眼 (10~60Hz)</string>
     <string name="rules_preset_game">遊戲極速 (120Hz)</string>
-    <string name="rules_card_config_title">應用規則設定</string>
-    <string name="rules_select_app_hint">點擊選擇目標應用</string>
-    <string name="rules_switch_adaptive">自適應更新率</string>
-    <string name="rules_switch_adaptive_summary_on">在最低與最高更新率區間動態調節</string>
-    <string name="rules_switch_adaptive_summary_off">鎖定在最高更新率固定輸出</string>
-    <string name="rules_label_max_hz">最高更新率</string>
-    <string name="rules_label_min_hz">最低更新率</string>
-    <string name="rules_btn_save">儲存此規則</string>
+    <string name="rules_card_config_title">新建 / 編輯單應用規則</string>
+    <string name="rules_select_app_hint">第一步：點擊選擇目標應用</string>
+    <string name="rules_select_app_selected">當前配置應用：%1$s</string>
+    <string name="rules_switch_adaptive">該應用允許動態降頻 (LTPO)</string>
+    <string name="rules_switch_adaptive_summary_on">開啟後在該應用內按上下限動態調節；關閉則固定鎖死最高更新率</string>
+    <string name="rules_switch_adaptive_summary_off">已關閉動態降頻：在該應用內固定鎖死最高更新率輸出</string>
+    <string name="rules_label_max_hz">該應用最高更新率</string>
+    <string name="rules_label_min_hz">該應用最低更新率</string>
+    <string name="rules_btn_save">儲存此應用規則</string>
+    <string name="rules_btn_save_with_app">儲存「%1$s」的更新率規則</string>
+    <string name="rules_btn_select_and_save">＋ 選擇應用並新增規則</string>
     <string name="rules_btn_delete">刪除此規則</string>
-    <string name="rules_card_list_title">已生效的應用規則 (%1$d)</string>
-    <string name="rules_list_empty">暫無獨立應用規則，所有應用將遵循系統全局更新率。</string>
+    <string name="rules_card_list_title">已單獨指定更新率的應用 (%1$d)</string>
+    <string name="rules_list_empty">當前未對任何應用單獨設定規則\n所有應用均按系統全局更新率運作。如需為個別應用自訂更新率，請在上方選擇應用並新增。</string>
     <string name="rules_btn_clear_all">清空全部規則</string>
-    <string name="rules_toast_saved">已儲存應用規則</string>
-    <string name="rules_toast_deleted">已刪除應用規則</string>
-    <string name="rules_toast_cleared">已清空所有應用規則</string>
+    <string name="rules_toast_saved">已儲存該應用的專屬更新率規則</string>
+    <string name="rules_toast_deleted">已刪除該應用的更新率規則</string>
+    <string name="rules_toast_cleared">已清空所有單應用更新率規則</string>
 
     <!-- Settings Glass Screen -->
     <string name="settings_section_startup">啟動與服務常駐</string>

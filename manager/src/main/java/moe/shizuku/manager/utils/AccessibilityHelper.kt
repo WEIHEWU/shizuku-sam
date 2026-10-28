@@ -168,12 +168,21 @@ object AccessibilityHelper {
     }
 
     /**
+     * 检查当前是否有实际功能（单应用刷新率规则或游戏自动加速）依赖无障碍服务
+     */
+    fun hasActiveDependentFeatures(context: Context): Boolean {
+        return MaxHzPrefs.appRefreshRules(context).isNotEmpty() ||
+            MaxHzPrefs.gameAutoPerformanceEnabled(context)
+    }
+
+    /**
      * 巡检并秒级自愈无障碍服务（防掉线核心入口）。
      *
      * 任何时候当应用发现无障碍未存活且处于锁定状态时调用，安全防抖，异步执行，不卡死主线程。
      */
     fun ensureAccessibilityAlive(context: Context, force: Boolean = false) {
         if (!isAccessibilityLocked(context) && !force) return
+        if (!force && !hasActiveDependentFeatures(context)) return
         if (MaxHzAccessibilityService.isServiceAlive) return
 
         val now = SystemClock.uptimeMillis()
@@ -204,14 +213,21 @@ object AccessibilityHelper {
      */
     fun onServiceConnected(context: Context) {
         Log.i(TAG, "MaxHzAccessibilityService 已成功连接并在系统层面激活！")
-        setAccessibilityLocked(context, true)
+        if (hasActiveDependentFeatures(context)) {
+            setAccessibilityLocked(context, true)
+        }
     }
 
     /**
      * 当无障碍服务被系统解绑或进程被销毁时回调
      */
-    fun onServiceUnboundOrDied(context: Context) {
-        if (!isAccessibilityLocked(context)) return
+    fun onServiceUnboundOrDied(context: Context, manualDisableLikely: Boolean = false) {
+        if (manualDisableLikely) {
+            setAccessibilityLocked(context, false)
+            Log.i(TAG, "检测到用户在系统设置中主动关闭无障碍服务，已解除自愈锁定")
+            return
+        }
+        if (!isAccessibilityLocked(context) || !hasActiveDependentFeatures(context)) return
         Log.w(TAG, "无障碍服务发生解绑/断连，正在安排 1 秒后自动抢救...")
         helperScope.launch {
             delay(1000)
@@ -355,10 +371,11 @@ object AccessibilityHelper {
     }
 
     /**
-     * 主动彻底关闭即时切换无障碍服务
+     * 主动彻底关闭即时切换无障碍服务（优先调用 Android 7.0+ 原生 disableSelf，同时同步清理 Secure Settings）
      */
     fun disableInstantSwitch(context: Context): Boolean {
         setAccessibilityLocked(context, false)
+        val selfDisabled = MaxHzAccessibilityService.disableSelfIfRunning()
         val showArgs = ComponentName(context, MaxHzAccessibilityService::class.java).flattenToString()
         val cr = context.contentResolver
         val current = Settings.Secure.getString(cr, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES) ?: ""
@@ -379,7 +396,7 @@ object AccessibilityHelper {
             }
         }
         MaxHzAccessibilityService.invalidateCache()
-        return true
+        return selfDisabled || hasPermission || shellReady || !MaxHzAccessibilityService.isSettingEnabled(context)
     }
 
     /**

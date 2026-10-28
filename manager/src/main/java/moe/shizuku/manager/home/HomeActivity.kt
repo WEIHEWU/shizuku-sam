@@ -235,16 +235,101 @@ abstract class HomeActivity : MaxHzActivity() {
     }
 
     private fun syncSchemeAStates() {
+        val cr = contentResolver
+        val pm = getSystemService(android.os.PowerManager::class.java)
+
+        // 若当前特权通道已就绪，自动清理早先因服务未启动留下的陈旧报错日志，避免诊断中心状态矛盾
+        if (isServiceRunning() || isRootAvailableState.value || runCatching { MaxHzShell.isReady() }.getOrDefault(false)) {
+            val staleErr = MaxHzPrefs.resultText(this, "background_error").orEmpty()
+            if (staleErr.contains("未检测到已授权的 Root") || staleErr.contains("Shizuku 未运行")) {
+                MaxHzPrefs.clearResult(this, "background_error")
+            }
+        }
+
+        // 1. 先通过 ContentResolver 与 PowerManager 同步可读的真实系统状态
+        val sysSaver = runCatching {
+            pm?.isPowerSaveMode == true || Settings.Global.getInt(cr, "low_power", 0) == 1
+        }.getOrDefault(false)
+        val sysPerf = runCatching {
+            Settings.System.getInt(cr, "sem_enhanced_cpu_responsiveness", 0) == 1 ||
+                Settings.Global.getInt(cr, "sem_enhanced_cpu_responsiveness", 0) == 1
+        }.getOrDefault(false)
+
+        val storedTileMode = MaxHzPrefs.gameTileMode(this)
+        if ((storedTileMode == 1 || MaxHzPrefs.compatibleSaverEnabled(this)) && !sysSaver) {
+            MaxHzPrefs.setCompatibleSaverEnabled(this, false)
+            if (storedTileMode == 1) MaxHzPrefs.setGameTileMode(this, 0)
+        }
+        if ((storedTileMode == 2 || MaxHzPrefs.superPerformanceEnabled(this)) && sysSaver) {
+            MaxHzPrefs.markSuperPerformanceState(this, false)
+            if (storedTileMode == 2) MaxHzPrefs.setGameTileMode(this, 0)
+        }
+
         val tileMode = MaxHzPrefs.gameTileMode(this)
         gameTileModeState.intValue = when {
-            tileMode == 2 || MaxHzPrefs.superPerformanceEnabled(this) -> 2
+            tileMode == 2 || MaxHzPrefs.superPerformanceEnabled(this) || sysPerf -> 2
             tileMode == 1 || MaxHzPrefs.compatibleSaverEnabled(this) -> 1
             else -> 0
         }
+
+        runCatching { Settings.System.getInt(cr, "pass_through", -1) }.onSuccess { v ->
+            if (v != -1) {
+                val enabled = (v == 1)
+                if (enabled != MaxHzPrefs.passThroughEnabled(this)) {
+                    MaxHzPrefs.setPassThroughEnabled(this, enabled)
+                }
+            }
+        }
         passThroughState.value = MaxHzPrefs.passThroughEnabled(this)
+
+        runCatching { Settings.Global.getInt(cr, "protect_battery", -1) }.onSuccess { v ->
+            if (v != -1) {
+                val enabled = (v == 1)
+                if (enabled != MaxHzPrefs.batteryProtectionEnabled(this)) {
+                    MaxHzPrefs.setBatteryProtectionEnabled(this, enabled)
+                }
+            }
+        }
+        val currentLimit = runCatching { Settings.Global.getInt(cr, "battery_protection_threshold", -1) }
+            .getOrDefault(-1)
+            .let { if (it in 50..100) it else MaxHzPrefs.batteryLimit(this) }
+        val currentRecharge = runCatching { Settings.Global.getInt(cr, "ltc_release_threshold", -1) }
+            .getOrDefault(-1)
+            .let { if (it in 20..95) it else MaxHzPrefs.batteryRecharge(this) }
+        MaxHzPrefs.setBatteryProtectionConfig(this, currentLimit, currentRecharge)
         batteryProtectionState.value = MaxHzPrefs.batteryProtectionEnabled(this)
         batteryLimitState.intValue = MaxHzPrefs.batteryLimit(this)
         batteryRechargeState.intValue = MaxHzPrefs.batteryRecharge(this)
+
+        runCatching { Settings.Global.getString(cr, "cached_apps_freezer") }.onSuccess { v ->
+            val enabled = (v == "enabled")
+            if (enabled != MaxHzPrefs.mTombstoneEnabled(this)) {
+                MaxHzPrefs.setMTombstoneEnabled(this, enabled)
+            }
+        }
+        runCatching { Settings.Global.getString(cr, "device_idle_constants") }.onSuccess { v ->
+            val enabled = v?.contains("quick_doze_delay_to=60000") == true
+            if (enabled != MaxHzPrefs.quickDozeEnabled(this)) {
+                MaxHzPrefs.setQuickDozeEnabled(this, enabled)
+            }
+        }
+        runCatching { Settings.Secure.getLong(cr, "location_background_throttle_interval_ms", -1L) }.onSuccess { v ->
+            val enabled = (v >= 1800000L)
+            if (enabled != MaxHzPrefs.mLocationThrottleEnabled(this)) {
+                MaxHzPrefs.setMLocationThrottleEnabled(this, enabled)
+            }
+        }
+        runCatching { Settings.Global.getInt(cr, "wifi_scan_always_enabled", -1) }.onSuccess { v ->
+            if (v == 1 && MaxHzPrefs.scanGuardEnabled(this)) {
+                MaxHzPrefs.setScanGuardEnabled(this, false)
+            }
+        }
+        runCatching { Settings.Global.getInt(cr, "force_resizable_activities", -1) }.onSuccess { v ->
+            if (v != -1) {
+                MaxHzPrefs.saveResult(this, "force_resizable", if (v == 1) "1" else "0", true)
+            }
+        }
+
         gameAutoSwitchState.value = MaxHzPrefs.gameAutoPerformanceEnabled(this)
         gameAutoCountState.intValue = MaxHzPrefs.gameAutoPerformancePackages(this).size
         fpsMonitorState.value = MaxHzPrefs.fpsMonitorRunning(this)
@@ -261,6 +346,96 @@ abstract class HomeActivity : MaxHzActivity() {
         val cached = MaxHzPrefs.supportedRefreshRates(this)
         if (cached.isNotEmpty()) {
             supportedRefreshRatesState.value = cached
+        }
+
+        // 2. 若特权通道就绪，异步通过 Shell 精确核对隐藏/受限系统设置并回写真实状态
+        if (isServiceRunning() || isRootAvailableState.value) {
+            syncRealSystemSettingsViaShell()
+        }
+    }
+
+    private fun syncRealSystemSettingsViaShell() {
+        lifecycleScope.launch(Dispatchers.IO) {
+            if (!runCatching { MaxHzShell.isReady() }.getOrDefault(false)) return@launch
+            val r = MaxHzShell.exec(
+                """
+                echo "low_power=$(settings get global low_power 2>/dev/null)"
+                echo "sem_perf_sys=$(settings get system sem_enhanced_cpu_responsiveness 2>/dev/null)"
+                echo "sem_perf_glb=$(settings get global sem_enhanced_cpu_responsiveness 2>/dev/null)"
+                echo "pass_through=$(settings get system pass_through 2>/dev/null)"
+                echo "protect_battery=$(settings get global protect_battery 2>/dev/null)"
+                echo "protect_limit=$(settings get global battery_protection_threshold 2>/dev/null)"
+                echo "protect_recharge=$(settings get global ltc_release_threshold 2>/dev/null)"
+                echo "freezer=$(settings get global cached_apps_freezer 2>/dev/null)"
+                echo "doze_const=$(settings get global device_idle_constants 2>/dev/null)"
+                echo "loc_throttle=$(settings get secure location_background_throttle_interval_ms 2>/dev/null)"
+                echo "wifi_scan=$(settings get global wifi_scan_always_enabled 2>/dev/null)"
+                echo "ble_scan=$(settings get global ble_scan_always_enabled 2>/dev/null)"
+                echo "force_resiz=$(settings get global force_resizable_activities 2>/dev/null)"
+                echo "outdoor=$(settings get system display_outdoor_mode 2>/dev/null)"
+                """.trimIndent(),
+                timeoutSeconds = 4
+            )
+            if (r.code != 0) return@launch
+            val map = r.out.lineSequence()
+                .mapNotNull { line ->
+                    val idx = line.indexOf('=')
+                    if (idx <= 0) null else line.substring(0, idx).trim() to line.substring(idx + 1).trim()
+                }
+                .toMap()
+
+            val ctx = this@HomeActivity
+            val sysSaver = map["low_power"] == "1"
+            val sysPerf = map["sem_perf_sys"] == "1" || map["sem_perf_glb"] == "1"
+            val passThrough = map["pass_through"] == "1"
+            val protectBattery = map["protect_battery"] == "1"
+            val protectLimit = map["protect_limit"]?.toIntOrNull()
+            val protectRecharge = map["protect_recharge"]?.toIntOrNull()
+            val freezer = map["freezer"] == "enabled"
+            val quickDoze = map["doze_const"]?.contains("quick_doze_delay_to=60000") == true
+            val locThrottle = (map["loc_throttle"]?.toLongOrNull() ?: 0L) >= 1800000L
+            val scanGuard = map["wifi_scan"] == "0" && map["ble_scan"] == "0"
+            val forceResiz = map["force_resiz"] == "1"
+            val outdoor = map["outdoor"] == "1"
+
+            val storedMode = MaxHzPrefs.gameTileMode(ctx)
+            if ((storedMode == 1 || MaxHzPrefs.compatibleSaverEnabled(ctx)) && !sysSaver) {
+                MaxHzPrefs.setCompatibleSaverEnabled(ctx, false)
+                if (storedMode == 1) MaxHzPrefs.setGameTileMode(ctx, 0)
+            }
+            if ((storedMode == 2 || MaxHzPrefs.superPerformanceEnabled(ctx)) && sysSaver) {
+                MaxHzPrefs.markSuperPerformanceState(ctx, false)
+                if (storedMode == 2) MaxHzPrefs.setGameTileMode(ctx, 0)
+            }
+            MaxHzPrefs.setPassThroughEnabled(ctx, passThrough)
+            MaxHzPrefs.setBatteryProtectionEnabled(ctx, protectBattery)
+            val updatedLimit = if (protectLimit != null && protectLimit in 50..100) protectLimit else MaxHzPrefs.batteryLimit(ctx)
+            val updatedRecharge = if (protectRecharge != null && protectRecharge in 20..95) protectRecharge else MaxHzPrefs.batteryRecharge(ctx)
+            MaxHzPrefs.setBatteryProtectionConfig(ctx, updatedLimit, updatedRecharge)
+            MaxHzPrefs.setMTombstoneEnabled(ctx, freezer)
+            MaxHzPrefs.setQuickDozeEnabled(ctx, quickDoze)
+            MaxHzPrefs.setMLocationThrottleEnabled(ctx, locThrottle)
+            MaxHzPrefs.setScanGuardEnabled(ctx, scanGuard)
+            MaxHzPrefs.saveResult(ctx, "force_resizable", if (forceResiz) "1" else "0", true)
+
+            withContext(Dispatchers.Main) {
+                val finalMode = MaxHzPrefs.gameTileMode(ctx)
+                gameTileModeState.intValue = when {
+                    finalMode == 2 || MaxHzPrefs.superPerformanceEnabled(ctx) || sysPerf -> 2
+                    finalMode == 1 || MaxHzPrefs.compatibleSaverEnabled(ctx) -> 1
+                    else -> 0
+                }
+                passThroughState.value = passThrough
+                batteryProtectionState.value = protectBattery
+                batteryLimitState.intValue = MaxHzPrefs.batteryLimit(ctx)
+                batteryRechargeState.intValue = MaxHzPrefs.batteryRecharge(ctx)
+                tombstoneState.value = freezer
+                quickDozeState.value = quickDoze
+                locationThrottleState.value = locThrottle
+                scanGuardState.value = scanGuard
+                forceResizableState.value = forceResiz
+                outdoorModeState.value = outdoor
+            }
         }
     }
 
@@ -529,30 +704,25 @@ abstract class HomeActivity : MaxHzActivity() {
         onOpenLaboratoryClick = { handleOpenLaboratoryClick() },
         onOpenGameAutoConfigClick = { pushDetail(getString(R.string.detail_title_game_auto)) { gameAutoPerformanceCard() } },
         onSelectAppForAppRule = { callback ->
-            val hasPrivilege = isServiceRunning() || isRootAvailableState.value
-            if (!hasPrivilege) {
-                Toast.makeText(this, R.string.toast_service_not_running_start_first, Toast.LENGTH_SHORT).show()
-            } else if (!AccessibilityHelper.isInstantSwitchEnabled(this)) {
-                Toast.makeText(this, "无障碍服务尚未开启，请先开启无障碍服务", Toast.LENGTH_SHORT).show()
-                AccessibilityHelper.openInstantSwitchSettings(this)
-            } else {
-                showUserAppPicker { pkg, label ->
-                    callback(pkg, label)
-                }
+            showUserAppPicker { pkg, label ->
+                callback(pkg, label)
             }
         },
         onSaveAppRule = { rule ->
             val hasPrivilege = isServiceRunning() || isRootAvailableState.value
             if (!hasPrivilege) {
                 Toast.makeText(this, R.string.toast_service_not_running_start_first, Toast.LENGTH_SHORT).show()
-            } else if (!AccessibilityHelper.isInstantSwitchEnabled(this)) {
-                Toast.makeText(this, "无障碍服务尚未开启，请先开启无障碍服务", Toast.LENGTH_SHORT).show()
-                AccessibilityHelper.openInstantSwitchSettings(this)
             } else {
                 MaxHzPrefs.saveAppRefreshRule(this, rule)
                 appRulesState.value = MaxHzPrefs.appRefreshRules(this)
                 updateMaxHzServiceState()
                 Toast.makeText(this, R.string.rules_toast_saved, Toast.LENGTH_SHORT).show()
+                if (!AccessibilityHelper.isInstantSwitchEnabled(this)) {
+                    AccessibilityHelper.handleInstantSwitchClick(this) {
+                        isInstantSwitchActiveState.value = true
+                        updateMaxHzServiceState()
+                    }
+                }
             }
         },
         onDeleteAppRule = { pkg ->
@@ -572,6 +742,12 @@ abstract class HomeActivity : MaxHzActivity() {
                 isInstantSwitchActiveState.value = true
                 updateMaxHzServiceState()
             }
+        },
+        onDisableAccessibilityClick = {
+            AccessibilityHelper.disableInstantSwitch(this)
+            isInstantSwitchActiveState.value = false
+            updateMaxHzServiceState()
+            Toast.makeText(this, R.string.rules_toast_accessibility_disabled, Toast.LENGTH_SHORT).show()
         },
         onNightWakeupGuardClick = {
             pushDetail("待机异常唤醒排查") { nightWakeupGuardSection() }
@@ -776,15 +952,11 @@ abstract class HomeActivity : MaxHzActivity() {
             val (msg, finalMode) = withContext(Dispatchers.IO) {
                 when (mode) {
                     1 -> {
-                        val r = MaxHzController.applyDailySaver(
-                            MaxHzPrefs.quickDozeMaintenanceMinutes(this@HomeActivity),
-                            MaxHzPrefs.quickDozeNoMaintenance(this@HomeActivity)
-                        )
+                        val r = MaxHzController.applyCompatibleSaverAdaptive()
                         if (r.code == 0) {
                             MaxHzPrefs.setGameTileMode(this@HomeActivity, 1)
                             MaxHzPrefs.setCompatibleSaverEnabled(this@HomeActivity, true)
                             MaxHzPrefs.markSuperPerformanceState(this@HomeActivity, false)
-                            MaxHzPrefs.setQuickDozeEnabled(this@HomeActivity, true)
                             getString(R.string.toast_mode_switched_saver) to 1
                         } else {
                             val err = r.err.ifBlank { r.out }.ifBlank { "(${r.code})" }
@@ -798,7 +970,6 @@ abstract class HomeActivity : MaxHzActivity() {
                             MaxHzPrefs.setGameTileMode(this@HomeActivity, 2)
                             MaxHzPrefs.setCompatibleSaverEnabled(this@HomeActivity, false)
                             MaxHzPrefs.markSuperPerformanceState(this@HomeActivity, true, relaxed)
-                            MaxHzPrefs.setQuickDozeEnabled(this@HomeActivity, false)
                             getString(R.string.toast_mode_switched_game) to 2
                         } else {
                             val err = r.err.ifBlank { r.out }.ifBlank { "(${r.code})" }
@@ -811,7 +982,6 @@ abstract class HomeActivity : MaxHzActivity() {
                             MaxHzPrefs.setGameTileMode(this@HomeActivity, 0)
                             MaxHzPrefs.setCompatibleSaverEnabled(this@HomeActivity, false)
                             MaxHzPrefs.markSuperPerformanceState(this@HomeActivity, false)
-                            MaxHzPrefs.setQuickDozeEnabled(this@HomeActivity, false)
                             getString(R.string.toast_mode_switched_default) to 0
                         } else {
                             val err = r.err.ifBlank { r.out }.ifBlank { "(${r.code})" }

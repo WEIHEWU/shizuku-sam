@@ -159,6 +159,7 @@ class HomeActions(
     val onDeleteAppRule: (packageName: String) -> Unit = {},
     val onClearAppRules: () -> Unit = {},
     val onOpenAccessibilityClick: () -> Unit = {},
+    val onDisableAccessibilityClick: () -> Unit = {},
     val onNightWakeupGuardClick: () -> Unit = {},
     val onCalibrateLtpoAdaptiveClick: () -> Unit = {},
     val onSelectAppForGameAuto: ((onSelected: (packageName: String, label: String) -> Unit) -> Unit) = {},
@@ -1713,6 +1714,13 @@ private fun MiuixDiagnosticsCenterDialog(
     var isRestoring by remember(show) { mutableStateOf(false) }
     var restoreBanner by remember(show) { mutableStateOf<String?>(null) }
 
+    LaunchedEffect(show) {
+        if (show) {
+            actions.onSyncStates()
+            logRefreshTick++
+        }
+    }
+
     val channelLabel = remember(show, logRefreshTick) {
         runCatching { MaxHzShell.activePrivilegeChannelLabel() }.getOrDefault("未就绪")
     }
@@ -1722,7 +1730,10 @@ private fun MiuixDiagnosticsCenterDialog(
         gameTileMode,
         isPassThroughActive,
         isBatteryProtectionActive,
+        batteryProtectionLimit,
+        batteryProtectionRecharge,
         isGameAutoSwitchActive,
+        gameAutoPackageCount,
         isFpsMonitorActive,
         isOutdoorModeActive,
         isTombstoneActive,
@@ -1731,18 +1742,19 @@ private fun MiuixDiagnosticsCenterDialog(
         isLocationThrottleActive,
         isScanGuardActive,
         isForceResizableActive,
+        isInstantSwitchActive,
         appRulesCount
     ) {
         buildList {
             when (gameTileMode) {
-                1 -> add("• 全局性能模式：省电续航模式 (轻度性能配置 + 60Hz)")
+                1 -> add("• 全局性能模式：省电自适应高刷模式 (系统省电 + 120Hz 自适应)")
                 2 -> add("• 全局性能模式：满血游戏模式 (120Hz + 高触控采样)")
             }
             if (MaxHzPrefs.controlEnabled(context)) {
                 add("• 全局常驻刷新率控制：已开启")
             }
             if (appRulesCount > 0) {
-                add("• 分应用刷新率规则：已配置 $appRulesCount 款应用 (${if (isInstantSwitchActive) "即时切换生效中" else "无障碍未开启，已暂停"})")
+                add("• 单应用独立刷新率：已配置 $appRulesCount 款应用 (${if (isInstantSwitchActive) "即时切换生效中" else "无障碍未开启，已暂停"})")
             }
             if (isPassThroughActive) {
                 add("• 旁路供电 (暂停 USB PD 充电)：已开启")
@@ -1766,8 +1778,14 @@ private fun MiuixDiagnosticsCenterDialog(
         }
     }
 
-    val combinedLogs = remember(show, logRefreshTick) {
-        val errLogs = MaxHzPrefs.resultText(context, "background_error").orEmpty().trim()
+    val combinedLogs = remember(show, logRefreshTick, channelLabel) {
+        val rawErrLogs = MaxHzPrefs.resultText(context, "background_error").orEmpty().trim()
+        val errLogs = if (channelLabel != "未就绪" && (rawErrLogs.contains("未检测到已授权的 Root") || rawErrLogs.contains("Shizuku 未运行"))) {
+            MaxHzPrefs.clearResult(context, "background_error")
+            ""
+        } else {
+            rawErrLogs
+        }
         val gameLogs = MaxHzPrefs.resultText(context, "game_auto_runtime").orEmpty().trim()
         buildString {
             if (errLogs.isNotEmpty()) {
@@ -3138,24 +3156,41 @@ private fun AppRulesTabContent(
     val haptic = LocalHapticFeedback.current
     val context = LocalContext.current
     val pm = context.packageManager
+    val draftPrefs = remember(context) {
+        context.getSharedPreferences("maxhz_rule_draft", android.content.Context.MODE_PRIVATE)
+    }
 
     var targetPackage by remember { mutableStateOf<String?>(null) }
     var targetLabel by remember { mutableStateOf<String?>(null) }
-    var targetAdaptive by remember { mutableStateOf(true) }
-    var targetMaxHz by remember { mutableIntStateOf(120) }
-    var targetMinHz by remember { mutableIntStateOf(10) }
+    var hasTouchedPreset by remember { mutableStateOf(false) }
+    var targetAdaptive by remember {
+        mutableStateOf(draftPrefs.getBoolean("draft_adaptive", false))
+    }
+    var targetMaxHz by remember {
+        mutableIntStateOf(draftPrefs.getInt("draft_max_hz", 120))
+    }
+    var targetMinHz by remember {
+        mutableIntStateOf(draftPrefs.getInt("draft_min_hz", 10))
+    }
+
+    val updateDraftAdaptive: (Boolean) -> Unit = { value ->
+        targetAdaptive = value
+        draftPrefs.edit().putBoolean("draft_adaptive", value).apply()
+    }
+    val updateDraftMaxHz: (Int) -> Unit = { value ->
+        targetMaxHz = value
+        draftPrefs.edit().putInt("draft_max_hz", value).apply()
+    }
+    val updateDraftMinHz: (Int) -> Unit = { value ->
+        targetMinHz = value
+        draftPrefs.edit().putInt("draft_min_hz", value).apply()
+    }
 
     var headerGroupExpanded by remember { mutableStateOf(false) }
     var presetsGroupExpanded by remember { mutableStateOf(false) }
     var formGroupExpanded by remember { mutableStateOf(false) }
     var listGroupExpanded by remember { mutableStateOf(false) }
     var guideGroupExpanded by remember { mutableStateOf(false) }
-
-    val requireAccessibility: () -> Unit = {
-        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-        android.widget.Toast.makeText(context, R.string.rules_toast_accessibility_required, android.widget.Toast.LENGTH_SHORT).show()
-        actions.onOpenAccessibilityClick()
-    }
 
     LazyColumn(
         Modifier
@@ -3171,14 +3206,40 @@ private fun AppRulesTabContent(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item(key = "section-rules-header") {
-            SectionHeader(
-                title = stringResource(R.string.home_header_rules_title),
-                subtitle = stringResource(R.string.home_header_rules_subtitle),
-                isDark = isDark,
-                primaryColor = primaryColor,
-                expanded = headerGroupExpanded,
-                onToggle = { headerGroupExpanded = !headerGroupExpanded }
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                SectionHeader(
+                    title = stringResource(R.string.home_header_rules_title),
+                    subtitle = stringResource(R.string.home_header_rules_subtitle),
+                    isDark = isDark,
+                    primaryColor = primaryColor,
+                    expanded = headerGroupExpanded,
+                    onToggle = { headerGroupExpanded = !headerGroupExpanded }
+                )
+                // 常驻功能边界说明横幅，消除「全局开关 vs 单应用规则」混淆
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(
+                            if (isDark) primaryColor.copy(alpha = 0.14f)
+                            else primaryColor.copy(alpha = 0.09f)
+                        )
+                        .border(
+                            1.dp,
+                            if (isDark) primaryColor.copy(alpha = 0.30f) else primaryColor.copy(alpha = 0.22f),
+                            RoundedCornerShape(16.dp)
+                        )
+                        .padding(horizontal = 14.dp, vertical = 11.dp)
+                ) {
+                    Text(
+                        text = stringResource(R.string.rules_banner_scope_notice),
+                        fontSize = 12.sp,
+                        lineHeight = 17.5.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = if (isDark) MiuixTheme.colorScheme.onSurface else MiuixTheme.colorScheme.onSurface
+                    )
+                }
+            }
         }
 
         // 前台无障碍感知与即时切换状态卡
@@ -3248,6 +3309,23 @@ private fun AppRulesTabContent(
                                 .background(badgeBg)
                                 .padding(horizontal = 10.dp, vertical = 4.dp)
                         )
+                        if (isInstantSwitchActive) {
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = stringResource(R.string.rules_btn_disable_accessibility),
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (isDark) Color(0xFFF87171) else Color(0xFFE5484D),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(50))
+                                    .background(if (isDark) Color(0x2EF87171) else Color(0xFFFFECE8))
+                                    .clickable {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        actions.onDisableAccessibilityClick()
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                            )
+                        }
                     }
 
                     if (!isInstantSwitchActive) {
@@ -3290,26 +3368,74 @@ private fun AppRulesTabContent(
             }
         }
 
-        // 常用场景预设卡（2×2 宽敞点亮式冰蓝胶囊，支持方案 B）
-        item(key = "card-presets") {
-            var cardToggled by remember(presetsGroupExpanded) { mutableStateOf(false) }
-            val showSubtitle = presetsGroupExpanded xor cardToggled
-            Column(modifier = if (!isInstantSwitchActive) Modifier.alpha(0.45f) else Modifier) {
+        // 新建 / 编辑单应用规则卡（第一步选应用 -> 第二步选预设 -> 第三步调参数并保存）
+        item(key = "card-rule-form") {
+            var selectRowToggled by remember(formGroupExpanded) { mutableStateOf(false) }
+            var adaptiveRowToggled by remember(formGroupExpanded) { mutableStateOf(false) }
+            var maxHzRowToggled by remember(formGroupExpanded) { mutableStateOf(false) }
+            var minHzRowToggled by remember(formGroupExpanded) { mutableStateOf(false) }
+
+            Column {
                 GroupHeaderWithToggle(
-                    text = stringResource(R.string.rules_card_presets_title),
+                    text = stringResource(R.string.rules_card_config_title),
                     isDark = isDark,
                     primaryColor = primaryColor,
-                    expanded = showSubtitle,
-                    onToggle = { presetsGroupExpanded = !showSubtitle }
+                    expanded = formGroupExpanded,
+                    onToggle = {
+                        formGroupExpanded = !formGroupExpanded
+                        presetsGroupExpanded = formGroupExpanded
+                    }
                 )
                 GlassCard(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .onLongPressToggle(haptic) { cardToggled = !cardToggled },
+                    modifier = Modifier.fillMaxWidth(),
                     isDark = isDark,
                     isBlackNightTheme = isBlackNightTheme,
                     cornerRadius = 20.dp
                 ) {
+                    // 第一步：选择目标应用（置于最顶部，明确此卡片是针对特定应用配置）
+                    val showSelectSub = formGroupExpanded xor selectRowToggled
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .onLongPressToggle(haptic) { selectRowToggled = !selectRowToggled }
+                    ) {
+                        ArrowPreference(
+                            title = if (targetLabel != null) {
+                                stringResource(R.string.rules_select_app_selected, targetLabel!!)
+                            } else {
+                                stringResource(R.string.rules_select_app_hint)
+                            },
+                            summary = if (targetPackage != null) {
+                                targetPackage
+                            } else if (showSelectSub) {
+                                "点击从已安装应用中选择需要单独定制刷新率的 App"
+                            } else {
+                                "未选择应用（请先点击此处选择目标 App）"
+                            },
+                            onClick = {
+                                actions.onSelectAppForAppRule { pkg, label ->
+                                    targetPackage = pkg
+                                    targetLabel = label
+                                    hasTouchedPreset = true
+                                    val existingRule = appRules.firstOrNull { it.packageName == pkg }
+                                    if (existingRule != null) {
+                                        updateDraftAdaptive(existingRule.adaptive)
+                                        updateDraftMaxHz(existingRule.maxHz)
+                                        updateDraftMinHz(existingRule.minHz)
+                                    }
+                                }
+                            },
+                            startAction = {
+                                MiuixRowIcon(
+                                    isDark = isDark,
+                                    icon = painterResource(R.drawable.ic_maxhz_apps_24),
+                                    iconTint = primaryColor
+                                )
+                            }
+                        )
+                    }
+
+                    // 第二步：该应用的常用场景预设（未选应用且未点击预设时不默认高亮，防止被误认为全局模式）
                     val presets = listOf(
                         Triple(stringResource(R.string.rules_preset_daily), Pair(120, 10), true),
                         Triple(stringResource(R.string.rules_preset_video), Pair(60, 60), false),
@@ -3319,16 +3445,25 @@ private fun AppRulesTabContent(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(12.dp),
+                            .padding(horizontal = 16.dp, vertical = 6.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        Text(
+                            text = stringResource(R.string.rules_card_presets_title),
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                        )
                         presets.chunked(2).forEach { rowPresets ->
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 rowPresets.forEach { (name, rates, adaptive) ->
-                                    val isSelected = targetMaxHz == rates.first && targetMinHz == rates.second && targetAdaptive == adaptive
+                                    val isSelected = (targetPackage != null || hasTouchedPreset) &&
+                                        targetMaxHz == rates.first &&
+                                        targetMinHz == rates.second &&
+                                        targetAdaptive == adaptive
                                     val chipBg = when {
                                         isSelected && isDark -> primaryColor.copy(alpha = 0.24f)
                                         isSelected && !isDark -> primaryColor.copy(alpha = 0.14f)
@@ -3350,14 +3485,11 @@ private fun AppRulesTabContent(
                                             .background(chipBg)
                                             .border(1.dp, chipBorder, RoundedCornerShape(14.dp))
                                             .clickable {
-                                                if (!isInstantSwitchActive) {
-                                                    requireAccessibility()
-                                                    return@clickable
-                                                }
                                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                                targetMaxHz = rates.first
-                                                targetMinHz = rates.second
-                                                targetAdaptive = adaptive
+                                                hasTouchedPreset = true
+                                                updateDraftMaxHz(rates.first)
+                                                updateDraftMinHz(rates.second)
+                                                updateDraftAdaptive(adaptive)
                                             }
                                             .padding(horizontal = 14.dp, vertical = 11.dp),
                                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -3379,83 +3511,9 @@ private fun AppRulesTabContent(
                                 }
                             }
                         }
-
-                        AnimatedVisibility(
-                            visible = showSubtitle,
-                            enter = expandVertically() + fadeIn(),
-                            exit = shrinkVertically() + fadeOut()
-                        ) {
-                            Text(
-                                text = "点击预设可快速填充下方刷新率上/下限与 LTPO 自适应开关，选择目标应用后点击「保存并立即生效」即可。",
-                                fontSize = 11.5.sp,
-                                lineHeight = 16.sp,
-                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                modifier = Modifier
-                                    .padding(horizontal = 4.dp, vertical = 2.dp)
-                                    .clickable { cardToggled = !cardToggled }
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        // 目标应用与规则参数卡 (无分割线纯净 Miuix Card，支持方案 B)
-        item(key = "card-rule-form") {
-            var selectRowToggled by remember(formGroupExpanded) { mutableStateOf(false) }
-            var adaptiveRowToggled by remember(formGroupExpanded) { mutableStateOf(false) }
-            var maxHzRowToggled by remember(formGroupExpanded) { mutableStateOf(false) }
-            var minHzRowToggled by remember(formGroupExpanded) { mutableStateOf(false) }
-
-            Column(modifier = if (!isInstantSwitchActive) Modifier.alpha(0.45f) else Modifier) {
-                GroupHeaderWithToggle(
-                    text = stringResource(R.string.rules_card_config_title),
-                    isDark = isDark,
-                    primaryColor = primaryColor,
-                    expanded = formGroupExpanded,
-                    onToggle = { formGroupExpanded = !formGroupExpanded }
-                )
-                GlassCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    isDark = isDark,
-                    isBlackNightTheme = isBlackNightTheme,
-                    cornerRadius = 20.dp
-                ) {
-                    val showSelectSub = formGroupExpanded xor selectRowToggled
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .onLongPressToggle(haptic) { selectRowToggled = !selectRowToggled }
-                    ) {
-                        ArrowPreference(
-                            title = targetLabel ?: stringResource(R.string.rules_select_app_hint),
-                            summary = if (showSelectSub) (targetPackage ?: "点击从已安装应用中选择目标应用") else null,
-                            onClick = {
-                                if (!isInstantSwitchActive) {
-                                    requireAccessibility()
-                                    return@ArrowPreference
-                                }
-                                actions.onSelectAppForAppRule { pkg, label ->
-                                    targetPackage = pkg
-                                    targetLabel = label
-                                    val existingRule = appRules.firstOrNull { it.packageName == pkg }
-                                    if (existingRule != null) {
-                                        targetAdaptive = existingRule.adaptive
-                                        targetMaxHz = existingRule.maxHz
-                                        targetMinHz = existingRule.minHz
-                                    }
-                                }
-                            },
-                            startAction = {
-                                MiuixRowIcon(
-                                    isDark = isDark,
-                                    icon = painterResource(R.drawable.ic_maxhz_apps_24),
-                                    iconTint = primaryColor
-                                )
-                            }
-                        )
                     }
 
+                    // 第三步：该应用的动态降频开关与刷新率上下限
                     val showAdaptiveSub = formGroupExpanded xor adaptiveRowToggled
                     Box(
                         modifier = Modifier
@@ -3470,11 +3528,7 @@ private fun AppRulesTabContent(
                             } else null,
                             checked = targetAdaptive,
                             onCheckedChange = {
-                                if (!isInstantSwitchActive) {
-                                    requireAccessibility()
-                                    return@SwitchPreference
-                                }
-                                targetAdaptive = it
+                                updateDraftAdaptive(it)
                             }
                         )
                     }
@@ -3490,14 +3544,14 @@ private fun AppRulesTabContent(
                     ) {
                         WindowDropdownPreference(
                             title = stringResource(R.string.rules_label_max_hz),
-                            summary = if (showMaxHzSub) "应用在前台时允许达到的最高刷新率上限" else null,
+                            summary = if (showMaxHzSub) "该应用在前台运行时允许达到的最高刷新率上限" else null,
                             items = maxRateLabels,
                             selectedIndex = selectedMaxIndex,
-                            enabled = isInstantSwitchActive,
+                            enabled = true,
                             onSelectedIndexChange = { idx ->
                                 val hz = maxRates.getOrElse(idx) { 120 }
-                                targetMaxHz = hz
-                                if (targetMinHz > hz) targetMinHz = hz
+                                updateDraftMaxHz(hz)
+                                if (targetMinHz > hz) updateDraftMinHz(hz)
                             }
                         )
                     }
@@ -3514,13 +3568,13 @@ private fun AppRulesTabContent(
                         ) {
                             WindowDropdownPreference(
                                 title = stringResource(R.string.rules_label_min_hz),
-                                summary = if (showMinHzSub) "画面静止时允许 LTPO 降频到的最低刷新率下限" else null,
+                                summary = if (showMinHzSub) "在该应用内画面静止时允许 LTPO 降频到的最低刷新率下限" else null,
                                 items = minRateLabels,
                                 selectedIndex = selectedMinIndex,
-                                enabled = isInstantSwitchActive,
+                                enabled = true,
                                 onSelectedIndexChange = { idx ->
                                     val hz = minRates.getOrElse(idx) { 10 }
-                                    targetMinHz = hz
+                                    updateDraftMinHz(hz)
                                 }
                             )
                         }
@@ -3533,22 +3587,32 @@ private fun AppRulesTabContent(
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         val pkg = targetPackage
+                        val lbl = targetLabel
                         val hasExisting = pkg != null && appRules.any { it.packageName == pkg }
 
                         GlassPillButton(
-                            text = stringResource(R.string.rules_btn_save),
+                            text = if (!lbl.isNullOrBlank()) {
+                                stringResource(R.string.rules_btn_save_with_app, lbl)
+                            } else {
+                                stringResource(R.string.rules_btn_select_and_save)
+                            },
                             isDark = isDark,
                             style = GlassButtonStyle.Prominent(primaryColor),
                             modifier = Modifier.weight(1f),
                             onClick = {
-                                if (!isInstantSwitchActive) {
-                                    requireAccessibility()
-                                    return@GlassPillButton
-                                }
                                 if (pkg.isNullOrBlank()) {
                                     actions.onSelectAppForAppRule { p, l ->
                                         targetPackage = p
                                         targetLabel = l
+                                        val minHz = if (targetAdaptive) targetMinHz else targetMaxHz
+                                        actions.onSaveAppRule(
+                                            MaxHzPrefs.AppRefreshRule(
+                                                packageName = p,
+                                                adaptive = targetAdaptive,
+                                                maxHz = targetMaxHz,
+                                                minHz = minHz
+                                            )
+                                        )
                                     }
                                 } else {
                                     val minHz = if (targetAdaptive) targetMinHz else targetMaxHz
@@ -3574,6 +3638,7 @@ private fun AppRulesTabContent(
                                     actions.onDeleteAppRule(pkg)
                                     targetPackage = null
                                     targetLabel = null
+                                    hasTouchedPreset = false
                                 }
                             )
                         }
@@ -3633,15 +3698,12 @@ private fun AppRulesTabContent(
                                         title = label,
                                         summary = if (showPkg) rule.packageName else null,
                                         onClick = {
-                                            if (!isInstantSwitchActive) {
-                                                requireAccessibility()
-                                                return@BasicComponent
-                                            }
                                             targetPackage = rule.packageName
                                             targetLabel = label
-                                            targetAdaptive = rule.adaptive
-                                            targetMaxHz = rule.maxHz
-                                            targetMinHz = rule.minHz
+                                            hasTouchedPreset = true
+                                            updateDraftAdaptive(rule.adaptive)
+                                            updateDraftMaxHz(rule.maxHz)
+                                            updateDraftMinHz(rule.minHz)
                                         },
                                         startAction = {
                                             MiuixRowIcon(

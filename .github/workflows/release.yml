@@ -491,8 +491,40 @@ jobs:
           files: |
             releases/Shizuku-Sam-v13.8.34.apk
 
+      - name: "Publish Release v13.8.35 (Fix Diagnostics State Sync, Accessibility Turn-Off & Per-App Refresh Rate UX)"
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/v13.8.35')
+        with:
+          tag_name: v13.8.35
+          name: "Shizuku Sam v13.8.35 — 修复诊断中心状态同步、无障碍一键关闭与「单应用独立刷新率」交互重构"
+          body: |
+            ### Shizuku Sam v13.8.35
+
+            #### 🔍 修复「运行状态与覆盖项诊断中心」及首页开关与真实系统状态不一致
+            - **实时核对系统底层真实状态 (`HomeActivity.kt`)**：
+              - 每次返回首页或打开诊断中心时，通过 `PowerManager`、`ContentResolver` 及特权 Shell 异步回读 `low_power`、`sem_enhanced_cpu_responsiveness`、`pass_through`、`protect_battery`（区分三星基础保护 `3` 与自定义上限保护 `1`）、`cached_apps_freezer`、`device_idle_constants`、`location_background_throttle_interval_ms`、`wifi_scan_always_enabled`、`force_resizable_activities` 等底层真实值，彻底消除缓存开关与系统实际状态脱节的问题。
+            - **修正省电自适应高刷文案与独立开关隔离 (`HomeActivity.kt` / `HomeGlassScreen.kt`)**：
+              - 诊断中心 Mode 1 描述修正为 `• 全局性能模式：省电自适应高刷模式 (系统省电 + 120Hz 自适应)`；切换该模式时不再隐式污染独立的 `Quick Doze` 开关状态。
+            - **自动清理已过期的未授权报错记录 (`HomeActivity.kt` / `HomeGlassScreen.kt`)**：
+              - 当检测到 Root / Shizuku 特权通道已就绪时，自动清除早期因未授权留下的历史报错记录，避免诊断中心上下状态矛盾。
+
+            #### ♿ 修复无障碍服务「开启后无法关闭」问题
+            - **新增「关闭服务」一键按钮与原生 `disableSelf()` 支持 (`MaxHzAccessibilityService.kt` / `AccessibilityHelper.kt` / `HomeGlassScreen.kt`)**：
+              - 在「单应用独立刷新率」页面的无障碍卡片上新增 **「关闭服务」** 按钮，结合 Android 原生 `AccessibilityService.disableSelf()` 与 `Settings.Secure` 清理，无需跳转系统设置即可一键停用。
+              - 收紧后台无障碍保活自愈逻辑：仅当存在依赖无障碍的启用项（已配置单应用规则或开启了游戏自动加速）时才启用自愈，且识别到用户在系统「设置」手动关闭无障碍时不再强行重开。
+
+            #### 🎨 重构「单应用独立刷新率」页面，消除与全局刷新率的认知混淆
+            - **顶部常驻功能边界说明横幅 (`HomeGlassScreen.kt` / `strings.xml`)**：
+              - 标题更新为 **「单应用独立刷新率」**，顶部常驻提示：*「💡 功能说明：此页面不是全局刷新率开关！仅对您在下方列表单独添加的应用生效……未添加的应用一律保持系统全局刷新率。」*
+            - **按「第 1 步 → 第 2 步 → 第 3 步」重构规则配置流程**：
+              - **第一步：点击选择目标应用**（置于卡片最顶部，未选时明确提示）；
+              - **第二步：选择该应用的刷新率方案**（未选应用且未点击预设时不默认高亮任何胶囊，避免误认为全局档位）；
+              - **第三步：该应用允许动态降频 (LTPO) 与上下限**（移除无障碍未开启时的强制拦截，并持久化草稿开关状态，彻底解决开关无法关闭或切页自动弹回开启的问题）。
+          files: |
+            releases/Shizuku-Sam-v13.8.35.apk
+
       - name: Publish Future Version Tag Release
-        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2' && github.ref_name != 'v13.8.3' && github.ref_name != 'v13.8.4' && github.ref_name != 'v13.8.5' && github.ref_name != 'v13.8.6' && github.ref_name != 'v13.8.7' && github.ref_name != 'v13.8.8' && github.ref_name != 'v13.8.9' && github.ref_name != 'v13.8.10' && github.ref_name != 'v13.8.11' && github.ref_name != 'v13.8.19' && github.ref_name != 'v13.8.20' && github.ref_name != 'v13.8.21' && github.ref_name != 'v13.8.22' && github.ref_name != 'v13.8.23' && github.ref_name != 'v13.8.27' && github.ref_name != 'v13.8.28' && github.ref_name != 'v13.8.29' && github.ref_name != 'v13.8.30' && github.ref_name != 'v13.8.31' && github.ref_name != 'v13.8.32' && github.ref_name != 'v13.8.33' && github.ref_name != 'v13.8.34'
+        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2' && github.ref_name != 'v13.8.3' && github.ref_name != 'v13.8.4' && github.ref_name != 'v13.8.5' && github.ref_name != 'v13.8.6' && github.ref_name != 'v13.8.7' && github.ref_name != 'v13.8.8' && github.ref_name != 'v13.8.9' && github.ref_name != 'v13.8.10' && github.ref_name != 'v13.8.11' && github.ref_name != 'v13.8.19' && github.ref_name != 'v13.8.20' && github.ref_name != 'v13.8.21' && github.ref_name != 'v13.8.22' && github.ref_name != 'v13.8.23' && github.ref_name != 'v13.8.27' && github.ref_name != 'v13.8.28' && github.ref_name != 'v13.8.29' && github.ref_name != 'v13.8.30' && github.ref_name != 'v13.8.31' && github.ref_name != 'v13.8.32' && github.ref_name != 'v13.8.33' && github.ref_name != 'v13.8.34' && github.ref_name != 'v13.8.35'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}

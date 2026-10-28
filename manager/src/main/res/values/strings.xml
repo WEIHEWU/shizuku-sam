@@ -432,16 +432,19 @@ With %1$s, in any terminal app, you can connect to and interact with the shell r
     <string name="toast_auto_pairing_ready">Pairing assistant is ready! Tap \"Pair device with pairing code\" to pair automatically.</string>
 
     <!-- Tab 2: App Rules -->
-    <string name="home_header_rules_title">Per-App Refresh Rate</string>
-    <string name="home_header_rules_subtitle">Assign custom adaptive or fixed refresh rates to specific apps</string>
+    <string name="home_header_rules_title">Per-App Custom Refresh Rate</string>
+    <string name="home_header_rules_subtitle">Assign exclusive refresh rates to individual apps; restores global rate on exit</string>
+    <string name="rules_banner_scope_notice">💡 Note: This page is NOT a global refresh rate setting! It only applies to specific apps you add below. Any app not in the list will continue to follow your system global refresh rate.</string>
     <string name="rules_card_accessibility_title">Foreground App Detection</string>
     <string name="rules_card_accessibility_subtitle">Monitors active foreground apps via Accessibility Service to switch rates seamlessly</string>
     <string name="rules_badge_service_running">Service Running</string>
     <string name="rules_badge_service_disabled">Service Disabled</string>
     <string name="rules_btn_enable_accessibility">Enable Accessibility</string>
+    <string name="rules_btn_disable_accessibility">Turn Off Service</string>
+    <string name="rules_toast_accessibility_disabled">Accessibility foreground detection service disabled</string>
     <string name="rules_warning_accessibility">Accessibility service is not enabled. Rules will not switch automatically.</string>
-    <string name="rules_warning_accessibility_locked">App-specific refresh rate rules strictly require the Accessibility Service to detect foreground apps. This feature is disabled until the service is turned on.</string>
-    <string name="rules_toast_accessibility_required">Accessibility Service must be enabled to use per-app rules</string>
+    <string name="rules_warning_accessibility_locked">Per-app refresh rate rules require the Accessibility Service to detect foreground apps. You can configure and save rules below, and enable the service when ready.</string>
+    <string name="rules_toast_accessibility_required">Enable Accessibility Service for per-app rules to take effect automatically</string>
     <string name="rules_rule_status_paused">Paused (Service Off)</string>
     <string name="rules_compat_policy_tip_title">Why Some Apps (e.g. TikTok) Lock at 60Hz?</string>
     <string name="rules_compat_policy_tip_desc">Android and One UI have built-in compatibility policies that force video streaming apps (TikTok, etc.) to 60Hz. On Samsung devices, go to Developer Options, scroll to the bottom and enter \"More settings\", then enable \"Disable app compatibility policies\" to unlock full 120Hz.</string>
@@ -451,26 +454,29 @@ With %1$s, in any terminal app, you can connect to and interact with the shell r
     <string name="rules_btn_calibrate_ltpo">Activate Adaptive Refresh</string>
     <string name="toast_calibrate_ltpo_success">Successfully activated 1Hz~120Hz native LTPO adaptive refresh! Lowest power achieved when screen is idle.</string>
     <string name="toast_calibrate_ltpo_failed">Calibration failed: %1$s</string>
-    <string name="rules_card_presets_title">Scenario Presets</string>
+    <string name="rules_card_presets_title">Step 2: Choose Preset for This App</string>
     <string name="rules_preset_daily">Daily Adaptive (10~120Hz)</string>
     <string name="rules_preset_video">Video Saver (60Hz)</string>
     <string name="rules_preset_reading">Reading (10~60Hz)</string>
     <string name="rules_preset_game">Gaming Max (120Hz)</string>
-    <string name="rules_card_config_title">App Rule Configuration</string>
-    <string name="rules_select_app_hint">Tap to select target app</string>
-    <string name="rules_switch_adaptive">Adaptive Refresh Rate</string>
-    <string name="rules_switch_adaptive_summary_on">Dynamically scales between minimum and maximum rate</string>
-    <string name="rules_switch_adaptive_summary_off">Locks display to fixed maximum refresh rate</string>
-    <string name="rules_label_max_hz">Max Refresh Rate</string>
-    <string name="rules_label_min_hz">Min Refresh Rate</string>
-    <string name="rules_btn_save">Save Rule</string>
+    <string name="rules_card_config_title">Create / Edit Per-App Rule</string>
+    <string name="rules_select_app_hint">Step 1: Tap to select target app</string>
+    <string name="rules_select_app_selected">Target App: %1$s</string>
+    <string name="rules_switch_adaptive">Allow Dynamic Scaling (LTPO) for This App</string>
+    <string name="rules_switch_adaptive_summary_on">Dynamically scales between min and max rate inside this app; turn off to lock max rate</string>
+    <string name="rules_switch_adaptive_summary_off">Dynamic scaling off: locks display to fixed maximum refresh rate inside this app</string>
+    <string name="rules_label_max_hz">App Max Refresh Rate</string>
+    <string name="rules_label_min_hz">App Min Refresh Rate</string>
+    <string name="rules_btn_save">Save App Rule</string>
+    <string name="rules_btn_save_with_app">Save Rule for \"%1$s\"</string>
+    <string name="rules_btn_select_and_save">+ Select App &amp; Add Rule</string>
     <string name="rules_btn_delete">Delete Rule</string>
-    <string name="rules_card_list_title">Configured Rules (%1$d)</string>
-    <string name="rules_list_empty">No custom rules. All apps follow system global refresh rate.</string>
+    <string name="rules_card_list_title">Apps with Custom Refresh Rate (%1$d)</string>
+    <string name="rules_list_empty">No apps have custom rules yet.\nAll apps are running at the system global refresh rate. Select an app above to add a rule.</string>
     <string name="rules_btn_clear_all">Clear All Rules</string>
-    <string name="rules_toast_saved">Rule saved</string>
-    <string name="rules_toast_deleted">Rule removed</string>
-    <string name="rules_toast_cleared">All rules cleared</string>
+    <string name="rules_toast_saved">Saved custom rule for this app</string>
+    <string name="rules_toast_deleted">Removed custom rule for this app</string>
+    <string name="rules_toast_cleared">All per-app rules cleared</string>
 
     <!-- Settings Glass Screen -->
     <string name="settings_section_startup">Startup &amp; Background Daemon</string>
