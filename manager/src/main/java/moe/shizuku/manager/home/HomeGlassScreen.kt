@@ -166,6 +166,7 @@ class HomeActions(
     val onApplyQuickDozeConfig: (enabled: Boolean, minutes: Int, noMaintenance: Boolean, onResult: (Boolean, String) -> Unit) -> Unit = { _, _, _, _ -> },
     val onReadQuickDozeStatus: (onResult: (String) -> Unit) -> Unit = { _ -> },
     val onRunAppLaunchBoostAction: (actionType: Int, onResult: (Boolean, String) -> Unit) -> Unit = { _, _ -> },
+    val onOpenCustomAotPickerClick: () -> Unit = {},
     val onSyncStates: () -> Unit = {},
     val onExecuteRestoreAllDefaults: (onResult: (Boolean, String) -> Unit) -> Unit = { _ -> }
 )
@@ -1612,6 +1613,15 @@ private fun MiuixAppLaunchBoostDialog(
                         isWorking = false
                         statusText = msg
                     }
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            TextButton(
+                text = "🎯 自选应用 ART 预编译 (热点/全量/已编译管理)",
+                enabled = !isWorking,
+                onClick = {
+                    actions.onOpenCustomAotPickerClick()
                 },
                 modifier = Modifier.fillMaxWidth()
             )

@@ -275,14 +275,6 @@ class MaxHzService : Service() {
         if (!hasRefreshOverride) {
             return null
         }
-        if (!foregroundPackage.isNullOrBlank() &&
-            (MaxHzPackagePolicy.isGameApp(this, foregroundPackage) || MaxHzController.isSamsungGamePackage(foregroundPackage))
-        ) {
-            return RefreshMode("game_passthrough:$foregroundPackage") {
-                MaxHzController.restoreGameDisplayDefaults(foregroundPackage)
-            }
-        }
-
         val rule = foregroundRefreshRule(appRules)
         if (rule != null) {
             return if (rule.adaptive) {
@@ -293,6 +285,14 @@ class MaxHzService : Service() {
                 RefreshMode("app:${rule.packageName}:static:${rule.maxHz}") {
                     MaxHzRefreshSettings.applyStaticRefreshRate(it, rule.maxHz)
                 }
+            }
+        }
+
+        if (!foregroundPackage.isNullOrBlank() &&
+            (MaxHzPackagePolicy.isGameApp(this, foregroundPackage) || MaxHzController.isSamsungGamePackage(foregroundPackage))
+        ) {
+            return RefreshMode("game_passthrough:$foregroundPackage") {
+                MaxHzController.restoreGameDisplayDefaults(foregroundPackage)
             }
         }
 
@@ -313,8 +313,7 @@ class MaxHzService : Service() {
 
     private fun isGameAutoPerformanceForeground(packageName: String): Boolean {
         if (!MaxHzPrefs.gameAutoPerformanceEnabled(this)) return false
-        if (MaxHzPrefs.gameAutoPerformancePackages(this).contains(packageName) ||
-            MaxHzPackagePolicy.isGameApp(this, packageName)) return true
+        if (MaxHzPrefs.gameAutoPerformancePackages(this).contains(packageName)) return true
         return isGameAutoSessionBusy()
     }
 

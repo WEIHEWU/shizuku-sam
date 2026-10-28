@@ -5365,7 +5365,7 @@ open class MaxHzActivity : AppBarActivity() {
         ), gap)
     }
 
-    private fun showAotSpecificAppsPickerDialog(onCompleteState: () -> Unit) {
+    protected fun showAotSpecificAppsPickerDialog(onCompleteState: () -> Unit) {
         if (!runCatching { MaxHzShell.isReady() }.getOrDefault(false)) {
             Toast.makeText(this, "特权通道未就绪，请先启动 Shizuku 或授予 Root 权限", Toast.LENGTH_SHORT).show()
             return
@@ -5379,6 +5379,7 @@ open class MaxHzActivity : AppBarActivity() {
 
         lifecycleScope.launch {
             val allApps = withContext(Dispatchers.IO) {
+                val launchableSet = MaxHzPackagePolicy.getLaunchablePackages(this@MaxHzActivity)
                 val installed = try {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                         packageManager.getInstalledApplications(PackageManager.ApplicationInfoFlags.of(0))
@@ -5399,17 +5400,23 @@ open class MaxHzActivity : AppBarActivity() {
                     }
                     .map { info ->
                         val label = safeLoadLabel(info)
-                        val isSys = isSystemApp(info)
                         val trustClass = MaxHzPackagePolicy.trustClass(this@MaxHzActivity, info)
+                        val isSys = trustClass != MaxHzPackagePolicy.AppTrustClass.USER_APP
                         UserAppChoice(
                             label = label,
                             packageName = info.packageName,
                             systemApp = isSys,
-                            trustClass = trustClass
+                            trustClass = trustClass,
+                            isGame = MaxHzPackagePolicy.isGameApp(this@MaxHzActivity, info),
+                            isLaunchable = info.packageName in launchableSet
                         )
                     }
                     .distinctBy { it.packageName }
-                    .sortedWith(compareBy<UserAppChoice> { it.systemApp }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.label })
+                    .sortedWith(
+                        compareBy<UserAppChoice> { it.systemApp }
+                            .thenByDescending { it.isLaunchable }
+                            .thenBy(String.CASE_INSENSITIVE_ORDER) { it.label }
+                    )
                     .toList()
             }
 
@@ -7449,11 +7456,13 @@ open class MaxHzActivity : AppBarActivity() {
         }
     }
 
-    private data class UserAppChoice(
+    protected data class UserAppChoice(
         val label: String,
         val packageName: String,
         val systemApp: Boolean = false,
-        val trustClass: MaxHzPackagePolicy.AppTrustClass = MaxHzPackagePolicy.AppTrustClass.USER_APP
+        val trustClass: MaxHzPackagePolicy.AppTrustClass = MaxHzPackagePolicy.AppTrustClass.USER_APP,
+        val isGame: Boolean = false,
+        val isLaunchable: Boolean = true
     )
 
     private data class AppDisplayInfo(
@@ -7502,6 +7511,7 @@ open class MaxHzActivity : AppBarActivity() {
     }
 
     private fun loadDozeWhitelistTargetApps(whitelist: Set<String>): List<UserAppChoice> {
+        val launchableSet = MaxHzPackagePolicy.getLaunchablePackages(this)
         val installed = try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 packageManager.getInstalledApplications(PackageManager.ApplicationInfoFlags.of(0))
@@ -7526,16 +7536,31 @@ open class MaxHzActivity : AppBarActivity() {
                     label = label,
                     packageName = it.packageName,
                     systemApp = systemApp,
-                    trustClass = trustClass
+                    trustClass = trustClass,
+                    isGame = MaxHzPackagePolicy.isGameApp(this, it),
+                    isLaunchable = it.packageName in launchableSet
                 )
             }
         val whitelistOnly = whitelist
             .asSequence()
             .filterNot { it in installedPackages }
-            .map { UserAppChoice(label = it, packageName = it, systemApp = true, trustClass = MaxHzPackagePolicy.AppTrustClass.SUSPECTED_PRELOAD) }
+            .map {
+                UserAppChoice(
+                    label = it,
+                    packageName = it,
+                    systemApp = true,
+                    trustClass = MaxHzPackagePolicy.AppTrustClass.SUSPECTED_PRELOAD,
+                    isLaunchable = false
+                )
+            }
         return (visible + whitelistOnly)
             .distinctBy { it.packageName }
-            .sortedWith(compareByDescending<UserAppChoice> { it.packageName in whitelist }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.label })
+            .sortedWith(
+                compareByDescending<UserAppChoice> { it.packageName in whitelist }
+                    .thenBy { it.systemApp }
+                    .thenByDescending { it.isLaunchable }
+                    .thenBy(String.CASE_INSENSITIVE_ORDER) { it.label }
+            )
             .toList()
     }
 
@@ -7550,7 +7575,7 @@ open class MaxHzActivity : AppBarActivity() {
                 AbsListView.LayoutParams.WRAP_CONTENT
             )
             addView(TextView(this@MaxHzActivity).apply {
-                text = app.label
+                text = if (app.isGame) "🎮 ${app.label}" else app.label
                 textSize = 14f
                 setTextColor(themeColors.onSurface)
                 includeFontPadding = false
@@ -7559,7 +7584,8 @@ open class MaxHzActivity : AppBarActivity() {
             })
             if (showSubtitle) {
                 addView(TextView(this@MaxHzActivity).apply {
-                    text = "${appKindShort(app.trustClass)} · ${app.packageName}"
+                    val gameTag = if (app.isGame) "游戏 · " else ""
+                    text = "$gameTag${appKindShort(app.trustClass)} · ${app.packageName}"
                     textSize = 11.5f
                     setTextColor(themeColors.onSurfaceVariant)
                     includeFontPadding = false
@@ -7773,7 +7799,7 @@ open class MaxHzActivity : AppBarActivity() {
         }
     }
 
-    private fun showGameAutoAppPicker(onSelected: (UserAppChoice) -> Unit) {
+    protected fun showGameAutoAppPicker(onSelected: (UserAppChoice) -> Unit) {
         val loadingDialog = MaterialAlertDialogBuilder(this)
             .setTitle("添加游戏")
             .setView(emptyText("正在加载应用列表..."))
@@ -7793,7 +7819,7 @@ open class MaxHzActivity : AppBarActivity() {
                     .setTitle("添加游戏")
                     .setView(appPickerContentView(
                         apps,
-                        "默认选择游戏或需要高性能的应用。只有名单内应用进入前台时才会自动切换。"
+                        "已识别的游戏优先置顶（带 🎮 标识），也可选择其他需要高性能的应用。"
                     ) { app ->
                         onSelected(app)
                         dialog.dismiss()
@@ -7840,6 +7866,7 @@ open class MaxHzActivity : AppBarActivity() {
     }
 
     private fun loadRefreshRateTargetApps(): List<UserAppChoice> {
+        val launchableSet = MaxHzPackagePolicy.getLaunchablePackages(this)
         val apps = try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 packageManager.getInstalledApplications(PackageManager.ApplicationInfoFlags.of(0))
@@ -7863,16 +7890,23 @@ open class MaxHzActivity : AppBarActivity() {
                     label = label,
                     packageName = it.packageName,
                     systemApp = systemApp,
-                    trustClass = trustClass
+                    trustClass = trustClass,
+                    isGame = MaxHzPackagePolicy.isGameApp(this, it),
+                    isLaunchable = it.packageName in launchableSet
                 )
             }
             .distinctBy { it.packageName }
-            .sortedWith(compareBy<UserAppChoice> { it.systemApp }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.label })
+            .sortedWith(
+                compareBy<UserAppChoice> { it.systemApp }
+                    .thenByDescending { it.isLaunchable }
+                    .thenBy(String.CASE_INSENSITIVE_ORDER) { it.label }
+            )
             .toList()
     }
 
     private fun loadNightWakeupGuardTargetApps(): List<UserAppChoice> {
         val guarded = MaxHzPrefs.nightWakeupGuardPackages(this).toSet()
+        val launchableSet = MaxHzPackagePolicy.getLaunchablePackages(this)
         val appFlags = PackageManager.MATCH_DISABLED_COMPONENTS
         val apps = try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -7898,11 +7932,17 @@ open class MaxHzActivity : AppBarActivity() {
                     label = label,
                     packageName = it.packageName,
                     systemApp = systemApp,
-                    trustClass = trustClass
+                    trustClass = trustClass,
+                    isGame = MaxHzPackagePolicy.isGameApp(this, it),
+                    isLaunchable = it.packageName in launchableSet
                 )
             }
             .distinctBy { it.packageName }
-            .sortedWith(compareBy<UserAppChoice> { it.systemApp }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.label })
+            .sortedWith(
+                compareBy<UserAppChoice> { it.systemApp }
+                    .thenByDescending { it.isLaunchable }
+                    .thenBy(String.CASE_INSENSITIVE_ORDER) { it.label }
+            )
             .toList()
     }
 
@@ -7914,6 +7954,7 @@ open class MaxHzActivity : AppBarActivity() {
 
     private fun loadGameAutoTargetApps(): List<UserAppChoice> {
         val existing = MaxHzPrefs.gameAutoPerformancePackages(this).toSet()
+        val launchableSet = MaxHzPackagePolicy.getLaunchablePackages(this)
         val apps = try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 packageManager.getInstalledApplications(PackageManager.ApplicationInfoFlags.of(0L))
@@ -7928,22 +7969,31 @@ open class MaxHzActivity : AppBarActivity() {
             .asSequence()
             .filter { it.enabled }
             .filter { isPackageNameValid(it.packageName) }
+            .filter { (it.flags and ApplicationInfo.FLAG_HAS_CODE) != 0 }
             .filterNot { it.packageName == packageName }
             .filterNot { it.packageName in existing }
             .map {
                 val label = safeLoadLabel(it)
                 val trustClass = MaxHzPackagePolicy.trustClass(this, it)
                 val systemApp = trustClass != MaxHzPackagePolicy.AppTrustClass.USER_APP
+                val isGame = MaxHzPackagePolicy.isGameApp(this, it)
                 rememberAppDisplay(it.packageName, label, trustClass)
                 UserAppChoice(
                     label = label,
                     packageName = it.packageName,
                     systemApp = systemApp,
-                    trustClass = trustClass
+                    trustClass = trustClass,
+                    isGame = isGame,
+                    isLaunchable = it.packageName in launchableSet
                 )
             }
             .distinctBy { it.packageName }
-            .sortedWith(compareBy<UserAppChoice> { it.systemApp }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.label })
+            .sortedWith(
+                compareBy<UserAppChoice> { it.systemApp }
+                    .thenByDescending { it.isGame }
+                    .thenByDescending { it.isLaunchable }
+                    .thenBy(String.CASE_INSENSITIVE_ORDER) { it.label }
+            )
             .toList()
     }
 

@@ -582,8 +582,8 @@ abstract class HomeActivity : MaxHzActivity() {
             if (!hasPrivilege) {
                 Toast.makeText(this, R.string.toast_service_not_running_start_first, Toast.LENGTH_SHORT).show()
             } else {
-                showUserAppPicker { pkg, label ->
-                    callback(pkg, label)
+                showGameAutoAppPicker { app ->
+                    callback(app.packageName, app.label)
                 }
             }
         },
@@ -679,6 +679,17 @@ abstract class HomeActivity : MaxHzActivity() {
                     appLaunchBoostState.value = MaxHzPrefs.mDexoptEnabled(this@HomeActivity)
                     updateMaxHzServiceState()
                     onResult(ok, msg)
+                }
+            }
+        },
+        onOpenCustomAotPickerClick = {
+            val hasPrivilege = isServiceRunning() || isRootAvailableState.value
+            if (!hasPrivilege) {
+                Toast.makeText(this, R.string.toast_service_not_running_start_first, Toast.LENGTH_SHORT).show()
+            } else {
+                showAotSpecificAppsPickerDialog {
+                    appLaunchBoostState.value = MaxHzPrefs.mDexoptEnabled(this@HomeActivity)
+                    updateMaxHzServiceState()
                 }
             }
         },

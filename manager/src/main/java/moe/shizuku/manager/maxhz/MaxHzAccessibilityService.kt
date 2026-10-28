@@ -235,7 +235,7 @@ class MaxHzAccessibilityService : AccessibilityService() {
         pendingJob = scope.launch {
             if (mode.delayMs > 0) delay(mode.delayMs)
             if (lastSeenPackage != foregroundPackage || pendingPackage != foregroundPackage) return@launch
-            if (isGamePackageForPassthrough(foregroundPackage)) {
+            if (!mode.key.startsWith("app:") && isGamePackageForPassthrough(foregroundPackage)) {
                 safeApply { MaxHzController.restoreGameDisplayDefaults(foregroundPackage) }
                 lastAppliedMode = "game_passthrough:$foregroundPackage"
                 pendingPackage = null
@@ -1126,7 +1126,7 @@ class MaxHzAccessibilityService : AccessibilityService() {
 
     private suspend fun recheckForegroundAfterDefaultIfNeeded(foregroundPackage: String, modeKey: String) {
         if (modeKey != "system_default") return
-        if (MaxHzPackagePolicy.isRefreshRateTargetApp(this, foregroundPackage)) return
+        if (!MaxHzPackagePolicy.isTransientSystemWindow(this, foregroundPackage)) return
 
         delay(FALLBACK_FOREGROUND_RECHECK_DELAY_MS)
         val currentPackage = MaxHzForegroundApp.currentRecentPackage(this) ?: return
@@ -1148,13 +1148,6 @@ class MaxHzAccessibilityService : AccessibilityService() {
         val hasRefreshOverride = currentRules.isNotEmpty() || saverMode != null || MaxHzPrefs.controlEnabled(this)
         if (!hasRefreshOverride) return null
 
-        if (MaxHzPackagePolicy.isGameApp(this, foregroundPackage)) {
-            return RefreshMode("game_passthrough:$foregroundPackage", 0L) {
-                MaxHzController.restoreGameDisplayDefaults(foregroundPackage)
-            }
-        }
-
-        if (currentRules.isEmpty()) return saverMode
         val rule = currentRules[foregroundPackage]
         if (rule != null && MaxHzPackagePolicy.isRefreshRateTargetApp(this, foregroundPackage)) {
             return if (rule.adaptive) {
@@ -1173,6 +1166,14 @@ class MaxHzAccessibilityService : AccessibilityService() {
                 }
             }
         }
+
+        if (MaxHzPackagePolicy.isGameApp(this, foregroundPackage)) {
+            return RefreshMode("game_passthrough:$foregroundPackage", 0L) {
+                MaxHzController.restoreGameDisplayDefaults(foregroundPackage)
+            }
+        }
+
+        if (currentRules.isEmpty()) return saverMode
 
         dailySaverAdaptiveMode()?.let { return it }
 

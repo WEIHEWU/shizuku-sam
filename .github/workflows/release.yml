@@ -462,8 +462,37 @@ jobs:
           files: |
             releases/Shizuku-Sam-v13.8.33.apk
 
+      - name: "Publish Release v13.8.34 (Fix Game Picker, User/System App List Filtering & Custom AOT Picker Entry)"
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/v13.8.34')
+        with:
+          tag_name: v13.8.34
+          name: "Shizuku Sam v13.8.34 — 修复游戏模式无法添加游戏、用户/系统应用列表显示不全及自选 AOT 入口"
+          body: |
+            ### Shizuku Sam v13.8.34
+
+            #### 🎮 修复「游戏模式 → 添加游戏应用」找不到游戏的问题
+            - **修正游戏模式应用选择器绑定 (`HomeActivity.kt` / `MaxHzActivity.kt`)**：
+              - 修复 `v13.8.33` 迁移 Miuix 游戏模式弹窗时将「+ 添加游戏应用」误绑到刷新率选择器（该选择器内部排除了游戏）的回归问题，现已正确调用专属 `showGameAutoAppPicker`；
+              - 游戏选择器内自动将已识别的游戏带 `🎮` 标识优先置顶排列，并扩充主流游戏厂商包名识别规则。
+
+            #### 📱 修复「用户应用」与「系统应用」显示数量异常偏少的问题
+            - **修复用户安装应用被误判为系统预装而隐藏 (`MaxHzPackagePolicy.kt`)**：
+              - 重构 `trustClass()`，严格依据 Android `FLAG_SYSTEM` 与系统分区路径判定系统应用；凡是用户自行安装在 `/data/app/` 下的应用（包括 Chrome、三星浏览器、Good Lock 模块、Samsung Health、SmartThings、Gboard 等 `com.google.*` / `com.samsung.*` / `com.sec.*` 包名应用）均 100% 正常显示在「用户应用」分栏。
+            - **修复「系统应用」分栏只显示 2～3 个应用的问题 (`MaxHzPackagePolicy.kt` / `MaxHzActivity.kt`)**：
+              - 移除旧版仅含 23 个包名的硬编码 `isCuratedUserFacingPreload` 白名单，放行所有含可执行代码（`FLAG_HAS_CODE != 0`）、非纯资源叠加层（RRO Overlay）的系统应用；
+              - 在「系统应用」分栏中自动将带桌面启动图标的常用系统应用优先排在最上方。
+
+            #### ⚡️ 刷新率专属规则与 AOT 自选预编译增强
+            - **允许为游戏单独配置刷新率规则并修正优先级 (`MaxHzAccessibilityService.kt` / `MaxHzService.kt`)**：
+              - 支持在「应用专属刷新率规则」中自由选择游戏；当游戏未被「游戏模式自动性能切换」接管但用户配置了专属刷新率规则时，优先执行用户规则；未配置规则的游戏保持 `game_passthrough` 直通保护。
+            - **补回「🎯 自选应用 ART 预编译」入口 (`HomeGlassScreen.kt` / `HomeActivity.kt`)**：
+              - 在「应用冷启动加速与清理」弹窗中补回「🎯 自选应用 ART 预编译 (热点/全量/已编译管理)」按钮。
+          files: |
+            releases/Shizuku-Sam-v13.8.34.apk
+
       - name: Publish Future Version Tag Release
-        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2' && github.ref_name != 'v13.8.3' && github.ref_name != 'v13.8.4' && github.ref_name != 'v13.8.5' && github.ref_name != 'v13.8.6' && github.ref_name != 'v13.8.7' && github.ref_name != 'v13.8.8' && github.ref_name != 'v13.8.9' && github.ref_name != 'v13.8.10' && github.ref_name != 'v13.8.11' && github.ref_name != 'v13.8.19' && github.ref_name != 'v13.8.20' && github.ref_name != 'v13.8.21' && github.ref_name != 'v13.8.22' && github.ref_name != 'v13.8.23' && github.ref_name != 'v13.8.27' && github.ref_name != 'v13.8.28' && github.ref_name != 'v13.8.29' && github.ref_name != 'v13.8.30' && github.ref_name != 'v13.8.31' && github.ref_name != 'v13.8.32' && github.ref_name != 'v13.8.33'
+        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2' && github.ref_name != 'v13.8.3' && github.ref_name != 'v13.8.4' && github.ref_name != 'v13.8.5' && github.ref_name != 'v13.8.6' && github.ref_name != 'v13.8.7' && github.ref_name != 'v13.8.8' && github.ref_name != 'v13.8.9' && github.ref_name != 'v13.8.10' && github.ref_name != 'v13.8.11' && github.ref_name != 'v13.8.19' && github.ref_name != 'v13.8.20' && github.ref_name != 'v13.8.21' && github.ref_name != 'v13.8.22' && github.ref_name != 'v13.8.23' && github.ref_name != 'v13.8.27' && github.ref_name != 'v13.8.28' && github.ref_name != 'v13.8.29' && github.ref_name != 'v13.8.30' && github.ref_name != 'v13.8.31' && github.ref_name != 'v13.8.32' && github.ref_name != 'v13.8.33' && github.ref_name != 'v13.8.34'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
