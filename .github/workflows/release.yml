@@ -523,8 +523,37 @@ jobs:
           files: |
             releases/Shizuku-Sam-v13.8.35.apk
 
+      - name: "Publish Release v13.8.36 (Align Authorized Apps with Upstream, Fix Per-App Refresh Rate Schemes & Protect System Defaults)"
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v13.8.36
+          name: "Shizuku Sam v13.8.36 — 100% 对齐上游授权应用管理、修复单应用刷新率锁频失效与恢复默认 DPI/电池保护误改"
+          body: |
+            ### Shizuku Sam v13.8.36
+
+            #### ⚡ 已授权应用 & 管理应用 100% 回归上游 (`RikkaApps/Shizuku`) 原生极速链路
+            - **彻底解决隔夜点击已授权应用显示 `0` 与管理应用重新慢加载 3~6 秒问题 (`ShizukuService.java` / `InstalledPackagesCompat.java` / `AuthorizationManager.kt` / `AppsViewModel.kt` / `HomeActivity.kt`)**：
+              - 移除 `InstalledPackagesCompat` 中会在无 Looper 的 Binder 线程抛异常的 `ActivityThread.systemMain()` 反射分支，恢复直接调用上游 `PackageManagerApis.getInstalledPackagesNoThrow`；
+              - 移除 `AuthorizationManager.getPackages()` 中会遍历全机 400+ 应用并发起 800+ 次跨进程 IPC 的本地 PMS 全盘兜底扫描，恢复上游单次 `getApplications(-1)` 极速查询（耗时 `< 15ms`）；
+              - 修复 `HomeActivity` 中非 `Status.SUCCESS` 状态将已授权数量覆盖为 `0` 的问题，并在 `checkServerStatus()`（`onResume`）中同步刷新已授权数量。
+
+            #### 🎯 修复「单应用独立刷新率」锁频掉回 60Hz 及各方案路由 (`MaxHzRefreshSettings.kt` / `MaxHzController.kt` / `HomeGlassScreen.kt`)
+            - **区分三星 One UI 标准 60Hz 模式 (`mode=0`) 与高/低刷定频窗口锁 (`mode=1`)**：
+              - **游戏极速 (`120Hz` / `90Hz` 固定) & 超低刷定频 (`48Hz` / `30Hz` / `24Hz` 固定)**：使用 `refresh_rate_mode = 1` + `min_refresh_rate = hz, peak_refresh_rate = hz` 收拢上下限窗口强制锁定目标帧率，解决此前写入 `refresh_rate_mode = 0` 触发三星 60Hz 标准上限锁导致 120Hz 变 60Hz 的问题；
+              - **视频节能 (`60Hz` 固定)**：使用 `refresh_rate_mode = 0` + `min = 60, peak = 60`；
+              - **日常自适应 (`10~120Hz`) & 阅读护眼 (`10~60Hz`)**：使用 `refresh_rate_mode = 1` + `[minHz, maxHz]` 动态区间并清除省电刷新率限制位；
+              - 当 Shizuku / Root Shell 就绪时同步通过 `UID 2000` 下发，并在最高刷新率下拉菜单中补全 `96Hz / 30Hz / 24Hz` 选项。
+
+            #### 🛡️ 修复「恢复系统默认」导致 DPI/显示缩放异常及电池保护被改写 (`MaxHzController.kt`)
+            - **消除物理显示模式锁定导致的 DPI 缩放异常**：
+              - 在 `reload_samsung_adaptive_refresh()` 中移除强行锁定物理分辨率的 `cmd display set-user-preferred-display-mode`，统一替换为 `cmd display clear-user-preferred-display-mode 0` 与原生 `min_refresh_rate 0.0`。
+            - **保护用户原有的三星电池保护设置**：
+              - 恢复系统默认时，仅当本应用曾修改并备份过电池保护设置时才按备份还原；若用户从未开启本应用的电池保护，则保持系统原有 `protect_battery`（如 80% 最高保护）不变，不再无条件改写为基本保护。
+          files: |
+            releases/Shizuku-Sam-v13.8.36.apk
+
       - name: Publish Future Version Tag Release
-        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2' && github.ref_name != 'v13.8.3' && github.ref_name != 'v13.8.4' && github.ref_name != 'v13.8.5' && github.ref_name != 'v13.8.6' && github.ref_name != 'v13.8.7' && github.ref_name != 'v13.8.8' && github.ref_name != 'v13.8.9' && github.ref_name != 'v13.8.10' && github.ref_name != 'v13.8.11' && github.ref_name != 'v13.8.19' && github.ref_name != 'v13.8.20' && github.ref_name != 'v13.8.21' && github.ref_name != 'v13.8.22' && github.ref_name != 'v13.8.23' && github.ref_name != 'v13.8.27' && github.ref_name != 'v13.8.28' && github.ref_name != 'v13.8.29' && github.ref_name != 'v13.8.30' && github.ref_name != 'v13.8.31' && github.ref_name != 'v13.8.32' && github.ref_name != 'v13.8.33' && github.ref_name != 'v13.8.34' && github.ref_name != 'v13.8.35'
+        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2' && github.ref_name != 'v13.8.3' && github.ref_name != 'v13.8.4' && github.ref_name != 'v13.8.5' && github.ref_name != 'v13.8.6' && github.ref_name != 'v13.8.7' && github.ref_name != 'v13.8.8' && github.ref_name != 'v13.8.9' && github.ref_name != 'v13.8.10' && github.ref_name != 'v13.8.11' && github.ref_name != 'v13.8.19' && github.ref_name != 'v13.8.20' && github.ref_name != 'v13.8.21' && github.ref_name != 'v13.8.22' && github.ref_name != 'v13.8.23' && github.ref_name != 'v13.8.27' && github.ref_name != 'v13.8.28' && github.ref_name != 'v13.8.29' && github.ref_name != 'v13.8.30' && github.ref_name != 'v13.8.31' && github.ref_name != 'v13.8.32' && github.ref_name != 'v13.8.33' && github.ref_name != 'v13.8.34' && github.ref_name != 'v13.8.35' && github.ref_name != 'v13.8.36'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
