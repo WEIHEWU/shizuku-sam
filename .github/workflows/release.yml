@@ -552,8 +552,32 @@ jobs:
           files: |
             releases/Shizuku-Sam-v13.8.36.apk
 
+      - name: "Publish Release v13.8.37 (Align Authorized Apps with Shizuku Plus/Next, Fix Overnight 0 Count & App Management UI)"
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v13.8.37
+          name: "Shizuku Sam v13.8.37 — 紧跟上游 Shizuku Plus/Next 授权体系、彻底解决隔夜清零与慢加载及应用管理弹窗 UI 问题"
+          body: |
+            ### Shizuku Sam v13.8.37
+
+            #### ⚡ 紧跟上游 (`Shizuku Plus` & `Shizuku Next`) 授权与服务机制
+            - **同步服务端 `updateFlagsForUid` 包名记录与 `ShizukuConfigManager` 防清零逻辑 (`ShizukuService.java` / `ShizukuConfigManager.java`)**：
+              - 授权状态变更时完整记录 `packagesForUid` 列表（而非传入 `null`），并在启动扫描时仅在 `if (allowed)` 时同步写入，杜绝服务重启或运行时权限校验将已保存的 `FLAG_ALLOWED` 授权抹除；
+              - 放宽服务端与客户端的 Shizuku 应用识别条件为 `API_V23` 权限 **或** `V3_SUPPORT` 元数据，确保所有新旧客户端应用均被完整识别。
+            - **同步上游隔夜唤醒退避重试与代数锁防清零机制 (`AuthorizationManager.kt` / `AppsViewModel.kt`)**：
+              - `AuthorizationManager.granted()` 对齐 Shizuku Plus (`#398`) 增加最多 3 次 `pingBinder()` 唤醒退避重试；
+              - `AppsViewModel.load()` 对齐 Shizuku Plus (`#317` / `#424`) 引入单调递增代数令牌 `loadGeneration` 与非零授权数瞬态空返回保护，并共享内存与持久化快照，实现隔夜唤醒不归零、点击「管理已授权应用」**0ms 秒开**。
+            - **兼容常驻旧版服务端与 One UI 8/9 (`InstalledPackagesCompat.java` / `AuthorizationManager.kt`)**：
+              - 修复守护进程无 `Application` 时跨 Binder 线程获取 `SystemContext` 的兼容性，并在客户端合并纯内存级本地 `PackageManager` 过滤（循环内 0 次 IPC，耗时 `< 5ms`），彻底解决显示「暂未发现声明 Shizuku 权限的应用」及慢加载问题。
+
+            #### 🎨 修复「应用管理」弹窗留白与背景透字问题 (`ApplicationManagementActivity.kt`)
+            - 移除内部强制撑满 82% 屏幕高度的 `Modifier.fillMaxSize()`，改为 `wrapContentHeight()` 自适应包裹高度，消除应用较少或为空时底部的大片空白；
+            - 提升弹窗表面不透明度并加深背景遮罩（`dimAmount = 0.58f`），彻底消除底层主页文字透出的重影。
+          files: |
+            releases/Shizuku-Sam-v13.8.37.apk
+
       - name: Publish Future Version Tag Release
-        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2' && github.ref_name != 'v13.8.3' && github.ref_name != 'v13.8.4' && github.ref_name != 'v13.8.5' && github.ref_name != 'v13.8.6' && github.ref_name != 'v13.8.7' && github.ref_name != 'v13.8.8' && github.ref_name != 'v13.8.9' && github.ref_name != 'v13.8.10' && github.ref_name != 'v13.8.11' && github.ref_name != 'v13.8.19' && github.ref_name != 'v13.8.20' && github.ref_name != 'v13.8.21' && github.ref_name != 'v13.8.22' && github.ref_name != 'v13.8.23' && github.ref_name != 'v13.8.27' && github.ref_name != 'v13.8.28' && github.ref_name != 'v13.8.29' && github.ref_name != 'v13.8.30' && github.ref_name != 'v13.8.31' && github.ref_name != 'v13.8.32' && github.ref_name != 'v13.8.33' && github.ref_name != 'v13.8.34' && github.ref_name != 'v13.8.35' && github.ref_name != 'v13.8.36'
+        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2' && github.ref_name != 'v13.8.3' && github.ref_name != 'v13.8.4' && github.ref_name != 'v13.8.5' && github.ref_name != 'v13.8.6' && github.ref_name != 'v13.8.7' && github.ref_name != 'v13.8.8' && github.ref_name != 'v13.8.9' && github.ref_name != 'v13.8.10' && github.ref_name != 'v13.8.11' && github.ref_name != 'v13.8.19' && github.ref_name != 'v13.8.20' && github.ref_name != 'v13.8.21' && github.ref_name != 'v13.8.22' && github.ref_name != 'v13.8.23' && github.ref_name != 'v13.8.27' && github.ref_name != 'v13.8.28' && github.ref_name != 'v13.8.29' && github.ref_name != 'v13.8.30' && github.ref_name != 'v13.8.31' && github.ref_name != 'v13.8.32' && github.ref_name != 'v13.8.33' && github.ref_name != 'v13.8.34' && github.ref_name != 'v13.8.35' && github.ref_name != 'v13.8.36' && github.ref_name != 'v13.8.37'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
