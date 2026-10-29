@@ -15,6 +15,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import moe.shizuku.manager.MainActivity
 import moe.shizuku.manager.R
@@ -38,8 +39,11 @@ class WatchdogService : Service() {
         ShizukuSettings.setLastSettledStateRunning(true)
         getSystemService(NotificationManager::class.java)?.cancel(NOTIFICATION_ID_CRASH)
         scope.launch(Dispatchers.IO) {
-            runCatching {
-                MaxHzShell.exec(AdbStarter.buildSelfHardeningCommand(applicationContext))
+            delay(2000L)
+            if (selfHardenedThisSession.compareAndSet(false, true)) {
+                runCatching {
+                    MaxHzShell.exec(AdbStarter.buildSelfHardeningCommand(applicationContext))
+                }
             }
             AccessibilityHelper.ensureAccessibilityAlive(applicationContext)
         }
@@ -217,6 +221,7 @@ class WatchdogService : Service() {
         private const val MAX_COOLDOWN_MS = 300_000L
 
         private val running = AtomicBoolean(false)
+        private val selfHardenedThisSession = AtomicBoolean(false)
 
         fun backoffMs(crashes: Int): Long =
             minOf(BASE_COOLDOWN_MS * (1L shl crashes.coerceAtMost(10)), MAX_COOLDOWN_MS)

@@ -576,8 +576,39 @@ jobs:
           files: |
             releases/Shizuku-Sam-v13.8.37.apk
 
+      - name: "Publish Release v13.8.38 (Full Upstream Alignment: 0ms Cold-Start App Management, ShizukuStateMachine, WADB & Root Starter)"
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v13.8.38
+          name: "Shizuku Sam v13.8.38 — 全链路对齐上游 Shizuku Plus/Next：划掉后台/强退后秒开已授权应用、全局状态机与配对/Root 启动提速"
+          body: |
+            ### Shizuku Sam v13.8.38
+
+            #### ⚡ 彻底解决「划掉后台 / 强制重启后，首页先显示 0 个、点开管理已授权应用长时间转圈」
+            - **对齐上游 `AuthorizationManager.getPackages()` 极速路径与并发去重锁 (`AuthorizationManager.kt`)**：
+              - 正常运行时仅执行一次服务端 `getApplications(-1)`（`< 15ms`），移除每次无条件双扫全机 `pm.getInstalledPackages` 的冗余逻辑，仅在旧服务端返回空或异常时兜底回退；
+              - 新增 `scanLock` 互斥锁与 `2000ms` 节流缓存，将冷启动时原本并发撞车的 10~12 次全量扫描收敛为 **1 次**；
+              - 新增已知客户端包名快照（`ShizukuSettings.getKnownClientPackages()` + `AuthorizationManager.getQuickPackagesFromSnapshot()`），划掉后台或强制重启后在 `< 2ms` 内定向查询已知客户端包并填充首帧。
+            - **重构 `AppsViewModel` 与 `ApplicationManagementActivity` 首帧秒开机制**：
+              - 新增 `AppsViewModel.ensureSnapshotHydrated()` 与跨实例缓存同步广播，在 `HomeActivity.onCreate()` 和 `ApplicationManagementActivity.onCreate()` 渲染首帧前即完成毫秒级预热，首帧直接展示真实已授权数量与应用列表，0 等待秒开；
+              - `load(onlyCount = true)` 已有缓存时直接在内存中 `< 1ms` 统计授权数，不再触发全量包扫描；
+              - 修复 `ApplicationManagementActivity` 在 `onCreate` 与首次 `onResume` 中连续重复调用 `load()` 的问题。
+
+            #### 🔄 引入上游全局状态机 `ShizukuStateMachine` 与旧版服务端无感热升级
+            - 新增 `ShizukuStateMachine.kt`，统一管理 `STARTING` / `RUNNING` / `STOPPING` / `STOPPED` / `CRASHED` 状态机与 `90s` 启动超时恢复；
+            - 新增 `ShizukuStateMachine.isServerVersionSkewed()` 检测：当发现内存中仍驻留旧版本（如 `v13.7`）启动的 `shizuku_server` 时，自动在后台通过 Root / 无线调试无感重启升级服务端，使新版服务端的极速 `getApplications(-1)` 立即生效。
+
+            #### 📡 对齐上游无线调试配对、连接与 Root 启动流程
+            - **`AdbMdns.kt`**：对齐上游 `resolvedHost` 回环地址归一化（兼容 Android 16+ Local Network Protection）及解析失败时最多 5 次自动退避重发现；
+            - **`AdbPairingService.kt`**：恢复配对失败通知栏「重试」按钮，并新增配对成功通知栏「立即启动」按钮（点击直接跳回 `HomeActivity` 自动启动无线调试服务）；
+            - **`AdbStarter.kt` & `AdbStartWorker.kt`**：移除阻塞 ADB 启动关键路径的同步自加固 Shell 命令（改为后台延迟异步执行），并在锁屏等待解锁授权时调用 `setForegroundAsync`（`FOREGROUND_SERVICE_TYPE_SHORT_SERVICE`）保活；
+            - **`Starter.kt` & `StarterActivity.kt`**：对齐上游 `internalCommand` 与 `Starter.waitForBinder()`，拿到 Binder 后 `350ms` 自动关闭返回主页（移除旧的 `3000ms` 硬编码等待）；
+            - **`ShizukuReceiverStarter.kt` & `WatchdogService.kt`**：增加 `STARTING` / `RUNNING` 防重入锁（杜绝多广播并发拉起多个 `su` 进程），并将 `WatchdogService` 的自加固命令限制为每进程会话最多后台延迟执行一次，彻底消除冷启动时的后台 Shell 抢占。
+          files: |
+            releases/Shizuku-Sam-v13.8.38.apk
+
       - name: Publish Future Version Tag Release
-        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2' && github.ref_name != 'v13.8.3' && github.ref_name != 'v13.8.4' && github.ref_name != 'v13.8.5' && github.ref_name != 'v13.8.6' && github.ref_name != 'v13.8.7' && github.ref_name != 'v13.8.8' && github.ref_name != 'v13.8.9' && github.ref_name != 'v13.8.10' && github.ref_name != 'v13.8.11' && github.ref_name != 'v13.8.19' && github.ref_name != 'v13.8.20' && github.ref_name != 'v13.8.21' && github.ref_name != 'v13.8.22' && github.ref_name != 'v13.8.23' && github.ref_name != 'v13.8.27' && github.ref_name != 'v13.8.28' && github.ref_name != 'v13.8.29' && github.ref_name != 'v13.8.30' && github.ref_name != 'v13.8.31' && github.ref_name != 'v13.8.32' && github.ref_name != 'v13.8.33' && github.ref_name != 'v13.8.34' && github.ref_name != 'v13.8.35' && github.ref_name != 'v13.8.36' && github.ref_name != 'v13.8.37'
+        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2' && github.ref_name != 'v13.8.3' && github.ref_name != 'v13.8.4' && github.ref_name != 'v13.8.5' && github.ref_name != 'v13.8.6' && github.ref_name != 'v13.8.7' && github.ref_name != 'v13.8.8' && github.ref_name != 'v13.8.9' && github.ref_name != 'v13.8.10' && github.ref_name != 'v13.8.11' && github.ref_name != 'v13.8.19' && github.ref_name != 'v13.8.20' && github.ref_name != 'v13.8.21' && github.ref_name != 'v13.8.22' && github.ref_name != 'v13.8.23' && github.ref_name != 'v13.8.27' && github.ref_name != 'v13.8.28' && github.ref_name != 'v13.8.29' && github.ref_name != 'v13.8.30' && github.ref_name != 'v13.8.31' && github.ref_name != 'v13.8.32' && github.ref_name != 'v13.8.33' && github.ref_name != 'v13.8.34' && github.ref_name != 'v13.8.35' && github.ref_name != 'v13.8.36' && github.ref_name != 'v13.8.37' && github.ref_name != 'v13.8.38'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}

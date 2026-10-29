@@ -5,24 +5,28 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.provider.Settings
 import android.widget.Toast
-import com.topjohnwu.superuser.Shell
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import moe.shizuku.manager.R
 import moe.shizuku.manager.ShizukuSettings
+import moe.shizuku.manager.maxhz.MaxHzShell
 import moe.shizuku.manager.service.WatchdogService
 import moe.shizuku.manager.starter.Starter
 import moe.shizuku.manager.utils.EnvironmentUtils
+import moe.shizuku.manager.utils.ShizukuStateMachine
 import rikka.shizuku.Shizuku
 import java.io.EOFException
 import java.io.File
 import java.net.SocketException
-import java.net.SocketTimeoutException
 
 object AdbStarter {
+
+    private val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     @Volatile
     var keyOfferInFlight: Boolean = false
@@ -51,8 +55,15 @@ object AdbStarter {
     }
 
     suspend fun startAdb(context: Context, port: Int, log: ((String) -> Unit)? = null) {
+        if (port !in 1..65535) return
+
+        suspend fun AdbClient.runCommand(cmd: String) {
+            command(cmd) { log?.invoke(String(it)) }
+        }
+
         try {
-            log?.invoke("Starting with wireless adb in port $port...\n\n")
+            ShizukuStateMachine.set(ShizukuStateMachine.State.STARTING)
+            log?.invoke("Starting with wireless adb in port $port...\n")
 
             withContext(Dispatchers.IO) {
                 val key = runCatching {
@@ -65,31 +76,50 @@ object AdbStarter {
                 var activePort = port
                 val tcpMode = ShizukuSettings.getTcpMode()
                 val tcpPort = ShizukuSettings.getTcpPort()
-                if (tcpMode && activePort != tcpPort) {
+                if (tcpMode && activePort != tcpPort && tcpPort in 1..65535) {
+                    log?.invoke("Connecting on port $activePort...")
                     AdbClient("127.0.0.1", activePort, key).use { client ->
                         connectWithRetry(client)
+                        log?.invoke("Successfully connected on port $activePort...\nRestarting in TCP mode port: $tcpPort\n")
                         activePort = tcpPort
                         runCatching { client.command("tcpip:$activePort") }
                             .onFailure { if (it !is EOFException && it !is SocketException) throw it }
                     }
                 }
 
-                stopExistingServer()
+                // Only ask an existing root (uid 0) server to exit via fast Binder IPC so
+                // shell (uid 2000) starter does not hit EPERM when killing uid 0 shizuku_server.
+                if (runCatching { Shizuku.pingBinder() && Shizuku.getUid() == 0 }.getOrDefault(false)) {
+                    runCatching { Shizuku.exit() }
+                    delay(150)
+                }
 
+                log?.invoke("Connecting on port $activePort...\n")
                 AdbClient("127.0.0.1", activePort, key).use { client ->
                     connectWithRetry(client)
-                    client.command("shell:${Starter.internalCommand}") { log?.invoke(String(it)) }
-                    runCatching {
-                        client.command("shell:${buildSelfHardeningCommand(context)}")
-                    }
+                    log?.invoke("Successfully connected on port $activePort...\n")
+                    client.runCommand("shell:${Starter.internalCommand}")
+                    ShizukuSettings.setLastPort(activePort)
+                    ShizukuSettings.setLastLaunchMode(ShizukuSettings.LaunchMethod.ADB)
+                    ShizukuSettings.setLastSettledStateRunning(true)
+                    ShizukuStateMachine.update()
                 }
-                ShizukuSettings.setLastPort(activePort)
-                ShizukuSettings.setLastLaunchMode(ShizukuSettings.LaunchMethod.ADB)
-                ShizukuSettings.setLastSettledStateRunning(true)
+
+                val appCtx = context.applicationContext
                 if (ShizukuSettings.getWatchdog()) {
-                    runCatching { WatchdogService.start(context.applicationContext) }
+                    runCatching { WatchdogService.start(appCtx) }
+                }
+                backgroundScope.launch {
+                    delay(1500)
+                    runCatching { MaxHzShell.exec(buildSelfHardeningCommand(appCtx)) }
                 }
             }
+        } catch (e: Throwable) {
+            if (ShizukuStateMachine.get() == ShizukuStateMachine.State.STARTING) {
+                ShizukuStateMachine.set(ShizukuStateMachine.State.STOPPED)
+            }
+            ShizukuStateMachine.update()
+            throw e
         } finally {
             if (ShizukuSettings.getAutoDisableUsbDebugging() && context.checkSelfPermission(WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED) {
                 runCatching {
@@ -100,6 +130,7 @@ object AdbStarter {
     }
 
     suspend fun stopTcp(context: Context, port: Int) {
+        if (port !in 1..65535) return
         runCatching {
             val cr = context.contentResolver
             if (context.checkSelfPermission(WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED) {
@@ -107,10 +138,11 @@ object AdbStarter {
                 Settings.Global.putLong(cr, "adb_allowed_connection_time", 0L)
             }
 
-            if (Settings.Global.getInt(cr, Settings.Global.ADB_ENABLED, 0) == 0) {
+            if (!EnvironmentUtils.isAdbEnabled()) {
                 throw IllegalStateException("ADB is not enabled")
             }
 
+            ShizukuStateMachine.set(ShizukuStateMachine.State.STOPPING)
             val key = AdbKey(PreferenceAdbKeyStore(ShizukuSettings.getPreferences()), "shizuku")
             withContext(Dispatchers.IO) {
                 AdbClient("127.0.0.1", port, key).use { client ->
@@ -120,6 +152,7 @@ object AdbStarter {
             }
         }.onFailure {
             if (EnvironmentUtils.getAdbTcpPort() > 0) {
+                ShizukuStateMachine.update()
                 withContext(Dispatchers.Main) {
                     val message = when (it) {
                         is AdbKeyException -> context.getString(R.string.adb_error_key_store)
@@ -129,26 +162,6 @@ object AdbStarter {
                 }
             }
         }
-    }
-
-    /**
-     * 在以 shell(uid 2000) 拉起新服务前，清理可能残留的旧 shizuku_server
-     * （例如开机 Root 脚本以 uid 0 拉起的进程），避免 starter 因 EPERM 无法 kill 而失败。
-     */
-    private suspend fun stopExistingServer() {
-        val wasAlive = runCatching { Shizuku.pingBinder() }.getOrDefault(false)
-        if (wasAlive) {
-            runCatching { Shizuku.exit() }
-        }
-        val cached = Shell.getCachedShell()
-        if (cached != null && cached.isRoot) {
-            runCatching {
-                withTimeoutOrNull(3000L) {
-                    Shell.cmd("killall -9 shizuku_server 2>/dev/null || pkill -9 -f shizuku_server 2>/dev/null || true").exec()
-                }
-            }
-        }
-        if (wasAlive) delay(300)
     }
 
     private suspend fun connectWithRetry(client: AdbClient) {

@@ -7,6 +7,13 @@ import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.lifecycle.Observer
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.NetworkInterface
@@ -21,8 +28,17 @@ class AdbMdns(
     private var registered = false
     private var running = false
     private var serviceName: String? = null
+
+    @Volatile
+    var resolvedHost: String = "127.0.0.1"
+        private set
+
     private val listener = DiscoveryListener(this)
     private val nsdManager: NsdManager = context.getSystemService(NsdManager::class.java)
+    private val mdnsScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private var restartJob: Job? = null
+    private var restartScheduled = false
+    private var attempts = 0
 
     fun start() {
         if (running) return
@@ -35,8 +51,15 @@ class AdbMdns(
     fun stop() {
         if (!running) return
         running = false
+        restartJob?.cancel()
+        mdnsScope.cancel()
         if (registered) {
-            nsdManager.stopServiceDiscovery(listener)
+            try {
+                nsdManager.stopServiceDiscovery(listener)
+            } catch (e: IllegalArgumentException) {
+                Log.w(TAG, "listener not registered when stopping service discovery", e)
+            }
+            registered = false
         }
     }
 
@@ -57,27 +80,50 @@ class AdbMdns(
     }
 
     private fun onServiceResolved(resolvedService: NsdServiceInfo) {
-        val host = resolvedService.hostAddressCompat() ?: return
-        if (running && NetworkInterface.getNetworkInterfaces()
+        val hostAddress = resolvedService.hostAddressCompat()
+        val isLocal = hostAddress == "127.0.0.1" || hostAddress == "::1" || resolvedService.isLoopbackCompat()
+
+        if (running && (isLocal || (hostAddress != null && NetworkInterface.getNetworkInterfaces()
                 .asSequence()
                 .any { networkInterface ->
                     networkInterface.inetAddresses
                         .asSequence()
-                        .any { host == it.hostAddress }
-                }
-            && isPortAvailable(host, resolvedService.port)
+                        .any { hostAddress == it.hostAddress }
+                }))
+            && isPortAvailable(resolvedService.port)
         ) {
             serviceName = resolvedService.serviceName
-            observer.onChanged(host to resolvedService.port)
+            val normalizedHost = if (isLocal || hostAddress == null) "127.0.0.1" else hostAddress
+            resolvedHost = normalizedHost
+            observer.onChanged(normalizedHost to resolvedService.port)
+        } else if (running && attempts < 5 && !restartScheduled) {
+            attempts++
+            restartScheduled = true
+            val delayMs = attempts * 1000L
+            restartJob = mdnsScope.launch {
+                delay(delayMs)
+                if (registered) {
+                    try {
+                        nsdManager.stopServiceDiscovery(listener)
+                    } catch (e: IllegalArgumentException) {
+                        Log.w(TAG, "listener not registered when restarting service discovery", e)
+                    }
+                }
+                delay(100L)
+                if (!registered && running) {
+                    nsdManager.discoverServices(serviceType, NsdManager.PROTOCOL_DNS_SD, listener)
+                }
+                restartScheduled = false
+            }
         }
     }
 
-    private fun isPortAvailable(host: String, port: Int) = try {
+    private fun isPortAvailable(port: Int) = try {
         ServerSocket().use {
-            it.bind(InetSocketAddress(host, port), 1)
+            it.bind(InetSocketAddress("127.0.0.1", port), 1)
             false
         }
-    } catch (e: IOException) {
+    } catch (_: IOException) {
         true
     }
 
@@ -96,6 +142,15 @@ class AdbMdns(
         } else {
             @Suppress("DEPRECATION")
             host?.hostAddress
+        }
+    }
+
+    private fun NsdServiceInfo.isLoopbackCompat(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            hostAddresses.firstOrNull()?.isLoopbackAddress == true
+        } else {
+            @Suppress("DEPRECATION")
+            host?.isLoopbackAddress == true
         }
     }
 

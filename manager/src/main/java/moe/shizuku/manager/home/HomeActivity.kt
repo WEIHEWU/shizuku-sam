@@ -76,6 +76,8 @@ import moe.shizuku.manager.utils.AppIconCache
 import rikka.core.util.ClipboardUtils
 import moe.shizuku.manager.utils.CustomTabsHelper
 import moe.shizuku.manager.utils.EnvironmentUtils
+import moe.shizuku.manager.utils.ShizukuStateMachine
+import moe.shizuku.manager.management.AppsViewModel
 import rikka.html.text.HtmlCompat
 import rikka.lifecycle.Status
 import rikka.lifecycle.viewModels
@@ -83,9 +85,12 @@ import rikka.shizuku.Shizuku
 
 abstract class HomeActivity : MaxHzActivity() {
 
+    companion object {
+        const val EXTRA_START_SERVICE_VIA_WADB = "moe.shizuku.manager.intent.extra.START_SERVICE_VIA_WADB"
+    }
+
     private val binderReceivedListener = Shizuku.OnBinderReceivedListener {
         checkServerStatus()
-        appsModel.load()
     }
 
     private val binderDeadListener = Shizuku.OnBinderDeadListener {
@@ -146,6 +151,8 @@ abstract class HomeActivity : MaxHzActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        AppsViewModel.ensureSnapshotHydrated()
+        homeGrantedState.intValue = AppsViewModel.cachedGrantedCount ?: 0
         lastRecordedThemeKey = computeUserThemeKey()
         syncSchemeAStates()
 
@@ -211,7 +218,10 @@ abstract class HomeActivity : MaxHzActivity() {
         if (intent?.getBooleanExtra("open_night_guard", false) == true) {
             pushDetail("待机异常唤醒排查") { nightWakeupGuardSection() }
         }
-        if (intent?.getBooleanExtra("EXTRA_AUTO_START_AFTER_PAIRING", false) == true) {
+        if (intent?.getBooleanExtra("EXTRA_AUTO_START_AFTER_PAIRING", false) == true ||
+            intent?.getBooleanExtra(EXTRA_START_SERVICE_VIA_WADB, false) == true
+        ) {
+            intent?.removeExtra(EXTRA_START_SERVICE_VIA_WADB)
             lifecycleScope.launch {
                 delay(350)
                 handleWirelessAdbStartClick()
@@ -225,7 +235,10 @@ abstract class HomeActivity : MaxHzActivity() {
         if (intent.getBooleanExtra("open_night_guard", false)) {
             pushDetail("待机异常唤醒排查") { nightWakeupGuardSection() }
         }
-        if (intent.getBooleanExtra("EXTRA_AUTO_START_AFTER_PAIRING", false)) {
+        if (intent.getBooleanExtra("EXTRA_AUTO_START_AFTER_PAIRING", false) ||
+            intent.getBooleanExtra(EXTRA_START_SERVICE_VIA_WADB, false)
+        ) {
+            intent.removeExtra(EXTRA_START_SERVICE_VIA_WADB)
             lifecycleScope.launch {
                 delay(350)
                 handleWirelessAdbStartClick()
@@ -355,6 +368,7 @@ abstract class HomeActivity : MaxHzActivity() {
 
     private fun syncRealSystemSettingsViaShell() {
         lifecycleScope.launch(Dispatchers.IO) {
+            delay(600L)
             if (!runCatching { MaxHzShell.isReady() }.getOrDefault(false)) return@launch
             val r = MaxHzShell.exec(
                 """
@@ -2152,7 +2166,11 @@ abstract class HomeActivity : MaxHzActivity() {
     private fun checkServerStatus() {
         homeModel.reload()
         if (Shizuku.pingBinder()) {
-            appsModel.load(onlyCount = true)
+            appsModel.load()
+            if (ShizukuStateMachine.isServerVersionSkewed()) {
+                ShizukuSettings.setServerStartedBuild(moe.shizuku.manager.BuildConfig.VERSION_CODE)
+                moe.shizuku.manager.receiver.ShizukuReceiverStarter.start(applicationContext, forceStart = true)
+            }
         }
         isAutoPairingState.value = AdbPairingAccessibilityService.isEnabled(this)
         isDeviceOwnerState.value = DhizukuHelper.isPrivileged(this)

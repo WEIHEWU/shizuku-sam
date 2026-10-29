@@ -50,7 +50,10 @@ import com.topjohnwu.superuser.Shell
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 import moe.shizuku.manager.AppConstants.EXTRA
 import moe.shizuku.manager.R
 import moe.shizuku.manager.ShizukuSettings
@@ -79,6 +82,7 @@ import moe.shizuku.manager.service.WatchdogService
 import moe.shizuku.manager.utils.AccessibilityHelper
 import moe.shizuku.manager.utils.EnvironmentUtils
 import moe.shizuku.manager.utils.RootBootScriptHelper
+import moe.shizuku.manager.utils.ShizukuStateMachine
 import rikka.lifecycle.Resource
 import rikka.lifecycle.Status
 import rikka.lifecycle.viewModels
@@ -105,6 +109,7 @@ class StarterActivity : AppActivity() {
     private val serviceReadyState = mutableStateOf(false)
     private val errorState = mutableStateOf<Throwable?>(null)
     private var serviceReadyHandled = false
+    private var hasStarted = false
 
     private val binderListener = object : Shizuku.OnBinderReceivedListener {
         override fun onBinderReceived() {
@@ -118,12 +123,20 @@ class StarterActivity : AppActivity() {
         serviceReadyHandled = true
         serviceReadyState.value = true
         val current = viewModel.output.value?.data?.toString() ?: ""
-        if (!current.contains("Service started, this window will be automatically closed")) {
-            viewModel.appendOutput("\nService started, this window will be automatically closed in 3 seconds")
+        if (!current.contains(Starter.SERVICE_STARTED_MESSAGE)) {
+            viewModel.appendOutput("\n${Starter.SERVICE_STARTED_MESSAGE}")
         }
         window?.decorView?.postDelayed({
             if (!isFinishing) finish()
-        }, 3000)
+        }, 350)
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && !hasStarted) {
+            hasStarted = true
+            viewModel.start()
+        }
     }
 
     override fun onDestroy() {
@@ -156,55 +169,31 @@ class StarterActivity : AppActivity() {
         }
 
         Shizuku.addBinderReceivedListener(binderListener)
-        if (Shizuku.pingBinder()) {
-            onServiceReady()
-        }
 
-        var waitingForServiceShown = false
         viewModel.output.observe(this) {
             val output = it.data?.toString()?.trim() ?: return@observe
             outputTextState.value = output
-            if (!waitingForServiceShown && output.contains("info: shizuku_starter exit with 0")) {
-                waitingForServiceShown = true
-                if (!output.contains("Waiting for service...")) {
-                    viewModel.appendOutput("\nWaiting for service...")
-                }
-
-                if (Shizuku.pingBinder()) {
-                    onServiceReady()
-                    return@observe
-                }
-
-                lifecycleScope.launch(Dispatchers.IO) {
-                    var bound = false
-                    for (i in 1..60) {
-                        delay(250)
-                        if (Shizuku.pingBinder()) {
-                            bound = true
-                            withContext(Dispatchers.Main) {
-                                onServiceReady()
-                            }
-                            break
-                        }
-                    }
-                    if (!bound && !isFinishing) {
-                        withContext(Dispatchers.Main) {
-                            viewModel.appendOutput("[提示] 服务进程已在后台拉起，若此窗口未自动关闭，可轻触按钮返回主页。")
-                        }
-                    }
-                }
+            if (output.endsWith(Starter.SERVICE_STARTED_MESSAGE)) {
+                onServiceReady()
             } else if (it.status == Status.ERROR) {
                 errorState.value = it.error
             }
         }
 
+        // 兜底：若窗口在 300ms 内仍未收到焦点回调，自动触发 start()
+        window?.decorView?.postDelayed({
+            if (!hasStarted && !isFinishing) {
+                hasStarted = true
+                viewModel.start()
+            }
+        }, 300)
+
         val isDark = moe.shizuku.manager.maxhz.GlassThemeState.resolveIsDark(this)
         val isBlackNight = moe.shizuku.manager.maxhz.GlassThemeState.resolveIsBlackNight(this, isDark)
-        val dialogBgColor = if (isDark) {
-            if (isBlackNight) TitaniumBlack.Card.copy(alpha = 0.90f)
-            else Color(0xCC161B22)
-        } else {
-            Color(0xD9FFFDFB)
+        val dialogBgColor = when {
+            isBlackNight -> Color(0xFF0A0C10)
+            isDark -> Color(0xFA161B22)
+            else -> Color(0xFAFFFDFB)
         }
         val dialogStrokeColor = if (isDark) {
             TitaniumDark.Edge
@@ -540,7 +529,12 @@ private fun StarterMiuixScreen(
     }
 }
 
-private class ViewModel(context: Context, root: Boolean, host: String?, port: Int) : androidx.lifecycle.ViewModel() {
+private class ViewModel(
+    context: Context,
+    private val root: Boolean,
+    private val host: String?,
+    private val port: Int
+) : androidx.lifecycle.ViewModel() {
 
     private val appContext = context.applicationContext
     private val sb = StringBuilder()
@@ -548,15 +542,43 @@ private class ViewModel(context: Context, root: Boolean, host: String?, port: In
 
     val output = _output as LiveData<Resource<StringBuilder>>
 
-    init {
-        try {
-            if (root) {
-                startRoot()
-            } else {
-                startAdb(host ?: "127.0.0.1", port)
+    private var started = false
+
+    fun start() {
+        if (started) return
+        started = true
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                if (root) {
+                    startRoot()
+                } else {
+                    AdbStarter.startAdb(appContext, port) {
+                        appendOutput(it)
+                    }
+                }
+                Starter.waitForBinder {
+                    appendOutput(it)
+                }
+                if (root) {
+                    ShizukuSettings.setLastLaunchMode(ShizukuSettings.LaunchMethod.ROOT)
+                    ShizukuSettings.setLastSettledStateRunning(true)
+                    Shell.cmd(AdbStarter.buildSelfHardeningCommand(appContext)).submit()
+                    if (ShizukuSettings.getWatchdog()) {
+                        runCatching { WatchdogService.start(appContext) }
+                    }
+                    if (ShizukuSettings.getPreferences().getBoolean(ShizukuSettings.KEEP_START_ON_BOOT, false)) {
+                        RootBootScriptHelper.installBootScript()
+                    }
+                }
+            } catch (e: Throwable) {
+                if (ShizukuStateMachine.get() == ShizukuStateMachine.State.STARTING) {
+                    ShizukuStateMachine.set(ShizukuStateMachine.State.STOPPED)
+                }
+                ShizukuStateMachine.update()
+                e.printStackTrace()
+                sb.append('\n').append(Log.getStackTraceString(e))
+                postResult(e)
             }
-        } catch (e: Throwable) {
-            postResult(e)
         }
     }
 
@@ -572,58 +594,34 @@ private class ViewModel(context: Context, root: Boolean, host: String?, port: In
             _output.postValue(Resource.error(throwable, sb))
     }
 
-    private fun startRoot() {
-        sb.append("Starting with root...").append('\n').append('\n')
-        postResult()
+    private suspend fun startRoot() {
+        ShizukuStateMachine.set(ShizukuStateMachine.State.STARTING)
+        appendOutput("Starting with root...\n")
 
-        viewModelScope.launch(Dispatchers.IO) {
+        return withContext(Dispatchers.IO) {
             if (!Shell.getShell().isRoot) {
                 Shell.getCachedShell()?.close()
-                sb.append('\n').append("Can't open root shell, try again...").append('\n')
+                appendOutput("Can't open root shell, try again...\n")
 
-                postResult()
                 if (!Shell.getShell().isRoot) {
-                    sb.append('\n').append("Still not :(").append('\n')
-                    postResult(NotRootedException())
-                    return@launch
+                    appendOutput("Still not :(\n")
+                    throw NotRootedException()
                 }
             }
 
-            Shell.cmd(Starter.internalCommand).to(object : CallbackList<String?>() {
-                override fun onAddElement(s: String?) {
-                    sb.append(s).append('\n')
-                    postResult()
-                }
-            }).submit {
-                if (it.code != 0) {
-                    sb.append('\n').append("Send this to developer may help solve the problem.")
-                    postResult()
-                } else {
-                    ShizukuSettings.setLastLaunchMode(ShizukuSettings.LaunchMethod.ROOT)
-                    ShizukuSettings.setLastSettledStateRunning(true)
-                    Shell.cmd(AdbStarter.buildSelfHardeningCommand(appContext)).submit()
-                    if (ShizukuSettings.getWatchdog()) {
-                        runCatching { WatchdogService.start(appContext) }
+            suspendCancellableCoroutine { cont ->
+                Shell.cmd(Starter.internalCommand).to(object : CallbackList<String?>() {
+                    override fun onAddElement(s: String?) {
+                        s?.let { appendOutput(it) }
                     }
-                    if (ShizukuSettings.getPreferences().getBoolean(ShizukuSettings.KEEP_START_ON_BOOT, false)) {
-                        RootBootScriptHelper.installBootScript()
+                }).submit {
+                    if (it.isSuccess) {
+                        ShizukuStateMachine.update()
+                        cont.resume(Unit)
+                    } else {
+                        cont.resumeWithException(Exception("Command exited with non-zero value"))
                     }
                 }
-            }
-        }
-    }
-
-    private fun startAdb(host: String, port: Int) {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                AdbStarter.startAdb(appContext, port) {
-                    sb.append(it)
-                    postResult()
-                }
-            } catch (e: Throwable) {
-                e.printStackTrace()
-                sb.append('\n').append(Log.getStackTraceString(e))
-                postResult(e)
             }
         }
     }

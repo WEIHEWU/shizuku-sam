@@ -58,6 +58,7 @@ import moe.shizuku.manager.maxhz.getSystemOrAppPrimaryColor
 import moe.shizuku.manager.utils.AppIconCache
 import moe.shizuku.manager.utils.CustomTabsHelper
 import moe.shizuku.manager.utils.Logger.LOGGER
+import moe.shizuku.manager.utils.ShizukuStateMachine
 import moe.shizuku.manager.utils.ShizukuSystemApis
 import moe.shizuku.manager.utils.UserHandleCompat
 import rikka.html.text.HtmlCompat
@@ -79,22 +80,32 @@ import java.util.Objects
 class ApplicationManagementActivity : AppActivity() {
 
     private val viewModel by appsViewModel()
-    private val packagesState = mutableStateOf<List<PackageInfo>>(AppsViewModel.cachedPackages ?: emptyList())
-    private val isLoadingState = mutableStateOf(AppsViewModel.cachedPackages == null)
+    private val packagesState = mutableStateOf<List<PackageInfo>>(emptyList())
+    private val isLoadingState = mutableStateOf(true)
     private val refreshTickState = mutableIntStateOf(0)
+    private var isFirstResume = true
 
-    private val binderDeadListener = Shizuku.OnBinderDeadListener {
-        if (!isFinishing) {
-            finish()
+    private val stateListener: (ShizukuStateMachine.State) -> Unit = { state ->
+        when {
+            ShizukuStateMachine.isDead() && !Shizuku.pingBinder() && !isFinishing -> finish()
+            state == ShizukuStateMachine.State.RUNNING -> viewModel.load()
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        if (!Shizuku.pingBinder()) {
+        if (!Shizuku.pingBinder() && ShizukuStateMachine.isDead()) {
             finish()
             return
+        }
+
+        // 先用毫秒级快照填充缓存，确保首帧 0 等待直接渲染已授权应用列表
+        AppsViewModel.ensureSnapshotHydrated()
+        val initialSnapshot = AppsViewModel.cachedPackages
+        if (initialSnapshot != null) {
+            packagesState.value = initialSnapshot
+            isLoadingState.value = false
         }
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -133,11 +144,8 @@ class ApplicationManagementActivity : AppActivity() {
                 }
             }
         }
-        if (viewModel.packages.value == null) {
-            viewModel.load()
-        }
 
-        Shizuku.addBinderDeadListener(binderDeadListener)
+        ShizukuStateMachine.addListener(stateListener)
 
         val isDark = moe.shizuku.manager.maxhz.GlassThemeState.resolveIsDark(this)
         val isBlackNight = moe.shizuku.manager.maxhz.GlassThemeState.resolveIsBlackNight(this, isDark)
@@ -182,14 +190,19 @@ class ApplicationManagementActivity : AppActivity() {
     }
 
     override fun onDestroy() {
+        ShizukuStateMachine.removeListener(stateListener)
         super.onDestroy()
-        Shizuku.removeBinderDeadListener(binderDeadListener)
     }
 
     override fun onResume() {
         super.onResume()
-        // 对齐上游 Shizuku Plus / Shizuku Next：在后台无感刷新授权状态（AppsViewModel 具备代数锁与缓存首屏保护）
-        viewModel.load()
+        // 对齐上游 Shizuku Plus：跳过紧跟在 onCreate 后的首次 onResume（stateListener 已触发首次 load），
+        // 避免首帧重复发起两次并发全量扫描；从外部返回时再静默刷新授权状态。
+        if (isFirstResume) {
+            isFirstResume = false
+        } else {
+            viewModel.load()
+        }
         refreshTickState.intValue++
     }
 }

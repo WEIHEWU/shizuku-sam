@@ -16,6 +16,7 @@ import moe.shizuku.manager.ShizukuSettings
 import moe.shizuku.manager.ShizukuSettings.LaunchMethod
 import moe.shizuku.manager.adb.AdbStartWorker
 import moe.shizuku.manager.starter.Starter
+import moe.shizuku.manager.utils.ShizukuStateMachine
 import moe.shizuku.manager.utils.UserHandleCompat
 import rikka.shizuku.Shizuku
 
@@ -25,7 +26,9 @@ object ShizukuReceiverStarter {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     fun start(context: Context, forceStart: Boolean = false, onComplete: (() -> Unit)? = null) {
-        if (!forceStart && (UserHandleCompat.myUserId() > 0 || Shizuku.pingBinder())) {
+        if (!forceStart && (UserHandleCompat.myUserId() > 0
+                || ShizukuStateMachine.isRunning()
+                || ShizukuStateMachine.get() == ShizukuStateMachine.State.STARTING)) {
             onComplete?.invoke()
             return
         }
@@ -55,6 +58,13 @@ object ShizukuReceiverStarter {
         }
     }
 
+    fun stop() {
+        if (!ShizukuStateMachine.isRunning()) return
+        ShizukuStateMachine.set(ShizukuStateMachine.State.STOPPING)
+        runCatching { Shizuku.exit() }
+            .onFailure { Log.w(AppConstants.TAG, "Shizuku.exit failed", it) }
+    }
+
     fun cancelAdbStart(context: Context) {
         WorkManager.getInstance(context.applicationContext).cancelUniqueWork(WORK_NAME)
     }
@@ -65,12 +75,22 @@ object ShizukuReceiverStarter {
             return
         }
         try {
+            ShizukuStateMachine.set(ShizukuStateMachine.State.STARTING)
             val result = Shell.cmd(Starter.internalCommand).exec()
             if (!result.isSuccess) {
                 Log.e(AppConstants.TAG, "Root starter exited with code ${result.code}")
+                recoverFromFailedStart()
+            } else {
+                ShizukuStateMachine.update()
             }
         } catch (e: Exception) {
             Log.e(AppConstants.TAG, "Failed to start Shizuku with root", e)
+            recoverFromFailedStart()
         }
+    }
+
+    private fun recoverFromFailedStart() {
+        ShizukuStateMachine.set(ShizukuStateMachine.State.STOPPED)
+        ShizukuStateMachine.update()
     }
 }

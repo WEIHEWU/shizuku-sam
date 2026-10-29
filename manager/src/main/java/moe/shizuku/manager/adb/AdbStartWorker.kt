@@ -2,21 +2,26 @@ package moe.shizuku.manager.adb
 
 import android.Manifest.permission.WRITE_SECURE_SETTINGS
 import android.app.KeyguardManager
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.content.pm.ServiceInfo
 import android.database.ContentObserver
 import android.os.Build
 import android.provider.Settings
 import android.util.Log
 import androidx.annotation.RequiresApi
+import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Observer
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
+import androidx.work.ForegroundInfo
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
@@ -29,9 +34,11 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import moe.shizuku.manager.AppConstants
+import moe.shizuku.manager.R
 import moe.shizuku.manager.ShizukuSettings
 import moe.shizuku.manager.starter.Starter
 import moe.shizuku.manager.utils.EnvironmentUtils
+import moe.shizuku.manager.utils.ShizukuStateMachine
 import rikka.shizuku.Shizuku
 import java.util.concurrent.TimeoutException
 
@@ -131,6 +138,35 @@ class AdbStartWorker(
                     fun handleAuth() {
                         val km = applicationContext.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
                         if (km?.isKeyguardLocked == true) {
+                            runCatching {
+                                val nm = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && nm != null) {
+                                    nm.createNotificationChannel(
+                                        NotificationChannel(
+                                            CHANNEL_ID,
+                                            applicationContext.getString(R.string.notification_channel_adb_pairing),
+                                            NotificationManager.IMPORTANCE_LOW
+                                        )
+                                    )
+                                }
+                                val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
+                                    .setSmallIcon(R.drawable.ic_system_icon)
+                                    .setContentTitle(applicationContext.getString(R.string.app_name))
+                                    .setContentText("等待解锁后自动启动无线调试服务…")
+                                    .setOngoing(true)
+                                    .setSilent(true)
+                                    .build()
+                                val foregroundInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                                    ForegroundInfo(
+                                        NOTIFICATION_ID,
+                                        notification,
+                                        ServiceInfo.FOREGROUND_SERVICE_TYPE_SHORT_SERVICE
+                                    )
+                                } else {
+                                    ForegroundInfo(NOTIFICATION_ID, notification)
+                                }
+                                setForegroundAsync(foregroundInfo)
+                            }
                             val filter = IntentFilter(Intent.ACTION_USER_PRESENT)
                             unlockReceiver = object : BroadcastReceiver() {
                                 override fun onReceive(context: Context, intent: Intent) {
@@ -193,6 +229,10 @@ class AdbStartWorker(
             Log.i(AppConstants.TAG, "doWork: resolved port $port, starting ADB client")
             AdbStarter.startAdb(applicationContext, port)
             Starter.waitForBinder()
+            runCatching {
+                (applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager)
+                    ?.cancel(NOTIFICATION_ID)
+            }
             Log.i(AppConstants.TAG, "doWork: Shizuku service successfully started and binder ready on port $port")
 
             return Result.success()
@@ -200,7 +240,10 @@ class AdbStartWorker(
             throw e
         } catch (e: Exception) {
             Log.w(AppConstants.TAG, "AdbStartWorker failed on runAttempt $runAttemptCount", e)
-            return if (Shizuku.pingBinder()) {
+            if (ShizukuStateMachine.get() == ShizukuStateMachine.State.STARTING) {
+                ShizukuStateMachine.set(ShizukuStateMachine.State.STOPPED)
+            }
+            return if (ShizukuStateMachine.update() == ShizukuStateMachine.State.RUNNING) {
                 Result.success()
             } else {
                 Result.retry()
@@ -209,6 +252,8 @@ class AdbStartWorker(
     }
 
     companion object {
+        private const val CHANNEL_ID = "AdbStartWorker"
+        private const val NOTIFICATION_ID = 1448
         fun enqueue(context: Context) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 val um = context.getSystemService(android.os.UserManager::class.java)

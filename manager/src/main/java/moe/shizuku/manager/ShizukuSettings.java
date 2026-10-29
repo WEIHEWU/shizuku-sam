@@ -13,7 +13,10 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatDelegate;
 
 import java.lang.annotation.Retention;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.Locale;
+import java.util.Set;
 
 import moe.shizuku.manager.service.WatchdogService;
 import moe.shizuku.manager.utils.Token;
@@ -40,6 +43,9 @@ public class ShizukuSettings {
     public static final String KEEP_START_ON_BOOT = "start_on_boot";
     public static final String WATCHDOG = "watchdog";
     public static final String LAST_SETTLED_STATE_RUNNING = "last_settled_state_running";
+    public static final String KEY_LAST_SETTLED_STATE = "last_settled_shizuku_state";
+    public static final String KEY_SERVER_STARTED_BUILD = "server_started_build";
+    public static final String KEY_KNOWN_CLIENT_PACKAGES = "known_client_packages";
     public static final String TCP_MODE = "tcp_mode";
     public static final String TCP_PORT = "tcp_port";
     public static final String LAST_PORT = "last_port";
@@ -114,7 +120,53 @@ public class ShizukuSettings {
     }
 
     public static void setLastSettledStateRunning(boolean running) {
-        getPreferences().edit().putBoolean(LAST_SETTLED_STATE_RUNNING, running).apply();
+        getPreferences().edit()
+                .putBoolean(LAST_SETTLED_STATE_RUNNING, running)
+                .putString(KEY_LAST_SETTLED_STATE, running ? "RUNNING" : "STOPPED")
+                .apply();
+    }
+
+    @Nullable
+    public static String getLastSettledState() {
+        String state = getPreferences().getString(KEY_LAST_SETTLED_STATE, null);
+        if (state != null) {
+            return state;
+        }
+        return isLastSettledStateRunning() ? "RUNNING" : "STOPPED";
+    }
+
+    public static void setLastSettledState(@NonNull String stateName) {
+        SharedPreferences.Editor editor = getPreferences().edit()
+                .putString(KEY_LAST_SETTLED_STATE, stateName);
+        if ("RUNNING".equals(stateName)) {
+            editor.putBoolean(LAST_SETTLED_STATE_RUNNING, true);
+        } else if ("STOPPED".equals(stateName)) {
+            editor.putBoolean(LAST_SETTLED_STATE_RUNNING, false);
+        }
+        editor.apply();
+    }
+
+    public static int getServerStartedBuild() {
+        return getPreferences().getInt(KEY_SERVER_STARTED_BUILD, 0);
+    }
+
+    public static void setServerStartedBuild(int versionCode) {
+        getPreferences().edit().putInt(KEY_SERVER_STARTED_BUILD, versionCode).apply();
+    }
+
+    @NonNull
+    public static Set<String> getKnownClientPackages() {
+        SharedPreferences prefs = getPreferences();
+        if (prefs == null) return Collections.emptySet();
+        Set<String> stored = prefs.getStringSet(KEY_KNOWN_CLIENT_PACKAGES, null);
+        return stored != null ? new HashSet<>(stored) : Collections.emptySet();
+    }
+
+    public static void setKnownClientPackages(@NonNull Set<String> packages) {
+        SharedPreferences prefs = getPreferences();
+        if (prefs != null) {
+            prefs.edit().putStringSet(KEY_KNOWN_CLIENT_PACKAGES, new HashSet<>(packages)).apply();
+        }
     }
 
     public static String getAuthToken() {

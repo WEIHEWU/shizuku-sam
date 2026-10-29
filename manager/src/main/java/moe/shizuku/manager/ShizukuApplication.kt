@@ -10,6 +10,7 @@ import moe.shizuku.manager.ktx.logd
 import moe.shizuku.manager.service.WatchdogAlarmReceiver
 import moe.shizuku.manager.service.WatchdogService
 import moe.shizuku.manager.service.WatchdogWorker
+import moe.shizuku.manager.utils.ShizukuStateMachine
 import org.lsposed.hiddenapibypass.HiddenApiBypass
 import rikka.core.util.BuildUtils.atLeast30
 import rikka.material.app.LocaleDelegate
@@ -38,6 +39,7 @@ class ShizukuApplication : Application() {
         ShizukuSettings.initialize(context)
         LocaleDelegate.defaultLocale = ShizukuSettings.getLocale()
         AppCompatDelegate.setDefaultNightMode(ShizukuSettings.getNightMode())
+        ShizukuStateMachine.update()
     }
 
     override fun onCreate() {
