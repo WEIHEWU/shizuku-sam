@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.os.Parcel
 import moe.shizuku.manager.BuildConfig
 import moe.shizuku.manager.Manifest
+import moe.shizuku.manager.application
 import moe.shizuku.manager.utils.Logger.LOGGER
 import moe.shizuku.manager.utils.ShizukuSystemApis
 import rikka.parcelablelist.ParcelableListSlice
@@ -24,65 +25,128 @@ object AuthorizationManager {
         return try {
             data.writeInterfaceToken("moe.shizuku.server.IShizukuService")
             data.writeInt(userId)
+            val binder = Shizuku.getBinder()
+                ?: throw IllegalStateException("Shizuku binder not available")
             try {
-                Shizuku.getBinder()!!.transact(ServerConstants.BINDER_TRANSACTION_getApplications, data, reply, 0)
+                binder.transact(ServerConstants.BINDER_TRANSACTION_getApplications, data, reply, 0)
             } catch (e: Throwable) {
                 throw RuntimeException(e)
             }
             reply.readException()
             @Suppress("UNCHECKED_CAST")
-            (ParcelableListSlice.CREATOR.createFromParcel(reply) as ParcelableListSlice<PackageInfo>).list!!
+            (ParcelableListSlice.CREATOR.createFromParcel(reply) as? ParcelableListSlice<PackageInfo>)?.list
+                ?: emptyList()
         } finally {
             reply.recycle()
             data.recycle()
         }
     }
 
-    fun getPackages(): List<PackageInfo> {
-        val packages: MutableList<PackageInfo> = ArrayList()
-        if (Shizuku.isPreV11() || (Shizuku.getVersion() == 11 && Shizuku.getServerPatchVersion() < 3)) {
-            val allPackages: MutableList<PackageInfo> = ArrayList()
-            for (user in ShizukuSystemApis.getUsers(useCache = false)) {
-                try {
-                    allPackages.addAll(ShizukuSystemApis.getInstalledPackages((PackageManager.GET_META_DATA or PackageManager.GET_PERMISSIONS).toLong(), user.id))
-                } catch (e: Throwable) {
-                    LOGGER.w(e, "getInstalledPackages")
-                }
-            }
-            for (pi in allPackages) {
-                if (BuildConfig.APPLICATION_ID == pi.packageName) continue
-                if (pi.applicationInfo?.metaData?.getBoolean("moe.shizuku.client.V3_SUPPORT") != true) continue
-                if (pi.requestedPermissions?.contains(Manifest.permission.API_V23) != true) continue
+    private fun isShizukuClientPackage(pi: PackageInfo): Boolean {
+        if (BuildConfig.APPLICATION_ID == pi.packageName) return false
+        val ai = pi.applicationInfo ?: return false
+        val requestsPermission = pi.requestedPermissions?.contains(Manifest.permission.API_V23) == true
+        val isV3Support = ai.metaData?.getBoolean("moe.shizuku.client.V3_SUPPORT") == true
+        return requestsPermission || isV3Support
+    }
 
+    fun getPackages(): List<PackageInfo> {
+        val seenKeys = HashSet<String>()
+        val packages: MutableList<PackageInfo> = ArrayList()
+
+        fun addUnique(pi: PackageInfo) {
+            val uid = pi.applicationInfo?.uid ?: return
+            if (seenKeys.add("${pi.packageName}_$uid")) {
                 packages.add(pi)
             }
-        } else {
-            packages.addAll(getApplications(-1))
         }
+
+        try {
+            if (Shizuku.isPreV11() || (Shizuku.getVersion() == 11 && Shizuku.getServerPatchVersion() < 3)) {
+                for (user in ShizukuSystemApis.getUsers(useCache = false)) {
+                    try {
+                        for (pi in ShizukuSystemApis.getInstalledPackages((PackageManager.GET_META_DATA or PackageManager.GET_PERMISSIONS).toLong(), user.id)) {
+                            if (isShizukuClientPackage(pi)) addUnique(pi)
+                        }
+                    } catch (e: Throwable) {
+                        LOGGER.w(e, "getInstalledPackages")
+                    }
+                }
+            } else {
+                for (pi in getApplications(-1)) {
+                    if (BuildConfig.APPLICATION_ID != pi.packageName && pi.applicationInfo != null) {
+                        addUnique(pi)
+                    }
+                }
+            }
+        } catch (e: Throwable) {
+            LOGGER.w(e, "getPackages from server failed, falling back to local PackageManager")
+        }
+
+        // 纯内存级本地 PackageManager 兜底合并（不发起任何循环内 Binder IPC，耗时 <5ms）：
+        // 兼容驻留内存的旧版 v13.7 服务端进程及 One UI 8/9 (Android 16/17) 隐藏 API 限制
+        try {
+            val pm = application.packageManager
+            val localInstalled = pm.getInstalledPackages(PackageManager.GET_PERMISSIONS or PackageManager.GET_META_DATA)
+            for (pi in localInstalled) {
+                if (isShizukuClientPackage(pi)) {
+                    addUnique(pi)
+                }
+            }
+        } catch (e: Throwable) {
+            LOGGER.w(e, "Local PackageManager scan failed")
+        }
+
         return packages
     }
 
     fun granted(packageName: String, uid: Int): Boolean {
-        return if (Shizuku.isPreV11()) {
-            ShizukuSystemApis.checkPermission(Manifest.permission.API_V23, packageName, uid / 100000) == PackageManager.PERMISSION_GRANTED
-        } else {
-            (Shizuku.getFlagsForUid(uid, MASK_PERMISSION) and FLAG_ALLOWED) == FLAG_ALLOWED
+        return try {
+            // 对齐上游 Shizuku Plus (#398)：进程隔夜从休眠/墓碑唤醒瞬间 Binder 可能短暂未就绪，
+            // 最多重试 3 次，防止 granted() 误返 false 导致已授权数量被清零
+            var binderAlive = Shizuku.pingBinder()
+            if (!binderAlive) {
+                repeat(3) {
+                    if (!binderAlive) {
+                        Thread.sleep(150)
+                        binderAlive = Shizuku.pingBinder()
+                    }
+                }
+            }
+            if (!binderAlive) return false
+            if (Shizuku.isPreV11()) {
+                ShizukuSystemApis.checkPermission(Manifest.permission.API_V23, packageName, uid / 100000) == PackageManager.PERMISSION_GRANTED
+            } else {
+                (Shizuku.getFlagsForUid(uid, MASK_PERMISSION) and FLAG_ALLOWED) == FLAG_ALLOWED
+            }
+        } catch (_: Throwable) {
+            false
         }
     }
 
     fun grant(packageName: String, uid: Int) {
-        if (Shizuku.isPreV11()) {
-            ShizukuSystemApis.grantRuntimePermission(packageName, Manifest.permission.API_V23, uid / 100000)
-        } else {
-            Shizuku.updateFlagsForUid(uid, MASK_PERMISSION, FLAG_ALLOWED)
+        try {
+            if (Shizuku.isPreV11()) {
+                ShizukuSystemApis.grantRuntimePermission(packageName, Manifest.permission.API_V23, uid / 100000)
+            } else {
+                Shizuku.updateFlagsForUid(uid, MASK_PERMISSION, FLAG_ALLOWED)
+            }
+        } catch (e: SecurityException) {
+            throw e
+        } catch (_: Throwable) {
         }
     }
 
     fun revoke(packageName: String, uid: Int) {
-        if (Shizuku.isPreV11()) {
-            ShizukuSystemApis.revokeRuntimePermission(packageName, Manifest.permission.API_V23, uid / 100000)
-        } else {
-            Shizuku.updateFlagsForUid(uid, MASK_PERMISSION, 0)
+        try {
+            if (Shizuku.isPreV11()) {
+                ShizukuSystemApis.revokeRuntimePermission(packageName, Manifest.permission.API_V23, uid / 100000)
+            } else {
+                Shizuku.updateFlagsForUid(uid, MASK_PERMISSION, 0)
+            }
+        } catch (e: SecurityException) {
+            throw e
+        } catch (_: Throwable) {
         }
     }
 }

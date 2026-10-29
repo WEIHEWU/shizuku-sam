@@ -377,6 +377,7 @@ public class ShizukuService extends Service<ShizukuUserServiceManager, ShizukuCl
         enforceManagerPermission("updateFlagsForUid");
 
         int userId = UserHandleCompat.getUserId(uid);
+        List<String> packagesForUid = PackageManagerApis.getPackagesForUidNoThrow(uid);
 
         if ((mask & ConfigManager.MASK_PERMISSION) != 0) {
             boolean allowed = (value & ConfigManager.FLAG_ALLOWED) != 0;
@@ -393,24 +394,30 @@ public class ShizukuService extends Service<ShizukuUserServiceManager, ShizukuCl
                 }
             }
 
-            for (String packageName : PackageManagerApis.getPackagesForUidNoThrow(uid)) {
+            for (String packageName : packagesForUid) {
                 PackageInfo pi = Android17Compat.getPackageInfo(packageName, PackageManager.GET_PERMISSIONS, userId);
                 if (pi == null || pi.requestedPermissions == null || !ArraysKt.contains(pi.requestedPermissions, PERMISSION)) {
                     continue;
                 }
 
-                int deviceId = 0;//Context.DEVICE_ID_DEFAULT
                 if (allowed) {
-                    Android17Compat.grantRuntimePermission(packageName, PERMISSION, userId);
+                    try {
+                        Android17Compat.grantRuntimePermission(packageName, PERMISSION, userId);
+                    } catch (Throwable e) {
+                        LOGGER.w(e, "grantRuntimePermission failed for %s", packageName);
+                    }
                 } else {
-                    Android17Compat.revokeRuntimePermission(packageName, PERMISSION, userId);
+                    try {
+                        Android17Compat.revokeRuntimePermission(packageName, PERMISSION, userId);
+                    } catch (Throwable e) {
+                        LOGGER.w(e, "revokeRuntimePermission failed for %s", packageName);
+                    }
+                    onPermissionRevoked(packageName);
                 }
-
-                // TODO kill user service using
             }
         }
 
-        configManager.update(uid, null, mask, value);
+        configManager.update(uid, packagesForUid, mask, value);
     }
 
     private void onPermissionRevoked(String packageName) {
@@ -428,11 +435,7 @@ public class ShizukuService extends Service<ShizukuUserServiceManager, ShizukuCl
         }
 
         for (int user : users) {
-            List<PackageInfo> packages = PackageManagerApis.getInstalledPackagesNoThrow(PackageManager.GET_META_DATA | PackageManager.GET_PERMISSIONS, user);
-            if (packages.isEmpty()) {
-                packages = InstalledPackagesCompat.getInstalledPackagesNoThrow(PackageManager.GET_META_DATA | PackageManager.GET_PERMISSIONS, user);
-            }
-            for (PackageInfo pi : packages) {
+            for (PackageInfo pi : InstalledPackagesCompat.getInstalledPackagesNoThrow(PackageManager.GET_META_DATA | PackageManager.GET_PERMISSIONS, user)) {
                 if (Objects.equals(MANAGER_APPLICATION_ID, pi.packageName)) continue;
                 if (pi.applicationInfo == null) continue;
 
@@ -447,10 +450,11 @@ public class ShizukuService extends Service<ShizukuUserServiceManager, ShizukuCl
 
                 if (flags != 0) {
                     list.add(pi);
-                } else if (pi.applicationInfo.metaData != null
-                        && pi.applicationInfo.metaData.getBoolean("moe.shizuku.client.V3_SUPPORT", false)
-                        && pi.requestedPermissions != null
+                } else if (pi.requestedPermissions != null
                         && ArraysKt.contains(pi.requestedPermissions, PERMISSION)) {
+                    list.add(pi);
+                } else if (pi.applicationInfo.metaData != null
+                        && pi.applicationInfo.metaData.getBoolean("moe.shizuku.client.V3_SUPPORT", false)) {
                     list.add(pi);
                 }
             }

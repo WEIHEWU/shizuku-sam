@@ -79,8 +79,8 @@ import java.util.Objects
 class ApplicationManagementActivity : AppActivity() {
 
     private val viewModel by appsViewModel()
-    private val packagesState = mutableStateOf<List<PackageInfo>>(emptyList())
-    private val isLoadingState = mutableStateOf(true)
+    private val packagesState = mutableStateOf<List<PackageInfo>>(AppsViewModel.cachedPackages ?: emptyList())
+    private val isLoadingState = mutableStateOf(AppsViewModel.cachedPackages == null)
     private val refreshTickState = mutableIntStateOf(0)
 
     private val binderDeadListener = Shizuku.OnBinderDeadListener {
@@ -106,7 +106,7 @@ class ApplicationManagementActivity : AppActivity() {
         window?.let { win ->
             win.setBackgroundDrawable(ColorDrawable(AndroidColor.TRANSPARENT))
             win.setLayout(dialogWidth, ViewGroup.LayoutParams.WRAP_CONTENT)
-            win.setDimAmount(0.48f)
+            win.setDimAmount(0.58f)
             win.setGravity(Gravity.CENTER)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 win.addFlags(android.view.WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
@@ -127,7 +127,9 @@ class ApplicationManagementActivity : AppActivity() {
                     LOGGER.w(tr, "load packages error")
                 }
                 Status.LOADING -> {
-                    isLoadingState.value = true
+                    if (packagesState.value.isEmpty()) {
+                        isLoadingState.value = true
+                    }
                 }
             }
         }
@@ -141,9 +143,9 @@ class ApplicationManagementActivity : AppActivity() {
         val isBlackNight = moe.shizuku.manager.maxhz.GlassThemeState.resolveIsBlackNight(this, isDark)
 
         val dialogBgColor = when {
-            isBlackNight -> TitaniumBlack.Card.copy(alpha = 0.90f)
-            isDark -> Color(0xCC161B22)
-            else -> Color(0xD9FFFDFB)
+            isBlackNight -> Color(0xFF0A0C10)
+            isDark -> Color(0xFA161B22)
+            else -> Color(0xFAFFFDFB)
         }
         val dialogStrokeColor = if (isDark) TitaniumDark.Edge else GlassLight.DialogHairline
 
@@ -154,6 +156,7 @@ class ApplicationManagementActivity : AppActivity() {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .wrapContentHeight()
                             .heightIn(max = maxHeightDp)
                             .clip(RoundedCornerShape(24.dp))
                             .background(dialogBgColor)
@@ -185,8 +188,8 @@ class ApplicationManagementActivity : AppActivity() {
 
     override fun onResume() {
         super.onResume()
-        // 对齐上游 thedjchi / Shizuku Plus：严禁在 onResume 盲目并发触发全盘 load()
-        // 仅驱动列表视图刷新 tick，消除 Binder 与 PMS 争抢
+        // 对齐上游 Shizuku Plus / Shizuku Next：在后台无感刷新授权状态（AppsViewModel 具备代数锁与缓存首屏保护）
+        viewModel.load()
         refreshTickState.intValue++
     }
 }
@@ -210,29 +213,19 @@ private fun ApplicationManagementMiuixScreen(
     var groupExpanded by remember { mutableStateOf(false) }
     var showAdbLimitedDialog by remember { mutableStateOf(false) }
 
-    val bgColor = if (isBlackNightTheme) {
-        Color.Black
-    } else {
-        MiuixTheme.colorScheme.surface
-    }
-
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        containerColor = Color.Transparent,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0)
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxWidth()
+            .wrapContentHeight()
+            .overScrollVertical(),
+        contentPadding = PaddingValues(
+            top = 12.dp,
+            start = 14.dp,
+            end = 14.dp,
+            bottom = 16.dp
+        ),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .overScrollVertical(),
-            contentPadding = PaddingValues(
-                top = 12.dp,
-                start = 14.dp,
-                end = 14.dp,
-                bottom = 16.dp
-            ),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
             item(key = "header-top") {
                 MiuixSubPageTopBar(
                     title = stringResource(R.string.home_app_management_title),
@@ -328,7 +321,6 @@ private fun ApplicationManagementMiuixScreen(
                     }
                 }
             }
-        }
     }
 
     // Miuix 窗口级弹窗：ADB 权限受限提示

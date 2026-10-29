@@ -31,12 +31,17 @@ public final class InstalledPackagesCompat {
     @SuppressWarnings("unchecked")
     public static List<PackageInfo> getInstalledPackages(long flags, int userId) throws ReflectiveOperationException {
         try {
-            var slice = rikka.hidden.compat.PackageManagerApis.getInstalledPackages(flags, userId);
-            if (slice != null && slice.getList() != null) {
-                return slice.getList();
+            Object packageManager = getContextPackageManager();
+            if (packageManager != null) {
+                Method method = packageManager.getClass().getMethod("getInstalledPackagesAsUser", int.class, int.class);
+                Object result = invoke(method, packageManager, (int) flags, userId);
+                if (result != null) {
+                    return (List<PackageInfo>) result;
+                }
             }
-        } catch (Throwable tr) {
-            Log.d(TAG, "PackageManagerApis.getInstalledPackages failed, falling back to direct reflection", tr);
+        } catch (NoSuchMethodException ignored) {
+        } catch (Throwable e) {
+            Log.d(TAG, "getInstalledPackagesAsUser failed, falling back to hidden API", e);
         }
 
         Object packageManager = getPackageManager();
@@ -70,6 +75,28 @@ public final class InstalledPackagesCompat {
         field.setAccessible(true);
         Object service = field.get(null);
         return service.getClass().getMethod("get").invoke(service);
+    }
+
+    private static Object getContextPackageManager() throws ReflectiveOperationException {
+        Class<?> activityThreadClass = Class.forName("android.app.ActivityThread");
+        Object activityThread = activityThreadClass.getMethod("currentActivityThread").invoke(null);
+        if (activityThread != null) {
+            Object application = activityThreadClass.getMethod("getApplication").invoke(activityThread);
+            if (application != null) {
+                return application.getClass().getMethod("getPackageManager").invoke(application);
+            }
+            Object systemContext = activityThreadClass.getMethod("getSystemContext").invoke(activityThread);
+            if (systemContext != null) {
+                return systemContext.getClass().getMethod("getPackageManager").invoke(systemContext);
+            }
+        }
+
+        if (android.os.Looper.myLooper() != null) {
+            activityThread = activityThreadClass.getMethod("systemMain").invoke(null);
+            Object systemContext = activityThreadClass.getMethod("getSystemContext").invoke(activityThread);
+            return systemContext.getClass().getMethod("getPackageManager").invoke(systemContext);
+        }
+        return null;
     }
 
     private static Object invoke(Method method, Object receiver, Object... args) throws ReflectiveOperationException {
