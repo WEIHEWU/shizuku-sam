@@ -79,8 +79,8 @@ import java.util.Objects
 class ApplicationManagementActivity : AppActivity() {
 
     private val viewModel by appsViewModel()
-    private val packagesState = mutableStateOf<List<PackageInfo>>(AppsRepository.cachedPackages ?: emptyList())
-    private val isLoadingState = mutableStateOf(AppsRepository.cachedPackages == null)
+    private val packagesState = mutableStateOf<List<PackageInfo>>(emptyList())
+    private val isLoadingState = mutableStateOf(true)
     private val refreshTickState = mutableIntStateOf(0)
 
     private val binderDeadListener = Shizuku.OnBinderDeadListener {
@@ -127,16 +127,11 @@ class ApplicationManagementActivity : AppActivity() {
                     LOGGER.w(tr, "load packages error")
                 }
                 Status.LOADING -> {
-                    if (packagesState.value.isEmpty()) {
-                        isLoadingState.value = true
-                    }
+                    isLoadingState.value = true
                 }
             }
         }
-        if (AppsRepository.cachedPackages == null) {
-            viewModel.load(force = true)
-        } else if (!AppsRepository.isFresh(8000L)) {
-            // 已有内存缓存：首帧 0ms 秒开无感渲染，后台静默刷新
+        if (viewModel.packages.value == null) {
             viewModel.load()
         }
 
@@ -173,7 +168,7 @@ class ApplicationManagementActivity : AppActivity() {
                             refreshTick = refreshTickState.intValue,
                             onBackClick = { finish() },
                             onReloadCount = {
-                                viewModel.load(onlyCount = true, force = true)
+                                viewModel.load(onlyCount = true)
                                 refreshTickState.intValue++
                             }
                         )

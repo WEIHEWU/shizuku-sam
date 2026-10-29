@@ -12,22 +12,25 @@ object MaxHzRefreshSettings {
 
     fun applyScreenOnAdaptive(context: Context) {
         val bounds = refreshBounds(context)
-        if (!writeAdaptiveDirect(context, bounds.maxHz, bounds.minHz)) {
+        val directOk = writeAdaptiveDirect(context, bounds.maxHz, bounds.minHz)
+        if (!directOk || MaxHzShell.isReady()) {
             MaxHzController.applyScreenOnAdaptiveFast(bounds.maxHz, bounds.minHz)
         }
     }
 
     fun applyAdaptiveMax(context: Context, maxHz: Int, minHz: Int = 10) {
         val safeMax = maxHz.coerceIn(1, 240)
-        val safeMin = minHz.coerceIn(1, safeMax)
-        if (!writeAdaptiveDirect(context, safeMax, safeMin)) {
+        val safeMin = minHz.coerceIn(0, safeMax)
+        val directOk = writeAdaptiveDirect(context, safeMax, safeMin)
+        if (!directOk || MaxHzShell.isReady()) {
             MaxHzController.applyAdaptiveMax(safeMax, safeMin)
         }
     }
 
     fun applyStaticRefreshRate(context: Context, hz: Int) {
         val safeHz = hz.coerceIn(1, 240)
-        if (!writeStaticDirect(context, safeHz)) {
+        val directOk = writeStaticDirect(context, safeHz)
+        if (!directOk || MaxHzShell.isReady()) {
             MaxHzController.applyStaticRefreshRate(safeHz)
         }
     }
@@ -82,13 +85,26 @@ object MaxHzRefreshSettings {
     private fun writeStaticDirect(context: Context, hz: Int): Boolean {
         return runCatching {
             val cr = context.contentResolver
-            Settings.Secure.putInt(cr, "refresh_rate_mode", 0)
-            Settings.Secure.putInt(cr, "refresh_rate", hz)
-            Settings.Secure.putInt(cr, "user_refresh_rate", hz)
-            Settings.System.putString(cr, "peak_refresh_rate", hz.toString())
+            Settings.Global.putInt(cr, "pms_settings_refresh_rate_enabled", 0)
+            Settings.Global.putInt(cr, "psm_refresh_rate_tag", 0)
+            deleteGlobal(context, "sem_power_mode_refresh_rate")
+            deleteGlobal(context, "sem_power_mode_refresh_rate_cover")
+            if (hz == 60) {
+                Settings.Secure.putInt(cr, "refresh_rate_mode", 0)
+                Settings.Secure.putInt(cr, "refresh_rate", 60)
+                Settings.Secure.putInt(cr, "user_refresh_rate", 60)
+            } else {
+                // 三星 One UI 中 refresh_rate_mode=0 是 60Hz 标准上限锁，
+                // 固定 120Hz/90Hz 或固定 48Hz/30Hz/24Hz 必须处于 mode=1 并令 min=peak=hz
+                Settings.Secure.putInt(cr, "refresh_rate_mode", 1)
+                deleteSecure(context, "refresh_rate")
+                Settings.Secure.putInt(cr, "user_refresh_rate", hz)
+            }
+            Settings.System.putString(cr, "peak_refresh_rate", "$hz.0")
             Settings.System.putString(cr, "user_refresh_rate", hz.toString())
-            Settings.System.putString(cr, "min_refresh_rate", hz.toString())
+            Settings.System.putString(cr, "min_refresh_rate", "$hz.0")
             deleteSystem(context, "custom_refresh_rate")
+            deleteSystem(context, "display_min_refresh_rate")
         }.onFailure {
             Log.w(TAG, "Direct static refresh write failed: hz=$hz", it)
         }.isSuccess

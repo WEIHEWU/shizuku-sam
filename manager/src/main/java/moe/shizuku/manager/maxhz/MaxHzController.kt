@@ -329,17 +329,12 @@ object MaxHzController {
           sleep 0.15
           settings put secure refresh_rate_mode 1 >/dev/null 2>&1 || true
           settings put secure user_refresh_rate 120 >/dev/null 2>&1 || true
-          settings put system peak_refresh_rate 120 >/dev/null 2>&1 || true
+          settings put system peak_refresh_rate 120.0 >/dev/null 2>&1 || true
           settings put system user_refresh_rate 120 >/dev/null 2>&1 || true
-          settings put system min_refresh_rate 10 >/dev/null 2>&1 || true
-          display_size="${'$'}(wm size 2>/dev/null | sed -n 's/Override size: //p' | head -n 1)"
-          [ -z "${'$'}display_size" ] && display_size="${'$'}(wm size 2>/dev/null | sed -n 's/Physical size: //p' | head -n 1)"
-          width="${'$'}{display_size%x*}"
-          height="${'$'}{display_size#*x}"
-          case "${'$'}width:${'$'}height" in
-            *[!0-9:]*|:|*:|"${'$'}display_size:${'$'}display_size") ;;
-            *) cmd display set-user-preferred-display-mode "${'$'}width" "${'$'}height" 120 0 true >/dev/null 2>&1 || true ;;
-          esac
+          settings put system min_refresh_rate 0.0 >/dev/null 2>&1 || true
+          settings delete system custom_refresh_rate >/dev/null 2>&1 || true
+          settings delete system display_min_refresh_rate >/dev/null 2>&1 || true
+          cmd display clear-user-preferred-display-mode 0 >/dev/null 2>&1 || true
         }
 
         nudge_adaptive_refresh_if_needed() {
@@ -441,6 +436,8 @@ object MaxHzController {
           backup_setting global battery_protection_threshold
           backup_setting global battery_protection_limit
           backup_setting global battery_protection_recharge_level
+          backup_setting global ltc_highsoc_threshold
+          backup_setting global ltc_release_threshold
           backup_setting global recharge_level
           backup_setting system battery_protection_threshold
           backup_setting system battery_protection_limit
@@ -461,7 +458,31 @@ object MaxHzController {
         }
 
         restore_battery_protection() {
-          force_basic_battery_protection
+          force_fallback="${'$'}{1:-1}"
+          has_backup=0
+          for k in maxhz_backup_global_protect_battery maxhz_backup_system_protect_battery maxhz_backup_global_battery_protection_threshold maxhz_backup_global_ltc_highsoc_threshold; do
+            v="${'$'}(settings get global "${'$'}k" 2>/dev/null)"
+            if [ -n "${'$'}v" ] && [ "${'$'}v" != "null" ]; then
+              has_backup=1
+              break
+            fi
+          done
+          if [ "${'$'}has_backup" = "1" ]; then
+            for key in protect_battery battery_protection battery_protection_threshold battery_protection_limit battery_protection_recharge_level ltc_highsoc_threshold ltc_release_threshold recharge_level; do
+              restore_or_delete_setting global "${'$'}key"
+            done
+            for key in protect_battery battery_life_protect_enabled battery_protection_threshold battery_protection_limit battery_protection_recharge_level; do
+              restore_or_delete_setting system "${'$'}key"
+            done
+            for key in protect_battery battery_protection battery_protection_threshold battery_protection_limit battery_protection_recharge_level; do
+              restore_or_delete_setting secure "${'$'}key"
+            done
+            echo "已按备份恢复用户原有的系统电池保护设置。"
+          elif [ "${'$'}force_fallback" = "1" ]; then
+            force_basic_battery_protection
+          else
+            echo "未检测到本应用对电池保护的修改备份，保持系统原有电池保护设置不变。"
+          fi
         }
 
         force_basic_battery_protection() {
@@ -1488,8 +1509,8 @@ object MaxHzController {
               restore_or_delete_setting system "${'$'}key"
             done
             nudge_adaptive_refresh_if_needed "${'$'}refresh_mode_backup" 1
-            force_basic_battery_protection
-            echo "已完成最终恢复收尾：刷新率已恢复，电池保护不再由本 App 强制改写。"
+            restore_battery_protection 0
+            echo "已完成最终恢复收尾：刷新率已恢复，电池保护保持用户原有系统设置。"
             """.trimIndent(),
             timeoutSeconds = 10
         )
@@ -1613,7 +1634,7 @@ object MaxHzController {
             clear_prop debug.game.video.support
             clear_prop debug.game.video.speed
 
-            force_basic_battery_protection
+            restore_battery_protection 0
             reload_samsung_adaptive_refresh
             if [ "${'$'}rotation_acc_before" != "null" ] && [ -n "${'$'}rotation_acc_before" ]; then
               settings put system accelerometer_rotation "${'$'}rotation_acc_before" >/dev/null 2>&1 || true
@@ -2903,23 +2924,31 @@ object MaxHzController {
     }
 
     fun applyAdaptiveMax(maxHz: Int, minHz: Int = 10): MaxHzShell.Result {
+        val safeMax = maxHz.coerceIn(1, 240)
+        val safeMin = minHz.coerceIn(0, safeMax)
         return MaxHzShell.exec(
             """
+            settings put global pms_settings_refresh_rate_enabled 0 >/dev/null 2>&1 || true
+            settings put global psm_refresh_rate_tag 0 >/dev/null 2>&1 || true
+            settings delete global sem_power_mode_refresh_rate >/dev/null 2>&1 || true
+            settings delete global sem_power_mode_refresh_rate_cover >/dev/null 2>&1 || true
             settings put secure refresh_rate_mode 1
             settings delete secure refresh_rate >/dev/null 2>&1
-            settings put secure user_refresh_rate $maxHz
-            settings put system peak_refresh_rate $maxHz
-            settings put system user_refresh_rate $maxHz
-            settings put system min_refresh_rate $minHz
+            settings put secure user_refresh_rate $safeMax
+            settings put system peak_refresh_rate ${safeMax}.0
+            settings put system user_refresh_rate $safeMax
+            settings put system min_refresh_rate ${safeMin}.0
+            settings delete system custom_refresh_rate >/dev/null 2>&1 || true
+            settings delete system display_min_refresh_rate >/dev/null 2>&1 || true
             mode_now="${'$'}(settings get secure refresh_rate_mode 2>/dev/null)"
             peak_now="${'$'}(settings get system peak_refresh_rate 2>/dev/null)"
             min_now="${'$'}(settings get system min_refresh_rate 2>/dev/null)"
-            if [ "${'$'}mode_now" != "1" ] || ! printf '%s' "${'$'}peak_now" | grep -Eq "^${maxHz}(\\.0)?${'$'}" || ! printf '%s' "${'$'}min_now" | grep -Eq "^${minHz}(\\.0)?${'$'}"; then
+            if [ "${'$'}mode_now" != "1" ] || ! printf '%s' "${'$'}peak_now" | grep -Eq "^${safeMax}(\\.0)?${'$'}" || ! printf '%s' "${'$'}min_now" | grep -Eq "^${safeMin}(\\.0)?${'$'}"; then
               echo "验证失败：自适应刷新率没有生效。"
               echo "当前状态：mode=${'$'}mode_now，最高=${'$'}peak_now，最低=${'$'}min_now"
               exit 4
             fi
-            echo "已应用自适应刷新率：最高${maxHz}Hz，最低${minHz}Hz"
+            echo "已应用自适应刷新率：最高${safeMax}Hz，最低${safeMin}Hz"
             """.trimIndent()
         )
     }
@@ -2927,7 +2956,7 @@ object MaxHzController {
     fun applyAdaptiveMaxForPackage(packageName: String, maxHz: Int, minHz: Int = 10): MaxHzShell.Result {
         val safePackage = shellQuote(packageName)
         val safeMax = maxHz.coerceIn(1, 240)
-        val safeMin = minHz.coerceIn(1, safeMax)
+        val safeMin = minHz.coerceIn(0, safeMax)
         return MaxHzShell.exec(
             """
             target_pkg=$safePackage
@@ -2939,12 +2968,18 @@ object MaxHzController {
               echo "跳过应用刷新率：前台已从 ${'$'}target_pkg 切到 ${'$'}current_pkg"
               exit 3
             fi
+            settings put global pms_settings_refresh_rate_enabled 0 >/dev/null 2>&1 || true
+            settings put global psm_refresh_rate_tag 0 >/dev/null 2>&1 || true
+            settings delete global sem_power_mode_refresh_rate >/dev/null 2>&1 || true
+            settings delete global sem_power_mode_refresh_rate_cover >/dev/null 2>&1 || true
             settings put secure refresh_rate_mode 1
             settings delete secure refresh_rate >/dev/null 2>&1
             settings put secure user_refresh_rate $safeMax
-            settings put system peak_refresh_rate $safeMax
+            settings put system peak_refresh_rate ${safeMax}.0
             settings put system user_refresh_rate $safeMax
-            settings put system min_refresh_rate $safeMin
+            settings put system min_refresh_rate ${safeMin}.0
+            settings delete system custom_refresh_rate >/dev/null 2>&1 || true
+            settings delete system display_min_refresh_rate >/dev/null 2>&1 || true
             mode_now="${'$'}(settings get secure refresh_rate_mode 2>/dev/null)"
             peak_now="${'$'}(settings get system peak_refresh_rate 2>/dev/null)"
             min_now="${'$'}(settings get system min_refresh_rate 2>/dev/null)"
@@ -2960,20 +2995,38 @@ object MaxHzController {
 
     fun applyStaticRefreshRate(hz: Int): MaxHzShell.Result {
         val safeHz = hz.coerceIn(1, 240)
-        return MaxHzShell.exec(
+        val expectedMode = if (safeHz == 60) "0" else "1"
+        val modeSetup = if (safeHz == 60) {
             """
             settings put secure refresh_rate_mode 0
-            settings put secure refresh_rate $safeHz
+            settings put secure refresh_rate 60
+            settings put secure user_refresh_rate 60
+            """.trimIndent()
+        } else {
+            """
+            settings put secure refresh_rate_mode 1
+            settings delete secure refresh_rate >/dev/null 2>&1
             settings put secure user_refresh_rate $safeHz
-            settings put system peak_refresh_rate $safeHz
+            """.trimIndent()
+        }
+        return MaxHzShell.exec(
+            """
+            settings put global pms_settings_refresh_rate_enabled 0 >/dev/null 2>&1 || true
+            settings put global psm_refresh_rate_tag 0 >/dev/null 2>&1 || true
+            settings delete global sem_power_mode_refresh_rate >/dev/null 2>&1 || true
+            settings delete global sem_power_mode_refresh_rate_cover >/dev/null 2>&1 || true
+            $modeSetup
+            settings put system peak_refresh_rate ${safeHz}.0
             settings put system user_refresh_rate $safeHz
-            settings put system min_refresh_rate $safeHz
+            settings put system min_refresh_rate ${safeHz}.0
+            settings delete system custom_refresh_rate >/dev/null 2>&1 || true
+            settings delete system display_min_refresh_rate >/dev/null 2>&1 || true
             mode_now="${'$'}(settings get secure refresh_rate_mode 2>/dev/null)"
-            refresh_now="${'$'}(settings get secure refresh_rate 2>/dev/null)"
             peak_now="${'$'}(settings get system peak_refresh_rate 2>/dev/null)"
-            if [ "${'$'}mode_now" != "0" ] || ! printf '%s\n%s' "${'$'}refresh_now" "${'$'}peak_now" | grep -Eq "^${safeHz}(\\.0)?${'$'}"; then
+            min_now="${'$'}(settings get system min_refresh_rate 2>/dev/null)"
+            if [ "${'$'}mode_now" != "$expectedMode" ] || ! printf '%s' "${'$'}peak_now" | grep -Eq "^${safeHz}(\\.0)?${'$'}" || ! printf '%s' "${'$'}min_now" | grep -Eq "^${safeHz}(\\.0)?${'$'}"; then
               echo "验证失败：静态刷新率没有生效。"
-              echo "当前状态：mode=${'$'}mode_now，固定=${'$'}refresh_now，最高=${'$'}peak_now"
+              echo "当前状态：mode=${'$'}mode_now，最高=${'$'}peak_now，最低=${'$'}min_now"
               exit 4
             fi
             echo "已应用静态刷新率：${safeHz}Hz"
@@ -2984,6 +3037,20 @@ object MaxHzController {
     fun applyStaticRefreshRateForPackage(packageName: String, hz: Int): MaxHzShell.Result {
         val safePackage = shellQuote(packageName)
         val safeHz = hz.coerceIn(1, 240)
+        val expectedMode = if (safeHz == 60) "0" else "1"
+        val modeSetup = if (safeHz == 60) {
+            """
+            settings put secure refresh_rate_mode 0
+            settings put secure refresh_rate 60
+            settings put secure user_refresh_rate 60
+            """.trimIndent()
+        } else {
+            """
+            settings put secure refresh_rate_mode 1
+            settings delete secure refresh_rate >/dev/null 2>&1
+            settings put secure user_refresh_rate $safeHz
+            """.trimIndent()
+        }
         return MaxHzShell.exec(
             """
             target_pkg=$safePackage
@@ -2995,18 +3062,22 @@ object MaxHzController {
               echo "跳过应用刷新率：前台已从 ${'$'}target_pkg 切到 ${'$'}current_pkg"
               exit 3
             fi
-            settings put secure refresh_rate_mode 0
-            settings put secure refresh_rate $safeHz
-            settings put secure user_refresh_rate $safeHz
-            settings put system peak_refresh_rate $safeHz
+            settings put global pms_settings_refresh_rate_enabled 0 >/dev/null 2>&1 || true
+            settings put global psm_refresh_rate_tag 0 >/dev/null 2>&1 || true
+            settings delete global sem_power_mode_refresh_rate >/dev/null 2>&1 || true
+            settings delete global sem_power_mode_refresh_rate_cover >/dev/null 2>&1 || true
+            $modeSetup
+            settings put system peak_refresh_rate ${safeHz}.0
             settings put system user_refresh_rate $safeHz
-            settings put system min_refresh_rate $safeHz
+            settings put system min_refresh_rate ${safeHz}.0
+            settings delete system custom_refresh_rate >/dev/null 2>&1 || true
+            settings delete system display_min_refresh_rate >/dev/null 2>&1 || true
             mode_now="${'$'}(settings get secure refresh_rate_mode 2>/dev/null)"
-            refresh_now="${'$'}(settings get secure refresh_rate 2>/dev/null)"
             peak_now="${'$'}(settings get system peak_refresh_rate 2>/dev/null)"
-            if [ "${'$'}mode_now" != "0" ] || ! printf '%s\n%s' "${'$'}refresh_now" "${'$'}peak_now" | grep -Eq "^${safeHz}(\\.0)?${'$'}"; then
+            min_now="${'$'}(settings get system min_refresh_rate 2>/dev/null)"
+            if [ "${'$'}mode_now" != "$expectedMode" ] || ! printf '%s' "${'$'}peak_now" | grep -Eq "^${safeHz}(\\.0)?${'$'}" || ! printf '%s' "${'$'}min_now" | grep -Eq "^${safeHz}(\\.0)?${'$'}"; then
               echo "验证失败：应用静态刷新率没有生效。"
-              echo "当前状态：mode=${'$'}mode_now，固定=${'$'}refresh_now，最高=${'$'}peak_now"
+              echo "当前状态：mode=${'$'}mode_now，最高=${'$'}peak_now，最低=${'$'}min_now"
               exit 4
             fi
             echo "已对 ${'$'}target_pkg 应用静态刷新率：${safeHz}Hz"

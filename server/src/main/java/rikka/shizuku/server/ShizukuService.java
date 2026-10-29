@@ -428,7 +428,11 @@ public class ShizukuService extends Service<ShizukuUserServiceManager, ShizukuCl
         }
 
         for (int user : users) {
-            for (PackageInfo pi : InstalledPackagesCompat.getInstalledPackagesNoThrow(PackageManager.GET_META_DATA | PackageManager.GET_PERMISSIONS, user)) {
+            List<PackageInfo> packages = PackageManagerApis.getInstalledPackagesNoThrow(PackageManager.GET_META_DATA | PackageManager.GET_PERMISSIONS, user);
+            if (packages.isEmpty()) {
+                packages = InstalledPackagesCompat.getInstalledPackagesNoThrow(PackageManager.GET_META_DATA | PackageManager.GET_PERMISSIONS, user);
+            }
+            for (PackageInfo pi : packages) {
                 if (Objects.equals(MANAGER_APPLICATION_ID, pi.packageName)) continue;
                 if (pi.applicationInfo == null) continue;
 

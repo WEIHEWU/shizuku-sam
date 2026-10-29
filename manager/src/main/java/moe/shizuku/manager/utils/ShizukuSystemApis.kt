@@ -10,7 +10,6 @@ import rikka.hidden.compat.UserManagerApis
 import rikka.hidden.compat.util.SystemServiceBinder
 import rikka.shizuku.Shizuku
 import rikka.shizuku.ShizukuBinderWrapper
-import rikka.shizuku.server.util.InstalledPackagesCompat
 
 object ShizukuSystemApis {
 
@@ -58,10 +57,11 @@ object ShizukuSystemApis {
         return if (!Shizuku.pingBinder()) {
             ArrayList()
         } else try {
-            InstalledPackagesCompat.getInstalledPackages(flags, userId)
+            val listSlice: ParceledListSlice<PackageInfo>? = PackageManagerApis.getInstalledPackages(flags, userId)
+            return if (listSlice != null) {
+                listSlice.list
+            } else ArrayList()
         } catch (tr: RemoteException) {
-            throw RuntimeException(tr.message, tr)
-        } catch (tr: ReflectiveOperationException) {
             throw RuntimeException(tr.message, tr)
         }
     }

@@ -85,12 +85,11 @@ abstract class HomeActivity : MaxHzActivity() {
 
     private val binderReceivedListener = Shizuku.OnBinderReceivedListener {
         checkServerStatus()
-        appsModel.load(force = true)
+        appsModel.load()
     }
 
     private val binderDeadListener = Shizuku.OnBinderDeadListener {
         checkServerStatus()
-        moe.shizuku.manager.management.AppsRepository.clear()
     }
 
     private val homeModel by viewModels { HomeViewModel() }
@@ -177,8 +176,8 @@ abstract class HomeActivity : MaxHzActivity() {
             }
         }
         appsModel.grantedCount.observe(this) {
-            homeGrantedState.intValue = appsModel.grantedCount.value?.data ?: 0
             if (it.status == Status.SUCCESS) {
+                homeGrantedState.intValue = it.data ?: 0
                 if (selectedPage == Page.SHIZUKU && homeComposeView == null) {
                     renderShizukuDslPage()
                 }
@@ -2152,6 +2151,9 @@ abstract class HomeActivity : MaxHzActivity() {
 
     private fun checkServerStatus() {
         homeModel.reload()
+        if (Shizuku.pingBinder()) {
+            appsModel.load(onlyCount = true)
+        }
         isAutoPairingState.value = AdbPairingAccessibilityService.isEnabled(this)
         isDeviceOwnerState.value = DhizukuHelper.isPrivileged(this)
         if (isDeviceOwnerState.value) {

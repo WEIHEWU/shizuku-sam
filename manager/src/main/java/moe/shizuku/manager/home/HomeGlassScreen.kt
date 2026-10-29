@@ -3533,7 +3533,7 @@ private fun AppRulesTabContent(
                         )
                     }
 
-                    val maxRates = listOf(120, 90, 60, 48)
+                    val maxRates = listOf(120, 96, 90, 60, 48, 30, 24)
                     val maxRateLabels = maxRates.map { "${it}Hz" }
                     val selectedMaxIndex = maxRates.indexOf(targetMaxHz).coerceAtLeast(0)
                     val showMaxHzSub = formGroupExpanded xor maxHzRowToggled
