@@ -607,8 +607,32 @@ jobs:
           files: |
             releases/Shizuku-Sam-v13.8.38.apk
 
+      - name: "Publish Release v13.8.39 (Fix Adaptive Power Saver, 2K Resolution/DPI Guard & Restore, and Game Mode State Sync)"
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v13.8.39
+          name: "Shizuku Sam v13.8.39 — 修复省电自适应重启降 1080p/改 DPI、恢复默认失效与进度弹窗、省电模式不生效及切回变游戏满血问题"
+          body: |
+            ### Shizuku Sam v13.8.39
+
+            #### 🛡️ 修复点击「省电自适应」重启后分辨率变 1080p、DPI 改变问题 (`MaxHzController.kt`)
+            - **移除所有 `cmd display clear-user-preferred-display-mode 0` 调用**：杜绝抹除 Android `DisplayManagerService` 中保存的用户 2K（QHD+ `1440×3120`）显示模式偏好，防止重启后回退至默认 FHD+（`1080×2340`）并缩放 DPI；
+            - **新增 `guard_display_resolution_and_dpi_before_saver()` 与 `guard_display_resolution_and_dpi_after_saver()`**：在开启省电模式前预先关闭三星 One UI 省电「降低屏幕分辨率」子开关（`pms_settings_screen_resolution_enabled=0`、`psm_screen_resolution_changed=0`），并对 `display_size_forced` 与 `display_density_forced` 进行快照守护与毫秒级回写校验。
+
+            #### 🔄 修复「恢复系统默认」不恢复分辨率/DPI/省电状态及无进度显示问题 (`MaxHzController.kt` / `HomeActivity.kt` / `MaxHzActivity.kt`)
+            - **新增原生 2K 分辨率与 DPI 自动还原 (`restore_display_resolution_and_dpi`)**：在点击「恢复系统默认」或「一键校准」时，若检测到 2K 屏幕被降为 `1080p`/`720p` 或 DPI 被按比例缩小，自动还原为原生 2K 分辨率（`1440×3120` + `wm size reset`）及对应 2K DPI（如 `450 -> 600`、`420 -> 560`）；
+            - **修复备份省电状态反向开启省电的缺陷**：在 `restore_compatible_saver_for_total()` 与 `restore_compatible_saver()` 中无条件关闭省电模式（`set_power_saver_and_verify 0`）并清理残留备份键，移除末尾会导致中断退出的 `exit 4`；
+            - **新增可视化恢复进度弹窗**：点击「恢复系统默认」确认后立即显示不可取消的恢复进度弹窗，并在完成后强制刷新全量开关状态与结果提示。
+
+            #### ⚡ 修复「省电自适应」不自动开启省电模式、高刷不生效及切回变「游戏满血」问题 (`MaxHzController.kt` / `HomeActivity.kt`)
+            - **完整写入 One UI 省电状态键与充电态兼容校验**：同步写入 `low_power=1`、`low_power_mode=1`、`low_power_mode_opened=1`、`POWER_SAVE_MODE_OPEN=1` 并调用 `cmd power set-mode 1`，修正充电状态下 `dumpsys power` 校验误判导致的 `exit 4`；
+            - **调整省电高刷时序**：先锁定 `pms_settings_refresh_rate_enabled=0`、`psm_refresh_rate_tag=0`，开启省电等待 One UI 电源服务稳定后再写入 `refresh_rate_mode=1`、`peak_refresh_rate=120.0`、`min_refresh_rate=0.0`，真正生效 1Hz~120Hz 省电自适应高刷；
+            - **修复退出软件切回变成「游戏满血」**：开启省电自适应时主动清理 `sem_enhanced_cpu_responsiveness`，并在 `HomeActivity` 状态同步中移除 `sysPerf` 越权覆盖 UI 模式的逻辑，确保省电自适应状态稳定保持。
+          files: |
+            releases/Shizuku-Sam-v13.8.39.apk
+
       - name: Publish Future Version Tag Release
-        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2' && github.ref_name != 'v13.8.3' && github.ref_name != 'v13.8.4' && github.ref_name != 'v13.8.5' && github.ref_name != 'v13.8.6' && github.ref_name != 'v13.8.7' && github.ref_name != 'v13.8.8' && github.ref_name != 'v13.8.9' && github.ref_name != 'v13.8.10' && github.ref_name != 'v13.8.11' && github.ref_name != 'v13.8.19' && github.ref_name != 'v13.8.20' && github.ref_name != 'v13.8.21' && github.ref_name != 'v13.8.22' && github.ref_name != 'v13.8.23' && github.ref_name != 'v13.8.27' && github.ref_name != 'v13.8.28' && github.ref_name != 'v13.8.29' && github.ref_name != 'v13.8.30' && github.ref_name != 'v13.8.31' && github.ref_name != 'v13.8.32' && github.ref_name != 'v13.8.33' && github.ref_name != 'v13.8.34' && github.ref_name != 'v13.8.35' && github.ref_name != 'v13.8.36' && github.ref_name != 'v13.8.37' && github.ref_name != 'v13.8.38'
+        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.7.3' && github.ref_name != 'v13.7.4' && github.ref_name != 'v13.7.5' && github.ref_name != 'v13.7.6' && github.ref_name != 'v13.7.7' && github.ref_name != 'v13.7.8' && github.ref_name != 'v13.7.9' && github.ref_name != 'v13.8.0' && github.ref_name != 'v13.8.1' && github.ref_name != 'v13.8.2' && github.ref_name != 'v13.8.3' && github.ref_name != 'v13.8.4' && github.ref_name != 'v13.8.5' && github.ref_name != 'v13.8.6' && github.ref_name != 'v13.8.7' && github.ref_name != 'v13.8.8' && github.ref_name != 'v13.8.9' && github.ref_name != 'v13.8.10' && github.ref_name != 'v13.8.11' && github.ref_name != 'v13.8.19' && github.ref_name != 'v13.8.20' && github.ref_name != 'v13.8.21' && github.ref_name != 'v13.8.22' && github.ref_name != 'v13.8.23' && github.ref_name != 'v13.8.27' && github.ref_name != 'v13.8.28' && github.ref_name != 'v13.8.29' && github.ref_name != 'v13.8.30' && github.ref_name != 'v13.8.31' && github.ref_name != 'v13.8.32' && github.ref_name != 'v13.8.33' && github.ref_name != 'v13.8.34' && github.ref_name != 'v13.8.35' && github.ref_name != 'v13.8.36' && github.ref_name != 'v13.8.37' && github.ref_name != 'v13.8.38' && github.ref_name != 'v13.8.39'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}

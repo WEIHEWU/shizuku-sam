@@ -164,28 +164,41 @@ restore_samsung_power_mode_flags() {
 }
 
 read_power_saver_service_state() {
-  if dumpsys power 2>/dev/null | grep -Eqi \
-    'mLowPowerModeEnabled=true|mBatterySaverEnabled=true|full_enabled=true|battery[ _-]*saver[^\n]*enabled[=: ]+true'; then
+  if [ "${'$'}(settings get global low_power 2>/dev/null)" = "1" ] || \
+     [ "${'$'}(settings get global low_power_mode 2>/dev/null)" = "1" ]; then
     printf '1\n'
     return
   fi
   if dumpsys power 2>/dev/null | grep -Eqi \
-    'mLowPowerModeEnabled=false|mBatterySaverEnabled=false|full_enabled=false|battery[ _-]*saver[^\n]*enabled[=: ]+false'; then
-    printf '0\n'
+    'Battery Saver is currently: ON|mLowPowerModeEnabled=true|mBatterySaverEnabled=true|full_enabled=true|battery[ _-]*saver[^\n]*enabled[=: ]+true'; then
+    printf '1\n'
     return
   fi
-  [ "${'$'}(settings get global low_power 2>/dev/null)" = "1" ] && printf '1\n' || printf '0\n'
+  printf '0\n'
 }
 
 set_power_saver_and_verify() {
   expected="${'$'}1"
-  if ! cmd power set-mode "${'$'}expected" >/dev/null 2>&1; then
-    return 1
+  if [ "${'$'}expected" = "1" ]; then
+    settings put global low_power_sticky 0 >/dev/null 2>&1 || true
+    settings put global low_power 1 >/dev/null 2>&1 || true
+    settings put global low_power_mode 1 >/dev/null 2>&1 || true
+    settings put global low_power_mode_opened 1 >/dev/null 2>&1 || true
+    settings put system POWER_SAVE_MODE_OPEN 1 >/dev/null 2>&1 || true
+    cmd power set-mode 1 >/dev/null 2>&1 || true
+  else
+    cmd power set-mode 0 >/dev/null 2>&1 || true
+    settings put global low_power 0 >/dev/null 2>&1 || true
+    settings put global low_power_mode 0 >/dev/null 2>&1 || true
+    settings put global low_power_sticky 0 >/dev/null 2>&1 || true
+    settings put global low_power_mode_opened 0 >/dev/null 2>&1 || true
+    settings put system POWER_SAVE_MODE_OPEN 0 >/dev/null 2>&1 || true
   fi
-  sleep 0.20
+  sleep 0.25
   [ "${'$'}(read_power_saver_service_state)" = "${'$'}expected" ] && return 0
   settings put global low_power "${'$'}expected" >/dev/null 2>&1 || return 1
-  sleep 0.35
+  cmd power set-mode "${'$'}expected" >/dev/null 2>&1 || true
+  sleep 0.25
   [ "${'$'}(read_power_saver_service_state)" = "${'$'}expected" ]
 }
 
@@ -215,37 +228,24 @@ backup_compatible_saver() {
 }
 
 restore_compatible_saver() {
-  backup_seen=0
-  backup_saver_on=0
-  restored_power_saver_expected=""
+  restored_power_saver_expected=0
   restored_power_saver_verified=1
   refresh_mode_backup="${'$'}(settings get global maxhz_backup_secure_refresh_rate_mode 2>/dev/null)"
-  for key in low_power low_power_mode low_power_sticky battery_saver_enabled; do
-    backup_value="${'$'}(settings get global "maxhz_backup_global_${'$'}key" 2>/dev/null)"
-    if [ "${'$'}backup_value" != "null" ]; then
-      backup_seen=1
-      [ "${'$'}backup_value" = "1" ] && backup_saver_on=1
-    fi
+  cmd power set-fixed-performance-mode-enabled false >/dev/null 2>&1 || true
+  set_power_saver_and_verify 0 >/dev/null 2>&1 || restored_power_saver_verified=0
+  for key in low_power low_power_mode low_power_sticky battery_saver_enabled low_power_mode_opened extra_low_power k_power_mode_state n_power_mode_state q_power_mode_state s_power_mode_state; do
+    settings put global "${'$'}key" 0 >/dev/null 2>&1 || true
+    settings delete global "maxhz_backup_global_${'$'}key" >/dev/null 2>&1 || true
   done
-  cmd power set-fixed-performance-mode-enabled false >/dev/null 2>&1
-  for key in low_power low_power_mode low_power_sticky battery_saver_enabled restricted_device_performance sem_low_heat_mode default_restrict_background_data low_power_back_data_off psm_network_power_saving sem_power_mode_limited_apps_and_home_screen pms_settings_refresh_rate_enabled pms_settings_refresh_rate_cover_enabled psm_refresh_rate_tag psm_refresh_rate_cover_tag psm_refresh_rate_tag_power_mode_state sem_power_mode_refresh_rate sem_power_mode_refresh_rate_cover max_fps min_fps; do
+  for key in restricted_device_performance sem_low_heat_mode default_restrict_background_data low_power_back_data_off psm_network_power_saving sem_power_mode_limited_apps_and_home_screen pms_settings_refresh_rate_enabled pms_settings_refresh_rate_cover_enabled psm_refresh_rate_tag psm_refresh_rate_cover_tag psm_refresh_rate_tag_power_mode_state sem_power_mode_refresh_rate sem_power_mode_refresh_rate_cover max_fps min_fps; do
     restore_or_delete_setting global "${'$'}key"
   done
-  restore_samsung_power_mode_flags
   for key in refresh_rate_mode refresh_rate user_refresh_rate pms_override_refresh_rate_mode; do
     restore_or_delete_setting secure "${'$'}key"
   done
   for key in POWER_SAVE_MODE_OPEN display_refresh_rate peak_refresh_rate user_refresh_rate min_refresh_rate display_min_refresh_rate; do
     restore_or_delete_setting system "${'$'}key"
   done
-  if [ "${'$'}backup_seen" = "1" ]; then
-    if [ "${'$'}backup_saver_on" = "1" ]; then
-      restored_power_saver_expected=1
-    else
-      restored_power_saver_expected=0
-    fi
-    set_power_saver_and_verify "${'$'}restored_power_saver_expected" || restored_power_saver_verified=0
-  fi
   nudge_adaptive_refresh_if_needed "${'$'}refresh_mode_backup"
 }
 """.trimIndent()

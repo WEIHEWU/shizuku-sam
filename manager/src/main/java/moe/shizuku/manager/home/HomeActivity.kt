@@ -260,11 +260,9 @@ abstract class HomeActivity : MaxHzActivity() {
 
         // 1. 先通过 ContentResolver 与 PowerManager 同步可读的真实系统状态
         val sysSaver = runCatching {
-            pm?.isPowerSaveMode == true || Settings.Global.getInt(cr, "low_power", 0) == 1
-        }.getOrDefault(false)
-        val sysPerf = runCatching {
-            Settings.System.getInt(cr, "sem_enhanced_cpu_responsiveness", 0) == 1 ||
-                Settings.Global.getInt(cr, "sem_enhanced_cpu_responsiveness", 0) == 1
+            pm?.isPowerSaveMode == true ||
+                Settings.Global.getInt(cr, "low_power", 0) == 1 ||
+                Settings.Global.getInt(cr, "low_power_mode", 0) == 1
         }.getOrDefault(false)
 
         val storedTileMode = MaxHzPrefs.gameTileMode(this)
@@ -279,8 +277,8 @@ abstract class HomeActivity : MaxHzActivity() {
 
         val tileMode = MaxHzPrefs.gameTileMode(this)
         gameTileModeState.intValue = when {
-            tileMode == 2 || MaxHzPrefs.superPerformanceEnabled(this) || sysPerf -> 2
             tileMode == 1 || MaxHzPrefs.compatibleSaverEnabled(this) -> 1
+            tileMode == 2 || MaxHzPrefs.superPerformanceEnabled(this) -> 2
             else -> 0
         }
 
@@ -373,6 +371,7 @@ abstract class HomeActivity : MaxHzActivity() {
             val r = MaxHzShell.exec(
                 """
                 echo "low_power=$(settings get global low_power 2>/dev/null)"
+                echo "low_power_mode=$(settings get global low_power_mode 2>/dev/null)"
                 echo "sem_perf_sys=$(settings get system sem_enhanced_cpu_responsiveness 2>/dev/null)"
                 echo "sem_perf_glb=$(settings get global sem_enhanced_cpu_responsiveness 2>/dev/null)"
                 echo "pass_through=$(settings get system pass_through 2>/dev/null)"
@@ -398,8 +397,7 @@ abstract class HomeActivity : MaxHzActivity() {
                 .toMap()
 
             val ctx = this@HomeActivity
-            val sysSaver = map["low_power"] == "1"
-            val sysPerf = map["sem_perf_sys"] == "1" || map["sem_perf_glb"] == "1"
+            val sysSaver = map["low_power"] == "1" || map["low_power_mode"] == "1"
             val passThrough = map["pass_through"] == "1"
             val protectBattery = map["protect_battery"] == "1"
             val protectLimit = map["protect_limit"]?.toIntOrNull()
@@ -434,8 +432,8 @@ abstract class HomeActivity : MaxHzActivity() {
             withContext(Dispatchers.Main) {
                 val finalMode = MaxHzPrefs.gameTileMode(ctx)
                 gameTileModeState.intValue = when {
-                    finalMode == 2 || MaxHzPrefs.superPerformanceEnabled(ctx) || sysPerf -> 2
                     finalMode == 1 || MaxHzPrefs.compatibleSaverEnabled(ctx) -> 1
+                    finalMode == 2 || MaxHzPrefs.superPerformanceEnabled(ctx) -> 2
                     else -> 0
                 }
                 passThroughState.value = passThrough
@@ -1327,29 +1325,41 @@ abstract class HomeActivity : MaxHzActivity() {
     }
 
     private fun handleRestoreDefaultsClick() {
+        val isDark = isDarkMode()
         val dialog = MaterialAlertDialogBuilder(this)
             .setTitle(R.string.restore_defaults_dialog_title)
             .setMessage(R.string.restore_defaults_dialog_message)
             .setNegativeButton(android.R.string.cancel, null)
             .setPositiveButton(R.string.restore_defaults_confirm) { _, _ ->
+                val progressDialog = MaterialAlertDialogBuilder(this@HomeActivity)
+                    .setTitle(R.string.restore_defaults_dialog_title)
+                    .setMessage("正在恢复系统默认设置（含省电模式、原生分辨率/DPI、自适应刷新率等），请稍候…")
+                    .setCancelable(false)
+                    .create()
+                progressDialog.show()
+                progressDialog.window?.setBackgroundDrawable(unifiedDialogCardBackground(isDark))
+                applyUnifiedDialogWindowStyle(progressDialog)
+
                 lifecycleScope.launch {
                     val r = withContext(Dispatchers.IO) {
                         restoreAllSystemDefaults()
                     }
+                    runCatching { progressDialog.dismiss() }
+                    gameTileModeState.intValue = 0
+                    passThroughState.value = false
+                    batteryProtectionState.value = false
+                    gameAutoSwitchState.value = false
+                    fpsMonitorState.value = false
+                    outdoorModeState.value = false
+                    tombstoneState.value = false
+                    quickDozeState.value = false
+                    autostartLimitState.value = false
+                    locationThrottleState.value = false
+                    scanGuardState.value = false
+                    appLaunchBoostState.value = false
+                    forceResizableState.value = false
+                    syncSchemeAStates()
                     if (r.code == 0) {
-                        gameTileModeState.intValue = 0
-                        passThroughState.value = false
-                        batteryProtectionState.value = false
-                        gameAutoSwitchState.value = false
-                        fpsMonitorState.value = false
-                        outdoorModeState.value = false
-                        tombstoneState.value = false
-                        quickDozeState.value = false
-                        autostartLimitState.value = false
-                        locationThrottleState.value = false
-                        scanGuardState.value = false
-                        appLaunchBoostState.value = false
-                        forceResizableState.value = false
                         Toast.makeText(this@HomeActivity, R.string.restore_defaults_success, Toast.LENGTH_LONG).show()
                     } else {
                         val err = r.err.ifBlank { r.out }.ifBlank { "(${r.code})" }
@@ -1359,7 +1369,6 @@ abstract class HomeActivity : MaxHzActivity() {
             }
             .create()
         dialog.show()
-        val isDark = isDarkMode()
         dialog.window?.setBackgroundDrawable(unifiedDialogCardBackground(isDark))
         applyUnifiedDialogWindowStyle(dialog)
     }

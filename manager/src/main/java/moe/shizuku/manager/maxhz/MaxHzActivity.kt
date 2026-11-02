@@ -6251,26 +6251,22 @@ open class MaxHzActivity : AppBarActivity() {
         val result = safeRestoreStep("总恢复") {
             MaxHzController.restoreAllPublicDefaults(nightGuardPackages)
         }
-        if (result.code == 0) {
-            MaxHzPrefs.setControlEnabled(this, false)
-            MaxHzPrefs.setCompatibleSaverEnabled(this, false)
-            MaxHzPrefs.setQuickDozeEnabled(this, false)
-            MaxHzPrefs.setNightWakeupGuardEnabled(this, false)
-            MaxHzPrefs.setScanGuardEnabled(this, false)
-            MaxHzPrefs.setBatteryProtectionEnabled(this, false)
-            MaxHzPrefs.setPassThroughEnabled(this, false)
-            MaxHzPrefs.setGameTileMode(this, 0)
-            MaxHzPrefs.markSuperPerformanceState(this, false)
-            MaxHzPrefs.setGameAutoPerformanceEnabled(this, false)
-            MaxHzController.quickSwitchGameDefault()
-            MaxHzPrefs.clearNightWakeupGuardAppliedPackages(this)
-            MaxHzPrefs.clearMFeatureStates(this)
-            MaxHzPrefs.clearResult(this, SYSTEM_RESIDUE_RESULT_KEY)
-            MaxHzPrefs.clearResult(this, "force_resizable")
-        }
-        if (result.code == 0) {
-            runCatching { updateMaxHzServiceState() }
-        }
+        MaxHzPrefs.setControlEnabled(this, false)
+        MaxHzPrefs.setCompatibleSaverEnabled(this, false)
+        MaxHzPrefs.setQuickDozeEnabled(this, false)
+        MaxHzPrefs.setNightWakeupGuardEnabled(this, false)
+        MaxHzPrefs.setScanGuardEnabled(this, false)
+        MaxHzPrefs.setBatteryProtectionEnabled(this, false)
+        MaxHzPrefs.setPassThroughEnabled(this, false)
+        MaxHzPrefs.setGameTileMode(this, 0)
+        MaxHzPrefs.markSuperPerformanceState(this, false)
+        MaxHzPrefs.setGameAutoPerformanceEnabled(this, false)
+        runCatching { MaxHzController.quickSwitchGameDefault() }
+        MaxHzPrefs.clearNightWakeupGuardAppliedPackages(this)
+        MaxHzPrefs.clearMFeatureStates(this)
+        MaxHzPrefs.clearResult(this, SYSTEM_RESIDUE_RESULT_KEY)
+        MaxHzPrefs.clearResult(this, "force_resizable")
+        runCatching { updateMaxHzServiceState() }
         return result
     }
 
@@ -10400,7 +10396,11 @@ open class MaxHzActivity : AppBarActivity() {
 
     private fun isSystemPowerSaveModeOn(): Boolean {
         val powerManager = getSystemService(PowerManager::class.java)
-        return powerManager?.isPowerSaveMode == true
+        if (powerManager?.isPowerSaveMode == true) return true
+        return runCatching {
+            Settings.Global.getInt(contentResolver, "low_power", 0) == 1 ||
+                Settings.Global.getInt(contentResolver, "low_power_mode", 0) == 1
+        }.getOrDefault(false)
     }
 
     private fun batteryProtectionState(): String {

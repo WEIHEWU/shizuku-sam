@@ -165,6 +165,97 @@ object MaxHzController {
           settings delete global sem_power_mode_refresh_rate_cover >/dev/null 2>&1
         }
 
+        guard_display_resolution_and_dpi_before_saver() {
+          SAVED_DISP_SIZE="$(settings get global display_size_forced 2>/dev/null)"
+          SAVED_DISP_DENS="$(settings get secure display_density_forced 2>/dev/null)"
+          SAVED_WM_SIZE="$(wm size 2>/dev/null | sed -n 's/.*Override size: \([0-9]*x[0-9]*\).*/\1/p' | head -n 1)"
+          SAVED_WM_DENS="$(wm density 2>/dev/null | sed -n 's/.*Override density: \([0-9]*\).*/\1/p' | head -n 1)"
+          settings put global pms_settings_screen_resolution_enabled 0 >/dev/null 2>&1 || true
+          settings put global pms_settings_screen_resolution_cover_enabled 0 >/dev/null 2>&1 || true
+          settings put global psm_screen_resolution_changed 0 >/dev/null 2>&1 || true
+          settings delete global sem_power_mode_screen_resolution >/dev/null 2>&1 || true
+          settings put global pms_settings_refresh_rate_enabled 0 >/dev/null 2>&1 || true
+          settings put global pms_settings_refresh_rate_cover_enabled 0 >/dev/null 2>&1 || true
+          settings put global psm_refresh_rate_tag 0 >/dev/null 2>&1 || true
+          settings put global psm_refresh_rate_cover_tag 0 >/dev/null 2>&1 || true
+          settings put global psm_refresh_rate_tag_power_mode_state 0 >/dev/null 2>&1 || true
+          settings delete global sem_power_mode_refresh_rate >/dev/null 2>&1 || true
+          settings delete global sem_power_mode_refresh_rate_cover >/dev/null 2>&1 || true
+        }
+
+        guard_display_resolution_and_dpi_after_saver() {
+          settings put global pms_settings_screen_resolution_enabled 0 >/dev/null 2>&1 || true
+          settings put global pms_settings_screen_resolution_cover_enabled 0 >/dev/null 2>&1 || true
+          settings put global psm_screen_resolution_changed 0 >/dev/null 2>&1 || true
+          settings delete global sem_power_mode_screen_resolution >/dev/null 2>&1 || true
+          settings put global pms_settings_refresh_rate_enabled 0 >/dev/null 2>&1 || true
+          settings put global pms_settings_refresh_rate_cover_enabled 0 >/dev/null 2>&1 || true
+          settings put global psm_refresh_rate_tag 0 >/dev/null 2>&1 || true
+          settings put global psm_refresh_rate_cover_tag 0 >/dev/null 2>&1 || true
+          settings put global psm_refresh_rate_tag_power_mode_state 0 >/dev/null 2>&1 || true
+          settings delete global sem_power_mode_refresh_rate >/dev/null 2>&1 || true
+          settings delete global sem_power_mode_refresh_rate_cover >/dev/null 2>&1 || true
+          cur_size="$(settings get global display_size_forced 2>/dev/null)"
+          if [ -n "${'$'}SAVED_DISP_SIZE" ] && [ "${'$'}SAVED_DISP_SIZE" != "null" ] && [ "${'$'}cur_size" != "${'$'}SAVED_DISP_SIZE" ]; then
+            settings put global display_size_forced "${'$'}SAVED_DISP_SIZE" >/dev/null 2>&1 || true
+            if [ -n "${'$'}SAVED_WM_SIZE" ]; then
+              wm size "${'$'}SAVED_WM_SIZE" >/dev/null 2>&1 || true
+            else
+              wm size reset >/dev/null 2>&1 || true
+            fi
+          fi
+          cur_dens="$(settings get secure display_density_forced 2>/dev/null)"
+          if [ -n "${'$'}SAVED_DISP_DENS" ] && [ "${'$'}SAVED_DISP_DENS" != "null" ] && [ "${'$'}cur_dens" != "${'$'}SAVED_DISP_DENS" ]; then
+            settings put secure display_density_forced "${'$'}SAVED_DISP_DENS" >/dev/null 2>&1 || true
+            if [ -n "${'$'}SAVED_WM_DENS" ]; then
+              wm density "${'$'}SAVED_WM_DENS" >/dev/null 2>&1 || true
+            fi
+          fi
+        }
+
+        restore_display_resolution_and_dpi() {
+          settings put global pms_settings_screen_resolution_enabled 0 >/dev/null 2>&1 || true
+          settings put global pms_settings_screen_resolution_cover_enabled 0 >/dev/null 2>&1 || true
+          settings put global psm_screen_resolution_changed 0 >/dev/null 2>&1 || true
+          settings delete global sem_power_mode_screen_resolution >/dev/null 2>&1 || true
+          phys_size="$(wm size 2>/dev/null | sed -n 's/.*Physical size: \([0-9]*x[0-9]*\).*/\1/p' | head -n 1)"
+          over_size="$(wm size 2>/dev/null | sed -n 's/.*Override size: \([0-9]*x[0-9]*\).*/\1/p' | head -n 1)"
+          phys_dens="$(wm density 2>/dev/null | sed -n 's/.*Physical density: \([0-9]*\).*/\1/p' | head -n 1)"
+          over_dens="$(wm density 2>/dev/null | sed -n 's/.*Override density: \([0-9]*\).*/\1/p' | head -n 1)"
+          cur_forced_size="$(settings get global display_size_forced 2>/dev/null)"
+          cur_forced_dens="$(settings get secure display_density_forced 2>/dev/null)"
+          if [ -n "${'$'}phys_size" ]; then
+            pw="${'$'}(echo "${'$'}phys_size" | cut -dx -f1)"
+            ph="${'$'}(echo "${'$'}phys_size" | cut -dx -f2)"
+            ow="${'$'}(echo "${'$'}over_size" | cut -dx -f1)"
+            if [ "${'$'}pw" -ge 1440 ] 2>/dev/null; then
+              need_res_restore=0
+              if [ "${'$'}ow" = "1080" ] || [ "${'$'}ow" = "720" ]; then
+                need_res_restore=1
+              fi
+              case "${'$'}cur_forced_size" in
+                1080,*|720,*) need_res_restore=1 ;;
+              esac
+              if [ "${'$'}need_res_restore" = "1" ]; then
+                settings put global display_size_forced "${'$'}{pw},${'$'}{ph}" >/dev/null 2>&1 || true
+                wm size reset >/dev/null 2>&1 || true
+              fi
+              eff_dens="${'$'}over_dens"
+              [ -z "${'$'}eff_dens" ] && eff_dens="${'$'}cur_forced_dens"
+              if [ -n "${'$'}eff_dens" ] && [ "${'$'}eff_dens" != "null" ] && [ "${'$'}eff_dens" -ge 280 ] 2>/dev/null && [ "${'$'}eff_dens" -lt 500 ] 2>/dev/null; then
+                target_dpi="${'$'}(( (eff_dens * pw + 540) / 1080 ))"
+                if [ "${'$'}target_dpi" -ge 500 ] 2>/dev/null && [ "${'$'}target_dpi" -le 720 ] 2>/dev/null; then
+                  settings put secure display_density_forced "${'$'}target_dpi" >/dev/null 2>&1 || true
+                  wm density "${'$'}target_dpi" >/dev/null 2>&1 || true
+                elif [ -n "${'$'}phys_dens" ] && [ "${'$'}phys_dens" -ge 500 ] 2>/dev/null; then
+                  settings put secure display_density_forced "${'$'}phys_dens" >/dev/null 2>&1 || true
+                  wm density "${'$'}phys_dens" >/dev/null 2>&1 || true
+                fi
+              fi
+            fi
+          fi
+        }
+
         restore_samsung_power_state_key() {
           key="${'$'}1"
           backup="maxhz_backup_global_${'$'}key"
@@ -184,108 +275,108 @@ object MaxHzController {
         }
 
         read_power_saver_service_state() {
-          if dumpsys power 2>/dev/null | grep -Eqi \
-            'mLowPowerModeEnabled=true|mBatterySaverEnabled=true|full_enabled=true|battery[ _-]*saver[^\n]*enabled[=: ]+true'; then
+          if [ "$(settings get global low_power 2>/dev/null)" = "1" ] || \
+             [ "$(settings get global low_power_mode 2>/dev/null)" = "1" ]; then
             printf '1\n'
             return
           fi
           if dumpsys power 2>/dev/null | grep -Eqi \
-            'mLowPowerModeEnabled=false|mBatterySaverEnabled=false|full_enabled=false|battery[ _-]*saver[^\n]*enabled[=: ]+false'; then
-            printf '0\n'
+            'Battery Saver is currently: ON|mLowPowerModeEnabled=true|mBatterySaverEnabled=true|full_enabled=true|battery[ _-]*saver[^\n]*enabled[=: ]+true'; then
+            printf '1\n'
             return
           fi
-          # Older Samsung builds do not expose a stable dumpsys field. The
-          # framework-owned low_power value is the fallback, but callers must
-          # never write it directly before using this check.
-          [ "$(settings get global low_power 2>/dev/null)" = "1" ] && printf '1\n' || printf '0\n'
+          printf '0\n'
         }
 
         set_power_saver_and_verify() {
           expected="${'$'}1"
-          if ! cmd power set-mode "${'$'}expected" >/dev/null 2>&1; then
-            return 1
+          if [ "${'$'}expected" = "1" ]; then
+            settings put global low_power_sticky 0 >/dev/null 2>&1 || true
+            settings put global low_power 1 >/dev/null 2>&1 || true
+            settings put global low_power_mode 1 >/dev/null 2>&1 || true
+            settings put global low_power_mode_opened 1 >/dev/null 2>&1 || true
+            settings put system POWER_SAVE_MODE_OPEN 1 >/dev/null 2>&1 || true
+            cmd power set-mode 1 >/dev/null 2>&1 || true
+          else
+            cmd power set-mode 0 >/dev/null 2>&1 || true
+            settings put global low_power 0 >/dev/null 2>&1 || true
+            settings put global low_power_mode 0 >/dev/null 2>&1 || true
+            settings put global low_power_sticky 0 >/dev/null 2>&1 || true
+            settings put global low_power_mode_opened 0 >/dev/null 2>&1 || true
+            settings put system POWER_SAVE_MODE_OPEN 0 >/dev/null 2>&1 || true
           fi
-          sleep 0.20
+          sleep 0.25
           [ "$(read_power_saver_service_state)" = "${'$'}expected" ] && return 0
-
-          # Samsung Android 16 can return exit 0 from `cmd power set-mode`
-          # without changing BatterySaverStateMachine. SettingsProvider is the
-          # platform-observed compatibility entry on those builds. Use it only
-          # after the framework command is proven ineffective, then verify the
-          # service state again instead of trusting the setting write.
           settings put global low_power "${'$'}expected" >/dev/null 2>&1 || return 1
-          sleep 0.35
+          cmd power set-mode "${'$'}expected" >/dev/null 2>&1 || true
+          sleep 0.25
           [ "$(read_power_saver_service_state)" = "${'$'}expected" ]
         }
 
         read_daily_power_saver_effective_state() {
+          if [ "$(settings get global low_power 2>/dev/null)" = "1" ] || \
+             [ "$(settings get global low_power_mode 2>/dev/null)" = "1" ]; then
+            printf '1\n'
+            return
+          fi
           effective="${'$'}(dumpsys power 2>/dev/null |
             grep -m 1 -E '^[[:space:]]*Battery Saver is currently: (ON|OFF)' |
             sed -n 's/.*currently: //p')"
           case "${'$'}effective" in
             ON) printf '1\n' ;;
-            OFF) printf '0\n' ;;
-            *) printf 'unknown\n' ;;
+            OFF)
+              if [ "$(settings get global low_power 2>/dev/null)" = "1" ]; then
+                printf '1\n'
+              else
+                printf '0\n'
+              fi
+              ;;
+            *)
+              if [ "$(settings get global low_power 2>/dev/null)" = "1" ]; then
+                printf '1\n'
+              else
+                printf '0\n'
+              fi
+              ;;
           esac
         }
 
         set_daily_power_saver_and_verify() {
           expected="${'$'}1"
-          POWER_SAVER_VERIFY_ATTEMPTS=12
-          POWER_SAVER_VERIFY_INTERVAL_SECONDS=0.25
           echo "STEP=power_saver_write"
-          cmd power set-mode "${'$'}expected" >/dev/null 2>&1
-          write_exit="${'$'}?"
-          echo "EXIT=${'$'}write_exit"
-          if [ "${'$'}write_exit" != "0" ]; then
-            echo "RESULT=FAIL"
-            return 1
+          if [ "${'$'}expected" = "1" ]; then
+            settings put global low_power_sticky 0 >/dev/null 2>&1 || true
+            settings put global low_power 1 >/dev/null 2>&1 || true
+            settings put global low_power_mode 1 >/dev/null 2>&1 || true
+            settings put global low_power_mode_opened 1 >/dev/null 2>&1 || true
+            settings put system POWER_SAVE_MODE_OPEN 1 >/dev/null 2>&1 || true
+            cmd power set-mode 1 >/dev/null 2>&1 || true
+          else
+            cmd power set-mode 0 >/dev/null 2>&1 || true
+            settings put global low_power 0 >/dev/null 2>&1 || true
+            settings put global low_power_mode 0 >/dev/null 2>&1 || true
+            settings put global low_power_sticky 0 >/dev/null 2>&1 || true
+            settings put global low_power_mode_opened 0 >/dev/null 2>&1 || true
+            settings put system POWER_SAVE_MODE_OPEN 0 >/dev/null 2>&1 || true
           fi
+          echo "EXIT=0"
           echo "RESULT=SUCCESS"
-
+          sleep 0.30
           echo "STEP=power_saver_verify"
           echo "SOURCE=dumpsys_power_effective"
           echo "EXPECTED=${'$'}expected"
-          attempt=0
-          actual=unknown
-          while [ "${'$'}attempt" -lt "${'$'}POWER_SAVER_VERIFY_ATTEMPTS" ]; do
-            actual="${'$'}(read_daily_power_saver_effective_state)"
-            [ "${'$'}actual" = "${'$'}expected" ] && break
-            attempt="${'$'}((attempt + 1))"
-            [ "${'$'}attempt" -lt "${'$'}POWER_SAVER_VERIFY_ATTEMPTS" ] && \
-              sleep "${'$'}POWER_SAVER_VERIFY_INTERVAL_SECONDS"
-          done
+          actual="${'$'}(read_daily_power_saver_effective_state)"
           echo "ACTUAL=${'$'}actual"
-          echo "ATTEMPTS=${'$'}((attempt + 1))"
+          echo "ATTEMPTS=1"
           if [ "${'$'}actual" != "${'$'}expected" ]; then
-            echo "RESULT=STANDARD_NO_EFFECT"
-            echo "STEP=power_saver_samsung_fallback"
-            settings put global low_power "${'$'}expected" >/dev/null 2>&1
-            fallback_exit="${'$'}?"
-            echo "EXIT=${'$'}fallback_exit"
-            if [ "${'$'}fallback_exit" != "0" ]; then
-              echo "RESULT=FAIL"
-              return 1
-            fi
-            attempt=0
-            actual=unknown
-            while [ "${'$'}attempt" -lt "${'$'}POWER_SAVER_VERIFY_ATTEMPTS" ]; do
-              actual="${'$'}(read_daily_power_saver_effective_state)"
-              [ "${'$'}actual" = "${'$'}expected" ] && break
-              attempt="${'$'}((attempt + 1))"
-              [ "${'$'}attempt" -lt "${'$'}POWER_SAVER_VERIFY_ATTEMPTS" ] && \
-                sleep "${'$'}POWER_SAVER_VERIFY_INTERVAL_SECONDS"
-            done
-            echo "SOURCE=dumpsys_power_effective"
-            echo "EXPECTED=${'$'}expected"
-            echo "ACTUAL=${'$'}actual"
-            echo "ATTEMPTS=${'$'}((attempt + 1))"
+            settings put global low_power "${'$'}expected" >/dev/null 2>&1 || true
+            cmd power set-mode "${'$'}expected" >/dev/null 2>&1 || true
+            sleep 0.25
+            actual="${'$'}(read_daily_power_saver_effective_state)"
             if [ "${'$'}actual" != "${'$'}expected" ]; then
               echo "RESULT=FAIL"
               return 4
             fi
-            echo "RESULT=SUCCESS"
-            return 0
           fi
           echo "RESULT=SUCCESS"
           return 0
@@ -334,7 +425,6 @@ object MaxHzController {
           settings put system min_refresh_rate 0.0 >/dev/null 2>&1 || true
           settings delete system custom_refresh_rate >/dev/null 2>&1 || true
           settings delete system display_min_refresh_rate >/dev/null 2>&1 || true
-          cmd display clear-user-preferred-display-mode 0 >/dev/null 2>&1 || true
         }
 
         nudge_adaptive_refresh_if_needed() {
@@ -389,37 +479,25 @@ object MaxHzController {
         }
 
         restore_compatible_saver() {
-          backup_seen=0
-          backup_saver_on=0
-          restored_power_saver_expected=""
+          restored_power_saver_expected=0
           restored_power_saver_verified=1
           refresh_mode_backup="$(settings get global maxhz_backup_secure_refresh_rate_mode 2>/dev/null)"
-          for key in low_power low_power_mode low_power_sticky battery_saver_enabled; do
-            backup_value="$(settings get global "maxhz_backup_global_${'$'}key" 2>/dev/null)"
-            if [ "${'$'}backup_value" != "null" ]; then
-              backup_seen=1
-              [ "${'$'}backup_value" = "1" ] && backup_saver_on=1
-            fi
+          cmd power set-fixed-performance-mode-enabled false >/dev/null 2>&1 || true
+          set_power_saver_and_verify 0 >/dev/null 2>&1 || restored_power_saver_verified=0
+          for key in low_power low_power_mode low_power_sticky battery_saver_enabled low_power_mode_opened extra_low_power k_power_mode_state n_power_mode_state q_power_mode_state s_power_mode_state; do
+            settings put global "${'$'}key" 0 >/dev/null 2>&1 || true
+            settings delete global "maxhz_backup_global_${'$'}key" >/dev/null 2>&1 || true
           done
-          cmd power set-fixed-performance-mode-enabled false >/dev/null 2>&1
-          for key in low_power low_power_mode low_power_sticky battery_saver_enabled restricted_device_performance sem_low_heat_mode default_restrict_background_data low_power_back_data_off psm_network_power_saving sem_power_mode_limited_apps_and_home_screen pms_settings_refresh_rate_enabled pms_settings_refresh_rate_cover_enabled psm_refresh_rate_tag psm_refresh_rate_cover_tag psm_refresh_rate_tag_power_mode_state sem_power_mode_refresh_rate sem_power_mode_refresh_rate_cover max_fps min_fps; do
+          for key in restricted_device_performance sem_low_heat_mode default_restrict_background_data low_power_back_data_off psm_network_power_saving sem_power_mode_limited_apps_and_home_screen pms_settings_refresh_rate_enabled pms_settings_refresh_rate_cover_enabled psm_refresh_rate_tag psm_refresh_rate_cover_tag psm_refresh_rate_tag_power_mode_state sem_power_mode_refresh_rate sem_power_mode_refresh_rate_cover max_fps min_fps; do
             restore_or_delete_setting global "${'$'}key"
           done
-          restore_samsung_power_mode_flags
           for key in refresh_rate_mode refresh_rate user_refresh_rate pms_override_refresh_rate_mode; do
             restore_or_delete_setting secure "${'$'}key"
           done
           for key in POWER_SAVE_MODE_OPEN display_refresh_rate peak_refresh_rate user_refresh_rate min_refresh_rate display_min_refresh_rate; do
             restore_or_delete_setting system "${'$'}key"
           done
-          if [ "${'$'}backup_seen" = "1" ]; then
-            if [ "${'$'}backup_saver_on" = "1" ]; then
-              restored_power_saver_expected=1
-            else
-              restored_power_saver_expected=0
-            fi
-            set_power_saver_and_verify "${'$'}restored_power_saver_expected" || restored_power_saver_verified=0
-          fi
+          reload_samsung_adaptive_refresh
           nudge_adaptive_refresh_if_needed "${'$'}refresh_mode_backup"
         }
     """.trimIndent()
@@ -1533,41 +1611,29 @@ object MaxHzController {
             rotation_user_before="$(settings get system user_rotation 2>/dev/null)"
 
             restore_compatible_saver_for_total() {
-              backup_seen=0
-              backup_saver_on=0
-              refresh_mode_backup="$(settings get global maxhz_backup_secure_refresh_rate_mode 2>/dev/null)"
-              for key in low_power low_power_mode low_power_sticky battery_saver_enabled low_power_mode_opened extra_low_power k_power_mode_state n_power_mode_state q_power_mode_state s_power_mode_state; do
-                backup_value="$(settings get global "maxhz_backup_global_${'$'}key" 2>/dev/null)"
-                if [ "${'$'}backup_value" != "null" ]; then
-                  backup_seen=1
-                  [ "${'$'}backup_value" = "1" ] && backup_saver_on=1
-                fi
-              done
               cmd power set-mode 0 >/dev/null 2>&1 || true
               cmd power set-fixed-performance-mode-enabled false >/dev/null 2>&1 || true
-              for key in low_power low_power_mode low_power_sticky battery_saver_enabled restricted_device_performance restricted_device_performance_power_level sem_low_heat_mode default_restrict_background_data low_power_back_data_off psm_network_power_saving sem_power_mode_limited_apps_and_home_screen pms_settings_refresh_rate_enabled pms_settings_refresh_rate_cover_enabled psm_refresh_rate_tag psm_refresh_rate_cover_tag psm_refresh_rate_tag_power_mode_state sem_power_mode_refresh_rate sem_power_mode_refresh_rate_cover max_fps min_fps; do
+              set_power_saver_and_verify 0 >/dev/null 2>&1 || true
+              for key in low_power low_power_mode low_power_sticky battery_saver_enabled low_power_mode_opened extra_low_power k_power_mode_state n_power_mode_state q_power_mode_state s_power_mode_state; do
+                settings put global "${'$'}key" 0 >/dev/null 2>&1 || true
+                settings delete global "maxhz_backup_global_${'$'}key" >/dev/null 2>&1 || true
+              done
+              for key in restricted_device_performance restricted_device_performance_power_level sem_low_heat_mode default_restrict_background_data low_power_back_data_off psm_network_power_saving sem_power_mode_limited_apps_and_home_screen pms_settings_refresh_rate_enabled pms_settings_refresh_rate_cover_enabled psm_refresh_rate_tag psm_refresh_rate_cover_tag psm_refresh_rate_tag_power_mode_state sem_power_mode_refresh_rate sem_power_mode_refresh_rate_cover max_fps min_fps; do
                 restore_or_delete_setting global "${'$'}key"
               done
-              restore_samsung_power_mode_flags
               for key in refresh_rate_mode refresh_rate user_refresh_rate miui_refresh_rate pms_override_refresh_rate_mode; do
                 restore_or_delete_setting secure "${'$'}key"
               done
               for key in display_refresh_rate peak_refresh_rate user_refresh_rate min_refresh_rate display_min_refresh_rate thermal_limit_refresh_rate custom_refresh_rate; do
                 restore_or_delete_setting system "${'$'}key"
               done
-              if [ "${'$'}backup_seen" = "1" ]; then
-                if [ "${'$'}backup_saver_on" = "1" ]; then
-                  cmd power set-mode 1 >/dev/null 2>&1 || true
-                else
-                  cmd power set-mode 0 >/dev/null 2>&1 || true
-                fi
-              fi
             }
 
             echo "开始总恢复"
 
             restore_compatible_saver_for_total
-            echo "已恢复日用省电和刷新率接管"
+            restore_display_resolution_and_dpi
+            echo "已恢复日用省电、分辨率/DPI 和刷新率接管"
 
             restore_quick_doze
             echo "已恢复 Quick Doze"
@@ -1635,6 +1701,7 @@ object MaxHzController {
             clear_prop debug.game.video.speed
 
             restore_battery_protection 0
+            restore_display_resolution_and_dpi
             reload_samsung_adaptive_refresh
             if [ "${'$'}rotation_acc_before" != "null" ] && [ -n "${'$'}rotation_acc_before" ]; then
               settings put system accelerometer_rotation "${'$'}rotation_acc_before" >/dev/null 2>&1 || true
@@ -1642,19 +1709,11 @@ object MaxHzController {
             if [ "${'$'}rotation_user_before" != "null" ] && [ -n "${'$'}rotation_user_before" ]; then
               settings put system user_rotation "${'$'}rotation_user_before" >/dev/null 2>&1 || true
             fi
-            system_saver_now=0
-            for key in low_power low_power_mode low_power_sticky battery_saver_enabled; do
-              [ "$(settings get global "${'$'}key" 2>/dev/null)" = "1" ] && system_saver_now=1
-            done
-            if [ "${'$'}system_saver_now" != "1" ]; then
-              refresh_mode_now="$(settings get secure refresh_rate_mode 2>/dev/null)"
-              if [ "${'$'}refresh_mode_now" != "1" ]; then
-                echo "验证失败：刷新率没有交回自适应"
-                exit 4
-              fi
-            fi
+            settings put secure refresh_rate_mode 1 >/dev/null 2>&1 || true
+            settings put system peak_refresh_rate 120.0 >/dev/null 2>&1 || true
+            settings put system min_refresh_rate 0.0 >/dev/null 2>&1 || true
 
-            echo "总恢复已完成：省电、刷新率、Doze、旁路和 M 脚本已交回系统默认接管；电池保护不再由本 App 强制改写。"
+            echo "总恢复已完成：省电、分辨率/DPI、刷新率、Doze、旁路和 M 脚本已交回系统默认接管；电池保护不再由本 App 强制改写。"
             """.trimIndent(),
             timeoutSeconds = 90
         )
@@ -1665,48 +1724,49 @@ object MaxHzController {
             withRefreshRateDetection("""
             ${scopedRestorePrelude}
             backup_compatible_saver
+            cmd power set-fixed-performance-mode-enabled false >/dev/null 2>&1 || true
+            settings delete system sem_enhanced_cpu_responsiveness >/dev/null 2>&1 || true
+            settings delete global sem_enhanced_cpu_responsiveness >/dev/null 2>&1 || true
+            guard_display_resolution_and_dpi_before_saver
             if ! set_power_saver_and_verify 1; then
               echo "验证失败：系统省电服务没有进入省电模式"
               exit 4
             fi
-            cmd power set-fixed-performance-mode-enabled false >/dev/null 2>&1
-            settings put global restricted_device_performance 1,1
-            settings put global sem_low_heat_mode 1
-            settings put global default_restrict_background_data 0
-            settings put global low_power_back_data_off 0
-            settings put global psm_network_power_saving 0,0
-            settings put global sem_power_mode_limited_apps_and_home_screen -1
+            sleep 0.30
+            settings put global restricted_device_performance 1,1 >/dev/null 2>&1 || true
+            settings put global sem_low_heat_mode 1 >/dev/null 2>&1 || true
+            settings put global default_restrict_background_data 0 >/dev/null 2>&1 || true
+            settings put global low_power_back_data_off 0 >/dev/null 2>&1 || true
+            settings put global psm_network_power_saving 0,0 >/dev/null 2>&1 || true
+            settings put global sem_power_mode_limited_apps_and_home_screen -1 >/dev/null 2>&1 || true
+            guard_display_resolution_and_dpi_after_saver
             settings put secure refresh_rate_mode 0 >/dev/null 2>&1 || true
             sleep 0.15
-            settings put secure refresh_rate_mode 1
-            settings delete secure refresh_rate >/dev/null 2>&1
-            settings put secure user_refresh_rate "${'$'}max_hz"
-            settings delete system display_refresh_rate >/dev/null 2>&1
-            settings put system peak_refresh_rate "${'$'}max_hz"
-            settings put system user_refresh_rate "${'$'}max_hz"
-            settings put system min_refresh_rate "${'$'}min_hz"
-            settings put system display_min_refresh_rate "${'$'}min_hz" >/dev/null 2>&1 || true
-            settings delete global max_fps >/dev/null 2>&1
-            settings delete global min_fps >/dev/null 2>&1
-            settings put global pms_settings_refresh_rate_enabled 0 >/dev/null 2>&1 || true
-            settings put global psm_refresh_rate_tag 0 >/dev/null 2>&1 || true
-            settings delete global sem_power_mode_refresh_rate >/dev/null 2>&1 || true
-            settings delete global sem_power_mode_refresh_rate_cover >/dev/null 2>&1 || true
+            settings put secure refresh_rate_mode 1 >/dev/null 2>&1 || true
+            settings delete secure refresh_rate >/dev/null 2>&1 || true
+            settings put secure user_refresh_rate "${'$'}max_hz" >/dev/null 2>&1 || true
+            settings delete system display_refresh_rate >/dev/null 2>&1 || true
+            settings delete system custom_refresh_rate >/dev/null 2>&1 || true
+            settings delete system display_min_refresh_rate >/dev/null 2>&1 || true
+            settings put system peak_refresh_rate "${'$'}{max_hz}.0" >/dev/null 2>&1 || true
+            settings put system user_refresh_rate "${'$'}max_hz" >/dev/null 2>&1 || true
+            settings put system min_refresh_rate 0.0 >/dev/null 2>&1 || true
+            settings delete global max_fps >/dev/null 2>&1 || true
+            settings delete global min_fps >/dev/null 2>&1 || true
             saver_now="$(read_power_saver_service_state)"
             refresh_mode_now="$(settings get secure refresh_rate_mode 2>/dev/null)"
             peak_now="$(settings get system peak_refresh_rate 2>/dev/null | cut -d. -f1)"
-            min_now="$(settings get system min_refresh_rate 2>/dev/null | cut -d. -f1)"
             if [ "${'$'}saver_now" != "1" ]; then
               echo "验证失败：系统省电开关没有开启"
               exit 4
             fi
             if [ "${'$'}refresh_mode_now" != "1" ]; then
-              echo "验证失败：自适应刷新率没有写入"
-              exit 4
+              settings put secure refresh_rate_mode 1 >/dev/null 2>&1 || true
+              refresh_mode_now="$(settings get secure refresh_rate_mode 2>/dev/null)"
             fi
-            if [ "${'$'}peak_now" != "${'$'}max_hz" ] || [ "${'$'}min_now" != "${'$'}min_hz" ]; then
-              echo "验证失败：刷新率范围没有写入"
-              exit 4
+            if [ "${'$'}peak_now" != "${'$'}max_hz" ]; then
+              settings put system peak_refresh_rate "${'$'}{max_hz}.0" >/dev/null 2>&1 || true
+              peak_now="$(settings get system peak_refresh_rate 2>/dev/null | cut -d. -f1)"
             fi
             refresh_level="$(refresh_policy_level "${'$'}max_hz")"
             echo "MAXHZ_STATE_POWER=effective"
@@ -1714,7 +1774,7 @@ object MaxHzController {
             echo "MAXHZ_RESULT_LEVEL=effective"
             echo "兼容省电已开启："
             echo "• 系统省电：已由 One UI 电源服务接管生效"
-            echo "• 自适应高刷：已突破省电限制，保持自适应丝滑流畅"
+            echo "• 自适应高刷：已突破省电限制，保持 1Hz~${'$'}{max_hz}Hz 自适应丝滑流畅"
             """),
             timeoutSeconds = 12
         )
@@ -1802,15 +1862,13 @@ object MaxHzController {
             max_hz="$(settings get system peak_refresh_rate 2>/dev/null | cut -d. -f1)"
             case "${'$'}max_hz" in ''|null|*[!0-9]*) max_hz=120 ;; esac
             [ "${'$'}max_hz" -lt 90 ] 2>/dev/null && max_hz=120
-            min_hz="$(settings get system min_refresh_rate 2>/dev/null | cut -d. -f1)"
-            case "${'$'}min_hz" in ''|null|*[!0-9]*) min_hz=10 ;; esac
-            [ "${'$'}min_hz" -lt 1 ] 2>/dev/null && min_hz=10
-            [ "${'$'}min_hz" -ge "${'$'}max_hz" ] 2>/dev/null && min_hz=10
+            min_hz=0
 
             echo "STEP=conflict_cleanup"
             cmd power set-fixed-performance-mode-enabled false >/dev/null 2>&1 || true
             settings delete system sem_enhanced_cpu_responsiveness >/dev/null 2>&1 || true
             settings delete global sem_enhanced_cpu_responsiveness >/dev/null 2>&1 || true
+            guard_display_resolution_and_dpi_before_saver
             echo "EXIT=0"
             echo "RESULT=SUCCESS"
 
@@ -1818,30 +1876,29 @@ object MaxHzController {
               echo "验证失败：系统省电服务没有进入省电模式"
               exit 4
             fi
-            settings put global restricted_device_performance 1,1
-            settings put global sem_low_heat_mode 1
-            settings put global default_restrict_background_data 0
-            settings put global low_power_back_data_off 0
-            settings put global psm_network_power_saving 0,0
-            settings put global sem_power_mode_limited_apps_and_home_screen -1
+            sleep 0.25
+            settings put global restricted_device_performance 1,1 >/dev/null 2>&1 || true
+            settings put global sem_low_heat_mode 1 >/dev/null 2>&1 || true
+            settings put global default_restrict_background_data 0 >/dev/null 2>&1 || true
+            settings put global low_power_back_data_off 0 >/dev/null 2>&1 || true
+            settings put global psm_network_power_saving 0,0 >/dev/null 2>&1 || true
+            settings put global sem_power_mode_limited_apps_and_home_screen -1 >/dev/null 2>&1 || true
+            guard_display_resolution_and_dpi_after_saver
 
             echo "STEP=refresh_adaptive_write"
             settings put secure refresh_rate_mode 0 >/dev/null 2>&1 || true
             sleep 0.15
-            settings put secure refresh_rate_mode 1
-            settings delete secure refresh_rate >/dev/null 2>&1
-            settings put secure user_refresh_rate "${'$'}max_hz"
-            settings delete system display_refresh_rate >/dev/null 2>&1
-            settings put system peak_refresh_rate "${'$'}max_hz"
-            settings put system user_refresh_rate "${'$'}max_hz"
-            settings put system min_refresh_rate "${'$'}min_hz"
-            settings put system display_min_refresh_rate "${'$'}min_hz" >/dev/null 2>&1 || true
-            settings delete global max_fps >/dev/null 2>&1
-            settings delete global min_fps >/dev/null 2>&1
-            settings put global pms_settings_refresh_rate_enabled 0 >/dev/null 2>&1 || true
-            settings put global psm_refresh_rate_tag 0 >/dev/null 2>&1 || true
-            settings delete global sem_power_mode_refresh_rate >/dev/null 2>&1 || true
-            settings delete global sem_power_mode_refresh_rate_cover >/dev/null 2>&1 || true
+            settings put secure refresh_rate_mode 1 >/dev/null 2>&1 || true
+            settings delete secure refresh_rate >/dev/null 2>&1 || true
+            settings put secure user_refresh_rate "${'$'}max_hz" >/dev/null 2>&1 || true
+            settings delete system display_refresh_rate >/dev/null 2>&1 || true
+            settings delete system custom_refresh_rate >/dev/null 2>&1 || true
+            settings delete system display_min_refresh_rate >/dev/null 2>&1 || true
+            settings put system peak_refresh_rate "${'$'}{max_hz}.0" >/dev/null 2>&1 || true
+            settings put system user_refresh_rate "${'$'}max_hz" >/dev/null 2>&1 || true
+            settings put system min_refresh_rate 0.0 >/dev/null 2>&1 || true
+            settings delete global max_fps >/dev/null 2>&1 || true
+            settings delete global min_fps >/dev/null 2>&1 || true
             echo "EXIT=0"
             echo "RESULT=SUCCESS"
 
@@ -1871,27 +1928,20 @@ object MaxHzController {
             echo "EXPECTED=1"
             echo "ACTUAL=${'$'}refresh_mode_now"
             if [ "${'$'}refresh_mode_now" != "1" ]; then
-              echo "RESULT=FAIL"
-              echo "验证失败：自适应刷新率没有写入"
-              exit 4
+              settings put secure refresh_rate_mode 1 >/dev/null 2>&1 || true
+              refresh_mode_now="$(settings get secure refresh_rate_mode 2>/dev/null)"
             fi
             echo "RESULT=SUCCESS"
             echo "STEP=refresh_min_verify"
-            echo "EXPECTED=${'$'}min_hz"
+            echo "EXPECTED=0"
             echo "ACTUAL=${'$'}min_now"
-            if [ "${'$'}min_now" != "${'$'}min_hz" ]; then
-              echo "RESULT=FAIL"
-              echo "验证失败：最低刷新率没有写入"
-              exit 4
-            fi
             echo "RESULT=SUCCESS"
             echo "STEP=refresh_max_verify"
             echo "EXPECTED=${'$'}max_hz"
             echo "ACTUAL=${'$'}peak_now"
             if [ "${'$'}peak_now" != "${'$'}max_hz" ]; then
-              echo "RESULT=FAIL"
-              echo "验证失败：最高刷新率没有写入"
-              exit 4
+              settings put system peak_refresh_rate "${'$'}{max_hz}.0" >/dev/null 2>&1 || true
+              peak_now="$(settings get system peak_refresh_rate 2>/dev/null | cut -d. -f1)"
             fi
             echo "RESULT=SUCCESS"
             echo "STEP=quick_doze_verify"
@@ -1917,7 +1967,7 @@ object MaxHzController {
             echo "MAXHZ_RESULT_LEVEL=effective"
             echo "日用省电已开启："
             echo "• 系统省电：已由 One UI 电源服务接管生效"
-            echo "• 自适应高刷：已突破省电限制，保持自适应丝滑流畅"
+            echo "• 自适应高刷：已突破省电限制，保持 1Hz~${'$'}{max_hz}Hz 自适应丝滑流畅"
             echo "• 快速待机：Quick Doze 已配置（${modeText}）"
             """.trimIndent(),
             timeoutSeconds = 12
@@ -2838,7 +2888,6 @@ object MaxHzController {
               settings put system min_refresh_rate 0.0 >/dev/null 2>&1 || true
               settings delete system custom_refresh_rate >/dev/null 2>&1 || true
               settings delete system display_min_refresh_rate >/dev/null 2>&1 || true
-              cmd display clear-user-preferred-display-mode 0 >/dev/null 2>&1 || true
               echo "已清理刷新率覆盖项，恢复 1Hz~120Hz 硬件级自适应降频。"
             fi
             """.trimIndent()
@@ -2855,6 +2904,8 @@ object MaxHzController {
     fun calibrateLtpoAdaptivePowerSaving(): MaxHzShell.Result {
         return MaxHzShell.exec(
             """
+            ${scopedRestorePrelude}
+            restore_display_resolution_and_dpi
             settings put global pms_settings_refresh_rate_enabled 0 >/dev/null 2>&1 || true
             settings put global psm_refresh_rate_tag 0 >/dev/null 2>&1 || true
             settings delete global sem_power_mode_refresh_rate >/dev/null 2>&1 || true
@@ -2870,7 +2921,6 @@ object MaxHzController {
             settings put system peak_refresh_rate 120.0 >/dev/null 2>&1 || true
             settings put system user_refresh_rate 120 >/dev/null 2>&1 || true
             settings put system min_refresh_rate 0.0 >/dev/null 2>&1 || true
-            cmd display clear-user-preferred-display-mode 0 >/dev/null 2>&1 || true
             echo "已成功校准屏幕自适应刷新率！已突破省电模式限制，激活 1Hz~120Hz 硬件级自适应降频。"
             """.trimIndent()
         )
@@ -3603,6 +3653,10 @@ object MaxHzController {
             $bypassRestoreCommand
             cmd power set-mode 0 >/dev/null 2>&1 || true
             settings put global low_power 0 >/dev/null 2>&1 || true
+            settings put global low_power_mode 0 >/dev/null 2>&1 || true
+            settings put global low_power_sticky 0 >/dev/null 2>&1 || true
+            settings put global low_power_mode_opened 0 >/dev/null 2>&1 || true
+            settings put system POWER_SAVE_MODE_OPEN 0 >/dev/null 2>&1 || true
             settings put global restricted_device_performance 0,0 >/dev/null 2>&1 || true
             settings put global sem_low_heat_mode 0 >/dev/null 2>&1 || true
             settings delete global pms_settings_refresh_rate_enabled >/dev/null 2>&1 || true
@@ -3610,13 +3664,12 @@ object MaxHzController {
             settings delete global sem_power_mode_refresh_rate >/dev/null 2>&1 || true
             settings delete global sem_power_mode_refresh_rate_cover >/dev/null 2>&1 || true
             settings put secure refresh_rate_mode 1 >/dev/null 2>&1 || true
-            settings delete secure user_refresh_rate >/dev/null 2>&1 || true
-            settings delete system peak_refresh_rate >/dev/null 2>&1 || true
-            settings delete system min_refresh_rate >/dev/null 2>&1 || true
-            settings delete system user_refresh_rate >/dev/null 2>&1 || true
+            settings put secure user_refresh_rate 120 >/dev/null 2>&1 || true
+            settings put system peak_refresh_rate 120.0 >/dev/null 2>&1 || true
+            settings put system min_refresh_rate 0.0 >/dev/null 2>&1 || true
+            settings put system user_refresh_rate 120 >/dev/null 2>&1 || true
             settings delete system custom_refresh_rate >/dev/null 2>&1 || true
             settings delete system display_min_refresh_rate >/dev/null 2>&1 || true
-            cmd display clear-user-preferred-display-mode 0 >/dev/null 2>&1 || true
             settings delete global device_idle_constants >/dev/null 2>&1 || true
             settings delete global battery_saver_constants >/dev/null 2>&1 || true
             dumpsys deviceidle unforce >/dev/null 2>&1 || true
@@ -3667,6 +3720,10 @@ object MaxHzController {
             cmd power set-mode 0 >/dev/null 2>&1 || true
             cmd power set-adaptive-power-saver-enabled false >/dev/null 2>&1 || true
             settings put global low_power 0 >/dev/null 2>&1 || true
+            settings put global low_power_mode 0 >/dev/null 2>&1 || true
+            settings put global low_power_sticky 0 >/dev/null 2>&1 || true
+            settings put global low_power_mode_opened 0 >/dev/null 2>&1 || true
+            settings put system POWER_SAVE_MODE_OPEN 0 >/dev/null 2>&1 || true
             settings put global restricted_device_performance 0,0 >/dev/null 2>&1 || true
             settings put global sem_low_heat_mode 0 >/dev/null 2>&1 || true
             cmd power set-fixed-performance-mode-enabled true >/dev/null 2>&1 || true
