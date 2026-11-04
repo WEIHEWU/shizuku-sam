@@ -147,7 +147,7 @@ abstract class HomeActivity : MaxHzActivity() {
     private val isInstantSwitchActiveState = mutableStateOf(false)
     private val supportedRefreshRatesState = mutableStateOf<List<Int>>(listOf(10, 24, 30, 48, 60, 90, 120))
     private var lastRecordedThemeKey: String? = null
-    private var autoRestartAttempted = false
+    @Volatile private var isModeSwitching = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -161,20 +161,7 @@ abstract class HomeActivity : MaxHzActivity() {
             if (it.status == Status.SUCCESS) {
                 val status = homeModel.serviceStatus.value?.data ?: return@observe
                 if (status.isRunning) {
-                    autoRestartAttempted = true
                     ShizukuSettings.setLastLaunchMode(if (status.uid == 0) ShizukuSettings.LaunchMethod.ROOT else ShizukuSettings.LaunchMethod.ADB)
-                } else if (!autoRestartAttempted &&
-                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
-                    ShizukuSettings.getLastLaunchMode() == ShizukuSettings.LaunchMethod.ADB &&
-                    checkSelfPermission(android.Manifest.permission.WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED
-                ) {
-                    val sysPropPort = EnvironmentUtils.getAdbTcpPort()
-                    val discoveredPort = activeAdbPortState.intValue
-                    val hasLivePort = sysPropPort in 1..65535 || discoveredPort in 1..65535
-                    if (hasLivePort) {
-                        autoRestartAttempted = true
-                        moe.shizuku.manager.adb.AdbStartWorker.enqueue(this)
-                    }
                 }
                 // Compose 版通过 homeStatusState 快照自动重组，无需手动重渲染
                 if (selectedPage == Page.SHIZUKU && homeComposeView == null) {
@@ -259,27 +246,29 @@ abstract class HomeActivity : MaxHzActivity() {
         }
 
         // 1. 先通过 ContentResolver 与 PowerManager 同步可读的真实系统状态
-        val sysSaver = runCatching {
-            pm?.isPowerSaveMode == true ||
-                Settings.Global.getInt(cr, "low_power", 0) == 1 ||
-                Settings.Global.getInt(cr, "low_power_mode", 0) == 1
-        }.getOrDefault(false)
+        // 以 PowerManager.isPowerSaveMode（PowerManagerService 真实省电状态）为准，不读取易残留的 low_power 键
+        if (!isModeSwitching) {
+            val sysSaver = runCatching { pm?.isPowerSaveMode == true }.getOrDefault(false)
+            val storedTileMode = MaxHzPrefs.gameTileMode(this)
+            if (sysSaver) {
+                MaxHzPrefs.markSuperPerformanceState(this, false)
+                if (!MaxHzPrefs.compatibleSaverEnabled(this)) {
+                    MaxHzPrefs.setCompatibleSaverEnabled(this, true)
+                }
+                if (storedTileMode != 1) {
+                    MaxHzPrefs.setGameTileMode(this, 1)
+                }
+            } else if (storedTileMode == 1 || MaxHzPrefs.compatibleSaverEnabled(this)) {
+                MaxHzPrefs.setCompatibleSaverEnabled(this, false)
+                if (storedTileMode == 1) MaxHzPrefs.setGameTileMode(this, 0)
+            }
 
-        val storedTileMode = MaxHzPrefs.gameTileMode(this)
-        if ((storedTileMode == 1 || MaxHzPrefs.compatibleSaverEnabled(this)) && !sysSaver) {
-            MaxHzPrefs.setCompatibleSaverEnabled(this, false)
-            if (storedTileMode == 1) MaxHzPrefs.setGameTileMode(this, 0)
-        }
-        if ((storedTileMode == 2 || MaxHzPrefs.superPerformanceEnabled(this)) && sysSaver) {
-            MaxHzPrefs.markSuperPerformanceState(this, false)
-            if (storedTileMode == 2) MaxHzPrefs.setGameTileMode(this, 0)
-        }
-
-        val tileMode = MaxHzPrefs.gameTileMode(this)
-        gameTileModeState.intValue = when {
-            tileMode == 1 || MaxHzPrefs.compatibleSaverEnabled(this) -> 1
-            tileMode == 2 || MaxHzPrefs.superPerformanceEnabled(this) -> 2
-            else -> 0
+            val tileMode = MaxHzPrefs.gameTileMode(this)
+            gameTileModeState.intValue = when {
+                sysSaver || tileMode == 1 || MaxHzPrefs.compatibleSaverEnabled(this) -> 1
+                tileMode == 2 || MaxHzPrefs.superPerformanceEnabled(this) -> 2
+                else -> 0
+            }
         }
 
         runCatching { Settings.System.getInt(cr, "pass_through", -1) }.onSuccess { v ->
@@ -367,11 +356,18 @@ abstract class HomeActivity : MaxHzActivity() {
     private fun syncRealSystemSettingsViaShell() {
         lifecycleScope.launch(Dispatchers.IO) {
             delay(600L)
+            if (isModeSwitching) return@launch
             if (!runCatching { MaxHzShell.isReady() }.getOrDefault(false)) return@launch
             val r = MaxHzShell.exec(
                 """
-                echo "low_power=$(settings get global low_power 2>/dev/null)"
-                echo "low_power_mode=$(settings get global low_power_mode 2>/dev/null)"
+                p_dump="$(dumpsys power 2>/dev/null | grep -E 'mLowPowerModeEnabled=|Battery Saver is currently:|isPowerSaveMode=' | head -n 5)"
+                if printf '%s\n' "${'$'}p_dump" | grep -Eq 'mLowPowerModeEnabled=true|Battery Saver is currently:[[:space:]]*ON|isPowerSaveMode=true'; then
+                  echo "pms_saver=1"
+                elif printf '%s\n' "${'$'}p_dump" | grep -Eq 'mLowPowerModeEnabled=false|Battery Saver is currently:[[:space:]]*OFF|isPowerSaveMode=false'; then
+                  echo "pms_saver=0"
+                else
+                  echo "pms_saver=unknown"
+                fi
                 echo "sem_perf_sys=$(settings get system sem_enhanced_cpu_responsiveness 2>/dev/null)"
                 echo "sem_perf_glb=$(settings get global sem_enhanced_cpu_responsiveness 2>/dev/null)"
                 echo "pass_through=$(settings get system pass_through 2>/dev/null)"
@@ -388,7 +384,7 @@ abstract class HomeActivity : MaxHzActivity() {
                 """.trimIndent(),
                 timeoutSeconds = 4
             )
-            if (r.code != 0) return@launch
+            if (r.code != 0 || isModeSwitching) return@launch
             val map = r.out.lineSequence()
                 .mapNotNull { line ->
                     val idx = line.indexOf('=')
@@ -397,7 +393,13 @@ abstract class HomeActivity : MaxHzActivity() {
                 .toMap()
 
             val ctx = this@HomeActivity
-            val sysSaver = map["low_power"] == "1" || map["low_power_mode"] == "1"
+            val pm = ctx.getSystemService(android.os.PowerManager::class.java)
+            val sysSaver = when (map["pms_saver"]) {
+                "1" -> true
+                "0" -> false
+                else -> runCatching { pm?.isPowerSaveMode == true }.getOrDefault(false)
+            }
+            val sysPerf = map["sem_perf_sys"] == "1" || map["sem_perf_glb"] == "1"
             val passThrough = map["pass_through"] == "1"
             val protectBattery = map["protect_battery"] == "1"
             val protectLimit = map["protect_limit"]?.toIntOrNull()
@@ -410,13 +412,21 @@ abstract class HomeActivity : MaxHzActivity() {
             val outdoor = map["outdoor"] == "1"
 
             val storedMode = MaxHzPrefs.gameTileMode(ctx)
-            if ((storedMode == 1 || MaxHzPrefs.compatibleSaverEnabled(ctx)) && !sysSaver) {
-                MaxHzPrefs.setCompatibleSaverEnabled(ctx, false)
-                if (storedMode == 1) MaxHzPrefs.setGameTileMode(ctx, 0)
-            }
-            if ((storedMode == 2 || MaxHzPrefs.superPerformanceEnabled(ctx)) && sysSaver) {
+            if (sysSaver) {
                 MaxHzPrefs.markSuperPerformanceState(ctx, false)
-                if (storedMode == 2) MaxHzPrefs.setGameTileMode(ctx, 0)
+                MaxHzPrefs.setCompatibleSaverEnabled(ctx, true)
+                if (storedMode != 1) {
+                    MaxHzPrefs.setGameTileMode(ctx, 1)
+                }
+            } else {
+                if (storedMode == 1 || MaxHzPrefs.compatibleSaverEnabled(ctx)) {
+                    MaxHzPrefs.setCompatibleSaverEnabled(ctx, false)
+                    if (storedMode == 1) MaxHzPrefs.setGameTileMode(ctx, 0)
+                }
+                if ((storedMode == 2 || MaxHzPrefs.superPerformanceEnabled(ctx)) && !sysPerf) {
+                    MaxHzPrefs.markSuperPerformanceState(ctx, false)
+                    if (storedMode == 2) MaxHzPrefs.setGameTileMode(ctx, 0)
+                }
             }
             MaxHzPrefs.setPassThroughEnabled(ctx, passThrough)
             MaxHzPrefs.setBatteryProtectionEnabled(ctx, protectBattery)
@@ -430,11 +440,13 @@ abstract class HomeActivity : MaxHzActivity() {
             MaxHzPrefs.saveResult(ctx, "force_resizable", if (forceResiz) "1" else "0", true)
 
             withContext(Dispatchers.Main) {
-                val finalMode = MaxHzPrefs.gameTileMode(ctx)
-                gameTileModeState.intValue = when {
-                    finalMode == 1 || MaxHzPrefs.compatibleSaverEnabled(ctx) -> 1
-                    finalMode == 2 || MaxHzPrefs.superPerformanceEnabled(ctx) -> 2
-                    else -> 0
+                if (!isModeSwitching) {
+                    val finalMode = MaxHzPrefs.gameTileMode(ctx)
+                    gameTileModeState.intValue = when {
+                        sysSaver || finalMode == 1 || MaxHzPrefs.compatibleSaverEnabled(ctx) -> 1
+                        finalMode == 2 || MaxHzPrefs.superPerformanceEnabled(ctx) -> 2
+                        else -> 0
+                    }
                 }
                 passThroughState.value = passThrough
                 batteryProtectionState.value = protectBattery
@@ -959,52 +971,57 @@ abstract class HomeActivity : MaxHzActivity() {
         }
         val prevMode = gameTileModeState.intValue
         gameTileModeState.intValue = mode
+        isModeSwitching = true
         lifecycleScope.launch {
-            val (msg, finalMode) = withContext(Dispatchers.IO) {
-                when (mode) {
-                    1 -> {
-                        val r = MaxHzController.applyCompatibleSaverAdaptive()
-                        if (r.code == 0) {
-                            MaxHzPrefs.setGameTileMode(this@HomeActivity, 1)
-                            MaxHzPrefs.setCompatibleSaverEnabled(this@HomeActivity, true)
-                            MaxHzPrefs.markSuperPerformanceState(this@HomeActivity, false)
-                            getString(R.string.toast_mode_switched_saver) to 1
-                        } else {
-                            val err = r.err.ifBlank { r.out }.ifBlank { "(${r.code})" }
-                            getString(R.string.toast_mode_switch_failed, err) to prevMode
+            try {
+                val (msg, finalMode) = withContext(Dispatchers.IO) {
+                    when (mode) {
+                        1 -> {
+                            val r = MaxHzController.applyCompatibleSaverAdaptive()
+                            if (r.code == 0) {
+                                MaxHzPrefs.setGameTileMode(this@HomeActivity, 1)
+                                MaxHzPrefs.setCompatibleSaverEnabled(this@HomeActivity, true)
+                                MaxHzPrefs.markSuperPerformanceState(this@HomeActivity, false)
+                                getString(R.string.toast_mode_switched_saver) to 1
+                            } else {
+                                val err = r.err.ifBlank { r.out }.ifBlank { "(${r.code})" }
+                                getString(R.string.toast_mode_switch_failed, err) to prevMode
+                            }
                         }
-                    }
-                    2 -> {
-                        val relaxed = MaxHzPrefs.gameAutoThermalRelaxed(this@HomeActivity)
-                        val r = MaxHzController.quickSwitchGamePerformance(relaxed)
-                        if (r.code == 0) {
-                            MaxHzPrefs.setGameTileMode(this@HomeActivity, 2)
-                            MaxHzPrefs.setCompatibleSaverEnabled(this@HomeActivity, false)
-                            MaxHzPrefs.markSuperPerformanceState(this@HomeActivity, true, relaxed)
-                            getString(R.string.toast_mode_switched_game) to 2
-                        } else {
-                            val err = r.err.ifBlank { r.out }.ifBlank { "(${r.code})" }
-                            getString(R.string.toast_mode_switch_failed, err) to prevMode
+                        2 -> {
+                            val relaxed = MaxHzPrefs.gameAutoThermalRelaxed(this@HomeActivity)
+                            val r = MaxHzController.quickSwitchGamePerformance(relaxed)
+                            if (r.code == 0) {
+                                MaxHzPrefs.setGameTileMode(this@HomeActivity, 2)
+                                MaxHzPrefs.setCompatibleSaverEnabled(this@HomeActivity, false)
+                                MaxHzPrefs.markSuperPerformanceState(this@HomeActivity, true, relaxed)
+                                getString(R.string.toast_mode_switched_game) to 2
+                            } else {
+                                val err = r.err.ifBlank { r.out }.ifBlank { "(${r.code})" }
+                                getString(R.string.toast_mode_switch_failed, err) to prevMode
+                            }
                         }
-                    }
-                    else -> {
-                        val r = MaxHzController.quickSwitchGameDefault()
-                        if (r.code == 0) {
-                            MaxHzPrefs.setGameTileMode(this@HomeActivity, 0)
-                            MaxHzPrefs.setCompatibleSaverEnabled(this@HomeActivity, false)
-                            MaxHzPrefs.markSuperPerformanceState(this@HomeActivity, false)
-                            getString(R.string.toast_mode_switched_default) to 0
-                        } else {
-                            val err = r.err.ifBlank { r.out }.ifBlank { "(${r.code})" }
-                            getString(R.string.toast_mode_switch_failed, err) to prevMode
+                        else -> {
+                            val r = MaxHzController.quickSwitchGameDefault()
+                            if (r.code == 0) {
+                                MaxHzPrefs.setGameTileMode(this@HomeActivity, 0)
+                                MaxHzPrefs.setCompatibleSaverEnabled(this@HomeActivity, false)
+                                MaxHzPrefs.markSuperPerformanceState(this@HomeActivity, false)
+                                getString(R.string.toast_mode_switched_default) to 0
+                            } else {
+                                val err = r.err.ifBlank { r.out }.ifBlank { "(${r.code})" }
+                                getString(R.string.toast_mode_switch_failed, err) to prevMode
+                            }
                         }
                     }
                 }
+                gameTileModeState.intValue = finalMode
+                quickDozeState.value = MaxHzPrefs.quickDozeEnabled(this@HomeActivity)
+                Toast.makeText(this@HomeActivity, msg, Toast.LENGTH_SHORT).show()
+                updateMaxHzServiceState()
+            } finally {
+                isModeSwitching = false
             }
-            gameTileModeState.intValue = finalMode
-            quickDozeState.value = MaxHzPrefs.quickDozeEnabled(this@HomeActivity)
-            Toast.makeText(this@HomeActivity, msg, Toast.LENGTH_SHORT).show()
-            updateMaxHzServiceState()
         }
     }
 
@@ -1969,17 +1986,16 @@ abstract class HomeActivity : MaxHzActivity() {
             return
         }
 
-        if (checkSelfPermission(android.Manifest.permission.WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED) {
-            runCatching {
-                Settings.Global.putInt(contentResolver, Settings.Global.ADB_ENABLED, 1)
-                Settings.Global.putLong(contentResolver, "adb_allowed_connection_time", 0L)
-                Settings.Global.putInt(contentResolver, "adb_wifi_enabled", 1)
-            }
-        }
-
         if (!EnvironmentUtils.isAdbEnabled(this)) {
             WadbEnableUsbDebuggingDialogFragment().show(supportFragmentManager)
             return
+        }
+
+        if (checkSelfPermission(android.Manifest.permission.WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED) {
+            runCatching {
+                Settings.Global.putLong(contentResolver, "adb_allowed_connection_time", 0L)
+                Settings.Global.putInt(contentResolver, "adb_wifi_enabled", 1)
+            }
         }
 
         lifecycleScope.launch {
@@ -2196,16 +2212,6 @@ abstract class HomeActivity : MaxHzActivity() {
                 isWifiConnectedState.value = wifi
                 isHotspotActiveState.value = hotspot
                 activeAdbPortState.intValue = port
-                if (!Shizuku.pingBinder() &&
-                    !autoRestartAttempted &&
-                    port in 1..65535 &&
-                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
-                    ShizukuSettings.getLastLaunchMode() == ShizukuSettings.LaunchMethod.ADB &&
-                    checkSelfPermission(android.Manifest.permission.WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED
-                ) {
-                    autoRestartAttempted = true
-                    moe.shizuku.manager.adb.AdbStartWorker.enqueue(this@HomeActivity)
-                }
             }
         }
     }

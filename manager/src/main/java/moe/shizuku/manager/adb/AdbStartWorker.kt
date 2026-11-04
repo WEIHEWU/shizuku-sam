@@ -26,6 +26,7 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import androidx.work.workDataOf
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.awaitClose
@@ -53,23 +54,12 @@ class AdbStartWorker(
             if (Shizuku.pingBinder()) return Result.success()
 
             val cr = applicationContext.contentResolver
+            val allowEnableWifi = inputData.getBoolean(KEY_ALLOW_ENABLE_WIFI, false)
 
-            // Give the system time to finish initializing after reboot before toggling ADB.
-            // Samsung One UI firmware takes longer to stabilize — give it an extra 1.5 s on top
-            // of the base 1.5 s delay to reduce the chance the firmware immediately resets
-            // adb_wifi_enabled after our first write.
-            if (runAttemptCount == 0 && !EnvironmentUtils.isAdbEnabled()) {
-                val baseDelay = if (Build.MANUFACTURER.equals("samsung", ignoreCase = true)) {
-                    3000L
-                } else {
-                    1500L
-                }
-                delay(baseDelay)
-            }
-
-            if (applicationContext.checkSelfPermission(WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED) {
+            if (allowEnableWifi &&
+                applicationContext.checkSelfPermission(WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED
+            ) {
                 runCatching {
-                    Settings.Global.putInt(cr, Settings.Global.ADB_ENABLED, 1)
                     Settings.Global.putLong(cr, "adb_allowed_connection_time", 0L)
                 }
             }
@@ -109,121 +99,120 @@ class AdbStartWorker(
             }
 
             val port = when {
-                tcpPort > 0 && isWifiOk -> tcpPort
-                savedPort > 0 && isWifiOk && runAttemptCount == 0 -> savedPort
-                else -> callbackFlow {
-                    val adbMdns = AdbMdns(applicationContext, AdbMdns.TLS_CONNECT, Observer { (_, p) ->
-                        if (p > 0) trySend(p)
-                    })
-
-                    var awaitingAuth = false
-                    var timeoutJob: Job? = null
-                    var unlockReceiver: BroadcastReceiver? = null
-                    var samsungResetCount = 0
-                    val maxSamsungResets = if (Build.MANUFACTURER.equals("samsung", ignoreCase = true)) {
-                        4
-                    } else {
-                        0
+                tcpPort > 0 && isWifiOk && AdbPortProber.isPortOpen(tcpPort, 400) -> tcpPort
+                savedPort > 0 && isWifiOk && AdbPortProber.isPortOpen(savedPort, 400) -> savedPort
+                else -> {
+                    val isWifiAdbEnabled = Settings.Global.getInt(cr, "adb_wifi_enabled", 0) == 1
+                    if (!allowEnableWifi && !isWifiAdbEnabled) {
+                        Log.i(AppConstants.TAG, "doWork: adb_wifi_enabled is 0 and allowEnableWifi=false; aborting background start")
+                        return Result.failure()
                     }
+                    callbackFlow {
+                        val adbMdns = AdbMdns(applicationContext, AdbMdns.TLS_CONNECT, Observer { (_, p) ->
+                            if (p > 0) trySend(p)
+                        })
 
-                    fun startDiscoveryWithTimeout() {
-                        adbMdns.start()
-                        timeoutJob?.cancel()
-                        timeoutJob = launch {
-                            delay(45_000L)
-                            close(TimeoutException("Timed out during mDNS port discovery"))
-                        }
-                    }
+                        var awaitingAuth = false
+                        var timeoutJob: Job? = null
+                        var unlockReceiver: BroadcastReceiver? = null
 
-                    fun handleAuth() {
-                        val km = applicationContext.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
-                        if (km?.isKeyguardLocked == true) {
-                            runCatching {
-                                val nm = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && nm != null) {
-                                    nm.createNotificationChannel(
-                                        NotificationChannel(
-                                            CHANNEL_ID,
-                                            applicationContext.getString(R.string.notification_channel_adb_pairing),
-                                            NotificationManager.IMPORTANCE_LOW
-                                        )
-                                    )
-                                }
-                                val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
-                                    .setSmallIcon(R.drawable.ic_system_icon)
-                                    .setContentTitle(applicationContext.getString(R.string.app_name))
-                                    .setContentText("等待解锁后自动启动无线调试服务…")
-                                    .setOngoing(true)
-                                    .setSilent(true)
-                                    .build()
-                                val foregroundInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                                    ForegroundInfo(
-                                        NOTIFICATION_ID,
-                                        notification,
-                                        ServiceInfo.FOREGROUND_SERVICE_TYPE_SHORT_SERVICE
-                                    )
-                                } else {
-                                    ForegroundInfo(NOTIFICATION_ID, notification)
-                                }
-                                setForegroundAsync(foregroundInfo)
+                        fun startDiscoveryWithTimeout() {
+                            adbMdns.start()
+                            timeoutJob?.cancel()
+                            timeoutJob = launch {
+                                delay(45_000L)
+                                close(TimeoutException("Timed out during mDNS port discovery"))
                             }
-                            val filter = IntentFilter(Intent.ACTION_USER_PRESENT)
-                            unlockReceiver = object : BroadcastReceiver() {
-                                override fun onReceive(context: Context, intent: Intent) {
-                                    if (intent.action == Intent.ACTION_USER_PRESENT) {
-                                        runCatching { context.unregisterReceiver(this) }
-                                        unlockReceiver = null
-                                        if (applicationContext.checkSelfPermission(WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED) {
-                                            Settings.Global.putInt(cr, "adb_wifi_enabled", 1)
+                        }
+
+                        fun handleAuth() {
+                            val km = applicationContext.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
+                            if (km?.isKeyguardLocked == true && allowEnableWifi) {
+                                runCatching {
+                                    val nm = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && nm != null) {
+                                        nm.createNotificationChannel(
+                                            NotificationChannel(
+                                                CHANNEL_ID,
+                                                applicationContext.getString(R.string.notification_channel_adb_pairing),
+                                                NotificationManager.IMPORTANCE_LOW
+                                            )
+                                        )
+                                    }
+                                    val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
+                                        .setSmallIcon(R.drawable.ic_system_icon)
+                                        .setContentTitle(applicationContext.getString(R.string.app_name))
+                                        .setContentText("等待解锁后自动启动无线调试服务…")
+                                        .setOngoing(true)
+                                        .setSilent(true)
+                                        .build()
+                                    val foregroundInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                                        ForegroundInfo(
+                                            NOTIFICATION_ID,
+                                            notification,
+                                            ServiceInfo.FOREGROUND_SERVICE_TYPE_SHORT_SERVICE
+                                        )
+                                    } else {
+                                        ForegroundInfo(NOTIFICATION_ID, notification)
+                                    }
+                                    setForegroundAsync(foregroundInfo)
+                                }
+                                val filter = IntentFilter(Intent.ACTION_USER_PRESENT)
+                                unlockReceiver = object : BroadcastReceiver() {
+                                    override fun onReceive(context: Context, intent: Intent) {
+                                        if (intent.action == Intent.ACTION_USER_PRESENT) {
+                                            runCatching { context.unregisterReceiver(this) }
+                                            unlockReceiver = null
+                                            if (allowEnableWifi &&
+                                                applicationContext.checkSelfPermission(WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED
+                                            ) {
+                                                Settings.Global.putInt(cr, "adb_wifi_enabled", 1)
+                                            }
                                         }
                                     }
                                 }
+                                ContextCompat.registerReceiver(
+                                    applicationContext,
+                                    unlockReceiver,
+                                    filter,
+                                    ContextCompat.RECEIVER_NOT_EXPORTED
+                                )
+                            } else {
+                                awaitingAuth = true
                             }
-                            ContextCompat.registerReceiver(
-                                applicationContext,
-                                unlockReceiver,
-                                filter,
-                                ContextCompat.RECEIVER_NOT_EXPORTED
-                            )
-                        } else {
-                            awaitingAuth = true
+                            timeoutJob?.cancel()
+                            adbMdns.stop()
                         }
-                        timeoutJob?.cancel()
-                        adbMdns.stop()
-                    }
 
-                    val observer = object : ContentObserver(null) {
-                        override fun onChange(selfChange: Boolean) {
-                            when (Settings.Global.getInt(cr, "adb_wifi_enabled", 0)) {
-                                0 -> if (awaitingAuth) {
-                                    close(SecurityException("Network is not authorized for wireless debugging"))
-                                } else if (samsungResetCount < maxSamsungResets) {
-                                    samsungResetCount++
-                                    launch {
-                                        delay(300L * samsungResetCount)
-                                        Settings.Global.putInt(cr, "adb_wifi_enabled", 1)
+                        val observer = object : ContentObserver(null) {
+                            override fun onChange(selfChange: Boolean) {
+                                when (Settings.Global.getInt(cr, "adb_wifi_enabled", 0)) {
+                                    0 -> if (awaitingAuth || !allowEnableWifi) {
+                                        close(SecurityException("Wireless debugging is disabled or network is not authorized"))
+                                    } else {
+                                        handleAuth()
                                     }
-                                } else {
-                                    handleAuth()
+                                    1 -> startDiscoveryWithTimeout()
                                 }
-                                1 -> startDiscoveryWithTimeout()
                             }
                         }
-                    }
 
-                    if (applicationContext.checkSelfPermission(WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED) {
-                        Settings.Global.putInt(cr, "adb_wifi_enabled", 1)
-                    }
-                    cr.registerContentObserver(Settings.Global.getUriFor("adb_wifi_enabled"), false, observer)
-                    startDiscoveryWithTimeout()
+                        if (allowEnableWifi &&
+                            applicationContext.checkSelfPermission(WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED
+                        ) {
+                            Settings.Global.putInt(cr, "adb_wifi_enabled", 1)
+                        }
+                        cr.registerContentObserver(Settings.Global.getUriFor("adb_wifi_enabled"), false, observer)
+                        startDiscoveryWithTimeout()
 
-                    awaitClose {
-                        adbMdns.stop()
-                        timeoutJob?.cancel()
-                        runCatching { cr.unregisterContentObserver(observer) }
-                        unlockReceiver?.let { runCatching { applicationContext.unregisterReceiver(it) } }
-                    }
-                }.first()
+                        awaitClose {
+                            adbMdns.stop()
+                            timeoutJob?.cancel()
+                            runCatching { cr.unregisterContentObserver(observer) }
+                            unlockReceiver?.let { runCatching { applicationContext.unregisterReceiver(it) } }
+                        }
+                    }.first()
+                }
             }
 
             Log.i(AppConstants.TAG, "doWork: resolved port $port, starting ADB client")
@@ -246,7 +235,7 @@ class AdbStartWorker(
             return if (ShizukuStateMachine.update() == ShizukuStateMachine.State.RUNNING) {
                 Result.success()
             } else {
-                Result.retry()
+                Result.failure()
             }
         }
     }
@@ -254,7 +243,9 @@ class AdbStartWorker(
     companion object {
         private const val CHANNEL_ID = "AdbStartWorker"
         private const val NOTIFICATION_ID = 1448
-        fun enqueue(context: Context) {
+        private const val KEY_ALLOW_ENABLE_WIFI = "allow_enable_wifi"
+
+        fun enqueue(context: Context, allowEnableWifi: Boolean = false) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 val um = context.getSystemService(android.os.UserManager::class.java)
                 if (um != null && !um.isUserUnlocked) return
@@ -268,6 +259,7 @@ class AdbStartWorker(
 
             val request = OneTimeWorkRequestBuilder<AdbStartWorker>()
                 .setConstraints(constraints)
+                .setInputData(workDataOf(KEY_ALLOW_ENABLE_WIFI to allowEnableWifi))
                 .build()
 
             val policy = if (AdbStarter.keyOfferInFlight) ExistingWorkPolicy.KEEP else ExistingWorkPolicy.REPLACE

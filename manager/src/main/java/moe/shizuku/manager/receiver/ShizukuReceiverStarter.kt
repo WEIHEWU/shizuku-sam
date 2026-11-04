@@ -25,7 +25,12 @@ object ShizukuReceiverStarter {
     const val WORK_NAME = "adb_start_worker"
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    fun start(context: Context, forceStart: Boolean = false, onComplete: (() -> Unit)? = null) {
+    fun start(
+        context: Context,
+        forceStart: Boolean = false,
+        allowEnableWifi: Boolean = false,
+        onComplete: (() -> Unit)? = null
+    ) {
         if (!forceStart && (UserHandleCompat.myUserId() > 0
                 || ShizukuStateMachine.isRunning()
                 || ShizukuStateMachine.get() == ShizukuStateMachine.State.STARTING)) {
@@ -47,7 +52,7 @@ object ShizukuReceiverStarter {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
                 appContext.checkSelfPermission(WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED
             ) {
-                AdbStartWorker.enqueue(appContext)
+                AdbStartWorker.enqueue(appContext, allowEnableWifi = allowEnableWifi)
             } else {
                 Log.w(AppConstants.TAG, "WRITE_SECURE_SETTINGS not granted for background ADB start")
             }

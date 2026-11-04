@@ -326,6 +326,7 @@
             android:description="@string/dhizuku_device_owner_desc"
             android:label="@string/dhizuku_device_owner_label"
             android:permission="android.permission.BIND_DEVICE_ADMIN"
+            android:enabled="false"
             android:exported="true">
             <meta-data
                 android:name="android.app.device_admin"
@@ -342,6 +343,7 @@
 
         <receiver
             android:name=".receiver.DhizukuControlReceiver"
+            android:enabled="false"
             android:exported="true">
             <intent-filter>
                 <action android:name="moe.shizuku.manager.action.REMOVE_DEVICE_OWNER" />
@@ -353,6 +355,7 @@
         <activity
             android:name=".admin.DhizukuRequestPermissionActivity"
             android:excludeFromRecents="true"
+            android:enabled="false"
             android:exported="true"
             android:theme="@android:style/Theme.Translucent.NoTitleBar">
             <intent-filter>
@@ -367,7 +370,7 @@
             android:name=".DhizukuProvider"
             android:authorities="${applicationId}.dhizuku_server.provider;${applicationId}.server.provider"
             android:directBootAware="true"
-            android:enabled="true"
+            android:enabled="false"
             android:exported="true"
             android:multiprocess="false" />
 

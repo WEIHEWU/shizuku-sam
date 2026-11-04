@@ -298,7 +298,7 @@ class MaxHzService : Service() {
 
         if (MaxHzPrefs.controlEnabled(this) && MaxHzPrefs.compatibleSaverEnabled(this) && MaxHzPrefs.mMainMode(this) == "off") {
             return RefreshMode("compatible_saver_adaptive") {
-                MaxHzController.applyCompatibleSaverAdaptive()
+                MaxHzRefreshSettings.applyScreenOnAdaptive(it)
             }
         }
 

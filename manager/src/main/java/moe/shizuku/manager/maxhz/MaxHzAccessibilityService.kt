@@ -1073,18 +1073,21 @@ class MaxHzAccessibilityService : AccessibilityService() {
         val targetProfile = MaxHzPrefs.gamePackageTargetProfile(this, activeGameAutoPackage)
         when (targetProfile) {
             MaxHzPrefs.GAME_PROFILE_DEFAULT -> {
+                MaxHzPrefs.setGameTileMode(this, 0)
                 MaxHzPrefs.markSuperPerformanceState(this, false)
                 MaxHzPrefs.setCompatibleSaverEnabled(this, false)
                 MaxHzPrefs.setQuickDozeEnabled(this, false)
                 MaxHzPrefs.setGameAutoSessionActive(this, true)
             }
             MaxHzPrefs.GAME_PROFILE_SAVER -> {
+                MaxHzPrefs.setGameTileMode(this, 1)
                 MaxHzPrefs.markSuperPerformanceState(this, false)
                 MaxHzPrefs.setCompatibleSaverEnabled(this, true)
                 MaxHzPrefs.setQuickDozeEnabled(this, true)
                 MaxHzPrefs.setGameAutoSessionActive(this, true)
             }
             else -> {
+                MaxHzPrefs.setGameTileMode(this, 2)
                 MaxHzPrefs.markSuperPerformanceState(
                     this,
                     true,
@@ -1122,6 +1125,14 @@ class MaxHzAccessibilityService : AccessibilityService() {
             getSystemService(PowerManager::class.java)?.isPowerSaveMode == true
         MaxHzPrefs.setCompatibleSaverEnabled(this, saverOn)
         MaxHzPrefs.setQuickDozeEnabled(this, saverOn)
+        MaxHzPrefs.setGameTileMode(
+            this,
+            when {
+                saverOn -> 1
+                snapshot?.superPerformance == true -> 2
+                else -> 0
+            }
+        )
         MaxHzPrefs.setGameAutoSessionActive(this, false)
         MaxHzPrefs.clearGameAutoSnapshot(this)
     }
