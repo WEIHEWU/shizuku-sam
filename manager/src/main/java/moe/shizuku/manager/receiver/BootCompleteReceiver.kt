@@ -29,15 +29,26 @@ class BootCompleteReceiver : BroadcastReceiver() {
 
         Log.i(AppConstants.TAG, "BootCompleteReceiver triggered by: $action")
 
-        if (action != Intent.ACTION_LOCKED_BOOT_COMPLETED) {
-            startMaxHzServiceIfNeeded(context)
-            try {
-                ShizukuReceiverStarter.start(context)
-            } catch (e: Exception) {
-                Log.w(AppConstants.TAG, "Auto-start skipped (service not ready, e.g. direct boot)", e)
-            }
-        } else {
+        if (action == Intent.ACTION_LOCKED_BOOT_COMPLETED) {
             Log.d(AppConstants.TAG, "LOCKED_BOOT_COMPLETED — deferring start to BOOT_COMPLETED")
+            return
+        }
+
+        val pendingResult = goAsync()
+        startMaxHzServiceIfNeeded(context)
+        try {
+            ShizukuReceiverStarter.start(context, forceStart = true) {
+                try {
+                    pendingResult.finish()
+                } catch (e: Exception) {
+                    Log.w(AppConstants.TAG, "Error finishing pendingResult", e)
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(AppConstants.TAG, "Auto-start skipped (service not ready, e.g. direct boot)", e)
+            try {
+                pendingResult.finish()
+            } catch (ignored: Exception) {}
         }
 
         try {

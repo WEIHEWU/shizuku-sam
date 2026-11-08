@@ -107,6 +107,10 @@ public class ShizukuSettings {
         return getPreferences().getInt("mode", LaunchMethod.UNKNOWN);
     }
 
+    public static boolean isKeepStartOnBoot() {
+        return getPreferences() != null && getPreferences().getBoolean(KEEP_START_ON_BOOT, false);
+    }
+
     public static void setLastLaunchMode(@LaunchMethod int method) {
         SharedPreferences.Editor editor = getPreferences().edit().putInt("mode", method);
         if (method == LaunchMethod.ROOT || method == LaunchMethod.ADB) {

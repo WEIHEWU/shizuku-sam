@@ -5,6 +5,8 @@ import android.content.ActivityNotFoundException
 import android.content.DialogInterface
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.util.Log
+import moe.shizuku.manager.AppConstants
 import moe.shizuku.manager.admin.DhizukuAdminReceiver
 import android.net.Uri
 import android.graphics.Color
@@ -148,6 +150,7 @@ abstract class HomeActivity : MaxHzActivity() {
     private val supportedRefreshRatesState = mutableStateOf<List<Int>>(listOf(10, 24, 30, 48, 60, 90, 120))
     private var lastRecordedThemeKey: String? = null
     @Volatile private var isModeSwitching = false
+    @Volatile private var rootAutoStartAttempted = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -2191,6 +2194,7 @@ abstract class HomeActivity : MaxHzActivity() {
     private fun checkServerStatus() {
         homeModel.reload()
         if (Shizuku.pingBinder()) {
+            rootAutoStartAttempted = false
             appsModel.load()
             if (ShizukuStateMachine.isServerVersionSkewed()) {
                 ShizukuSettings.setServerStartedBuild(moe.shizuku.manager.BuildConfig.VERSION_CODE)
@@ -2212,6 +2216,15 @@ abstract class HomeActivity : MaxHzActivity() {
                 isWifiConnectedState.value = wifi
                 isHotspotActiveState.value = hotspot
                 activeAdbPortState.intValue = port
+            }
+            if (!Shizuku.pingBinder() && !rootAutoStartAttempted && rootAvail) {
+                val launchMode = ShizukuSettings.getLastLaunchMode()
+                val isKeepBoot = ShizukuSettings.isKeepStartOnBoot()
+                if (launchMode == ShizukuSettings.LaunchMethod.ROOT || (launchMode == ShizukuSettings.LaunchMethod.UNKNOWN && isKeepBoot)) {
+                    rootAutoStartAttempted = true
+                    Log.i(AppConstants.TAG, "Auto-launching Shizuku with Root on HomeActivity startup")
+                    moe.shizuku.manager.receiver.ShizukuReceiverStarter.start(applicationContext, forceStart = true)
+                }
             }
         }
     }

@@ -29,10 +29,19 @@ object RootBootScriptHelper {
                     if /system/bin/pidof shizuku_server >/dev/null 2>&1; then
                         exit 0
                     fi
-                    setprop persist.adb.tcp.port 5555 2>/dev/null || true
-                    setprop service.adb.tcp.port 5555 2>/dev/null || true
+
+                    APK_PATH=${'$'}(pm path moe.shizuku.privileged.api 2>/dev/null | head -n1 | cut -d: -f2 | tr -d '\r')
+                    if [ -n "${'$'}APK_PATH" ]; then
+                        BASE_DIR=${'$'}(dirname "${'$'}APK_PATH")
+                        LIB_SO=${'$'}(find "${'$'}BASE_DIR/lib" -name "libshizuku.so" 2>/dev/null | head -n1)
+                        if [ -n "${'$'}LIB_SO" ] && [ -f "${'$'}LIB_SO" ]; then
+                            chmod 755 "${'$'}LIB_SO" 2>/dev/null || true
+                            "${'$'}LIB_SO" --apk="${'$'}APK_PATH" >/dev/null 2>&1 &
+                        fi
+                    fi
+
                     if [ -f "/data/local/tmp/shizuku" ]; then
-                        /data/local/tmp/shizuku >/dev/null 2>&1 || true
+                        /data/local/tmp/shizuku >/dev/null 2>&1 &
                     fi
                 """.trimIndent()
 

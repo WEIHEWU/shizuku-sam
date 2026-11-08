@@ -46,15 +46,18 @@ class ShizukuApplication : Application() {
         super.onCreate()
         application = this
         init(this)
-        if (ShizukuSettings.getWatchdog()) {
-            WatchdogService.start(this)
-            val userManager = getSystemService(Context.USER_SERVICE) as? UserManager
-            if (userManager == null || userManager.isUserUnlocked) {
+        val userManager = getSystemService(Context.USER_SERVICE) as? UserManager
+        val isUnlocked = userManager == null || userManager.isUserUnlocked
+        if (isUnlocked) {
+            if (ShizukuSettings.getWatchdog()) {
+                WatchdogService.start(this)
                 runCatching { WatchdogWorker.enqueue(this) }
                 WatchdogAlarmReceiver.scheduleNext(this)
             }
+            runCatching { WatchdogService.syncWithCurrentState(this) }
+        } else {
+            logd("ShizukuApplication", "User is locked (Direct Boot) - deferring Watchdog and auto-start until unlock")
         }
-        runCatching { WatchdogService.syncWithCurrentState(this) }
     }
 
 }
