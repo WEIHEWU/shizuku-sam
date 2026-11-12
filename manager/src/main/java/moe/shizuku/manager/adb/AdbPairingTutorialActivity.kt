@@ -238,26 +238,23 @@ class AdbPairingTutorialActivity : AppActivity() {
         super.onDestroy()
     }
 
-    // Android 17 (SDK 37) 将局域网访问限制在 ACCESS_LOCAL_NETWORK 运行时权限之后；
-    // Android 16 (SDK 36) 使用 NEARBY_WIFI_DEVICES。
-    // 若未在运行时获批，系统会在发起配对时弹出无限死循环的选择设备框 (Choose a device to connect)。
-    private fun localNetworkPermission(): String? = when {
-        Build.VERSION.SDK_INT >= 37 -> "android.permission.ACCESS_LOCAL_NETWORK"
-        Build.VERSION.SDK_INT >= 36 -> Manifest.permission.NEARBY_WIFI_DEVICES
-        else -> null
-    }
+    private val localNetRequester = LocalNetworkGate.Requester(this)
+    private var permissionRequestedOnceInSession = false
 
-    private val localNetworkPermissionLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) {
+    private fun startPairingService(userInitiated: Boolean = false) {
+        if (LocalNetworkGate.hasPermission(this)) {
             doStartPairingService()
+            return
         }
-
-    private fun startPairingService() {
-        val permission = localNetworkPermission()
-        if (permission != null && checkSelfPermission(permission) != PackageManager.PERMISSION_GRANTED) {
-            localNetworkPermissionLauncher.launch(permission)
+        if (userInitiated || !permissionRequestedOnceInSession) {
+            permissionRequestedOnceInSession = true
+            localNetRequester.requestIfNeeded(
+                caller = "AdbPairingTutorialActivity.startPairingService",
+                onGranted = { doStartPairingService() },
+                onDenied = { LocalNetworkGate.showSettingsGuideDialog(this) }
+            )
         } else {
-            doStartPairingService()
+            LocalNetworkGate.checkOrSkip("AdbPairingTutorialActivity.onResume(alreadyPrompted)", -1, this)
         }
     }
 
@@ -733,7 +730,7 @@ private fun MiuixManualPairingDialog(
     var portText by remember(show) { mutableStateOf("") }
     var codeText by remember(show) { mutableStateOf("") }
     var detectedHost by remember(show) { mutableStateOf("127.0.0.1") }
-    var statusMsg by remember(show) { mutableStateOf("正在通过本地 mDNS 自动搜索无线调试配对端口...") }
+    var statusMsg by remember(show) { mutableStateOf("正在通过本地 mDNS 自动搜索无线调试配对服务...") }
     var isError by remember(show) { mutableStateOf(false) }
     var isPairing by remember(show) { mutableStateOf(false) }
     var showDesc by remember(show) { mutableStateOf(false) }
@@ -746,7 +743,7 @@ private fun MiuixManualPairingDialog(
             }
             if (servicePort > 0) {
                 portText = servicePort.toString()
-                statusMsg = "已自动发现配对端口：$servicePort，请输入 6 位配对码"
+                statusMsg = "已自动发现配对地址：$detectedHost:$servicePort，请输入 6 位配对码"
                 isError = false
             }
         }

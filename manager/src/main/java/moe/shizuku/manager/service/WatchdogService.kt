@@ -21,9 +21,11 @@ import moe.shizuku.manager.MainActivity
 import moe.shizuku.manager.R
 import moe.shizuku.manager.ShizukuSettings
 import moe.shizuku.manager.adb.AdbStarter
+import moe.shizuku.manager.adb.LocalNetworkGate
 import moe.shizuku.manager.maxhz.MaxHzShell
 import moe.shizuku.manager.receiver.ShizukuReceiverStarter
 import moe.shizuku.manager.utils.AccessibilityHelper
+import moe.shizuku.manager.utils.StartupCoordinator
 import rikka.shizuku.Shizuku
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -60,6 +62,19 @@ class WatchdogService : Service() {
             consecutiveCrashes = 0
             return
         }
+        if (StartupCoordinator.isAutoRetryStopped()) {
+            Log.d(TAG, "Watchdog: auto-retry stopped by user, skipping restart")
+            return
+        }
+        if (consecutiveCrashes >= StartupCoordinator.MAX_AUTO_RETRIES) {
+            Log.w(TAG, "Watchdog: max auto-retries (${StartupCoordinator.MAX_AUTO_RETRIES}) reached, stopping background restart")
+            return
+        }
+        if (ShizukuSettings.getLastLaunchMode() == ShizukuSettings.LaunchMethod.ADB) {
+            if (!LocalNetworkGate.checkOrSkip("WatchdogService.handleCrashDetected", -1, applicationContext, isBackground = true)) {
+                return
+            }
+        }
         val now = System.currentTimeMillis()
         val cooldown = backoffMs(consecutiveCrashes)
         if (now - lastRestartMs > cooldown) {
@@ -67,7 +82,7 @@ class WatchdogService : Service() {
             lastRestartMs = now
             notifyRestart()
             ShizukuReceiverStarter.start(applicationContext)
-            Log.d(TAG, "Watchdog: restart #$consecutiveCrashes (cooldown was ${cooldown}ms)")
+            Log.d(TAG, "Watchdog: restart #$consecutiveCrashes/${StartupCoordinator.MAX_AUTO_RETRIES} (cooldown was ${cooldown}ms)")
         } else {
             Log.d(TAG, "Watchdog: restart suppressed (cooldown active, ${now - lastRestartMs}ms / ${cooldown}ms)")
         }
@@ -262,6 +277,15 @@ class WatchdogService : Service() {
             if (isAlive) {
                 ShizukuSettings.setLastSettledStateRunning(true)
             } else if (ShizukuSettings.isLastSettledStateRunning() && ShizukuSettings.getWatchdog()) {
+                if (StartupCoordinator.isAutoRetryStopped()) {
+                    Log.d(TAG, "syncWithCurrentState: auto-retry stopped by user, skipping")
+                    return
+                }
+                if (ShizukuSettings.getLastLaunchMode() == ShizukuSettings.LaunchMethod.ADB) {
+                    if (!LocalNetworkGate.checkOrSkip("WatchdogService.syncWithCurrentState", -1, context, isBackground = true)) {
+                        return
+                    }
+                }
                 ShizukuReceiverStarter.start(context.applicationContext)
             }
         }

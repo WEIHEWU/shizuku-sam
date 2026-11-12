@@ -2,11 +2,8 @@ name: Publish Release
 
 on:
   push:
-    branches:
-      - main
     tags:
       - 'v*'
-  workflow_dispatch:
 
 permissions:
   contents: write
@@ -24,37 +21,18 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: "Publish Release v13.8.41 (Fix Root Boot Auto-Start, Early Boot Retry & Watchdog Self-Healing)"
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v13.8.41
-          name: "Shizuku Sam v13.8.41 — 修复 Root 开机自启动、开机初期 su 守护重试与 Watchdog 自愈恢复"
-          make_latest: true
-          body: |
-            ### Shizuku Sam v13.8.41
+      - name: Verify Release APK Exists
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: test -f "releases/Shizuku-Sam-${{ github.ref_name }}.apk"
 
-            #### 🚀 修复「Root 开机自启失效」与「开机初期 su 重试」问题 (`ShizukuReceiverStarter.kt` / `BootCompleteReceiver.kt`)
-            - **移除 `State.STARTING` 锁死拦截**：以轻量级原子标志 `isRootStarting` 控制并发，避免因 90 秒超时未结束导致后续合法启动请求被完全忽略；
-            - **开机初期 root shell 自动就绪重试**：开机阶段 Magisk / KernelSU / APatch 守护进程就绪存在延迟，增加最多 8 次（间隔 1.5s）就绪重试，并在失败时重置缓存 shell；
-            - **`BootCompleteReceiver` 异步保障**：引入 `goAsync()` 挂起广播直到 Root 启动流程完成，防止系统过早回收广播进程；
-            - **Direct Boot（用户解锁前）安全隔离**：在 `LOCKED_BOOT_COMPLETED` 时延迟启动，避免直接读取未解密的凭据存储或因环境不就绪导致状态机写入 `STOPPED`。
-
-            #### 🛡️ 加固 Watchdog 自愈逻辑 (`ShizukuReceiverStarter.kt` / `HomeActivity.kt`)
-            - **保留已记录的运行态**：启动失败时仅置为 `CRASHED`，不覆盖擦除 `LAST_SETTLED_STATE_RUNNING`，让 Watchdog 与定期任务能在系统就绪后继续自动拉起；
-            - **主界面自动恢复**：进入主页发现 Shizuku 未运行且处于 Root 模式（或开启开机自启）时，自动尝试拉起一次 Root 服务。
-
-            #### 🔧 优化 Root 开机脚本辅助 (`RootBootScriptHelper.kt`)
-            - 修正 Magisk `service.d` 自启脚本中已失效的 `/data/local/tmp/shizuku` 路径，动态检测 `pm path` 与 native 库；
-            - 移除脚本中多余写入 `persist.adb.tcp.port` 的逻辑，彻底遵守不篡改系统 ADB 开关的原则。
-          files: |
-            releases/Shizuku-Sam-v13.8.41.apk
-
-      - name: Publish Future Version Tag Release
-        if: startsWith(github.ref, 'refs/tags/v') && github.ref_name != 'v13.8.41'
+      - name: Publish Version Tag Release
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: "Shizuku Sam ${{ github.ref_name }}"
+          make_latest: true
           generate_release_notes: true
+          fail_on_unmatched_files: true
           files: |
             releases/Shizuku-Sam-${{ github.ref_name }}.apk

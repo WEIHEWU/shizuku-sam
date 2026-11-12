@@ -268,7 +268,8 @@ private class ViewModel(context: Context) : androidx.lifecycle.ViewModel() {
                 return@launch
             }
 
-            AdbPairingClient(host, port, password, key).runCatching {
+            val targetHost = host.ifBlank { "127.0.0.1" }
+            AdbPairingClient(targetHost, port, password, key).runCatching {
                 start()
             }.onFailure {
                 _result.postValue(it)

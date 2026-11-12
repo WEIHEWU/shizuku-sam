@@ -43,6 +43,10 @@ class AdbClient(private val host: String, private val port: Int, private val key
     private val outputStream get() = if (useTls) tlsOutputStream else plainOutputStream
 
     fun connect(onKeyOffered: (() -> Unit)? = null, onKeyOfferDone: (() -> Unit)? = null) {
+        if (!LocalNetworkGate.checkOrSkip(caller = "AdbClient.connect", port = port, host = host)) {
+            throw LocalNetworkGate.LocalNetworkPermissionException("本地网络权限未授予，已跳过连接 $host:$port")
+        }
+        Log.i(TAG, "Connecting ADB socket -> $host:$port")
         useTls = false
         socket = Socket()
         try {

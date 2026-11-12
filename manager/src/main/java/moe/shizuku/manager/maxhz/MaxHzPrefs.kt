@@ -106,6 +106,8 @@ object MaxHzPrefs {
     private const val KEY_GAME_AUTO_PERFORMANCE_ENABLED = "game_auto_performance_enabled"
     private const val KEY_GAME_AUTO_PERFORMANCE_PACKAGES = "game_auto_performance_packages"
     private const val KEY_GAME_AUTO_PACKAGE_PROFILES = "game_auto_package_profiles"
+    private const val KEY_USER_MARKED_GAME_PACKAGES = "user_marked_game_packages"
+    private const val KEY_USER_UNMARKED_GAME_PACKAGES = "user_unmarked_game_packages"
     /** @deprecated 三档档位已废弃，保留 key 只为把「极限」档迁移到 [KEY_GAME_AUTO_THERMAL_RELAXED] */
     private const val KEY_GAME_AUTO_PERFORMANCE_PROFILE = "game_auto_performance_profile"
     private const val KEY_GAME_AUTO_PERFORMANCE_EXIT_DELAY_SECONDS = "game_auto_performance_exit_delay_seconds"
@@ -709,10 +711,71 @@ object MaxHzPrefs {
             .apply()
     }
 
+    fun isValidPackageName(packageName: String): Boolean {
+        return packageName.trim().matches(PACKAGE_NAME_PATTERN)
+    }
+
+    fun userMarkedGamePackages(context: Context): Set<String> {
+        return prefs(context).getStringSet(KEY_USER_MARKED_GAME_PACKAGES, emptySet()).orEmpty()
+            .filter { it.matches(PACKAGE_NAME_PATTERN) }
+            .toSet()
+    }
+
+    fun userUnmarkedGamePackages(context: Context): Set<String> {
+        return prefs(context).getStringSet(KEY_USER_UNMARKED_GAME_PACKAGES, emptySet()).orEmpty()
+            .filter { it.matches(PACKAGE_NAME_PATTERN) }
+            .toSet()
+    }
+
+    fun isUserMarkedGame(context: Context, packageName: String): Boolean {
+        return packageName.trim() in userMarkedGamePackages(context)
+    }
+
+    /**
+     * 用户手动切换应用的「🎮 游戏标记」状态并持久化。
+     */
+    fun setPackageGameMark(context: Context, packageName: String, markedAsGame: Boolean) {
+        val normalized = packageName.trim()
+        if (!normalized.matches(PACKAGE_NAME_PATTERN)) return
+        val marked = userMarkedGamePackages(context).toMutableSet()
+        val unmarked = userUnmarkedGamePackages(context).toMutableSet()
+        if (markedAsGame) {
+            marked.add(normalized)
+            unmarked.remove(normalized)
+        } else {
+            marked.remove(normalized)
+            unmarked.add(normalized)
+        }
+        prefs(context).edit()
+            .putStringSet(KEY_USER_MARKED_GAME_PACKAGES, marked)
+            .putStringSet(KEY_USER_UNMARKED_GAME_PACKAGES, unmarked)
+            .apply()
+    }
+
     fun addGameAutoPerformancePackage(context: Context, packageName: String) {
         val normalized = packageName.trim()
         if (!normalized.matches(PACKAGE_NAME_PATTERN)) return
+        // 被用户手动加入游戏名单的应用视为游戏并持久化记忆
+        setPackageGameMark(context, normalized, true)
         setGameAutoPerformancePackages(context, gameAutoPerformancePackages(context) + normalized)
+    }
+
+    fun addGameAutoPerformancePackages(context: Context, packageNames: Collection<String>): Int {
+        val valid = packageNames
+            .map { it.trim() }
+            .filter { it.matches(PACKAGE_NAME_PATTERN) }
+            .toSet()
+        if (valid.isEmpty()) return 0
+        val current = gameAutoPerformancePackages(context)
+        val addedCount = (valid - current).size
+        val marked = userMarkedGamePackages(context) + valid
+        val unmarked = userUnmarkedGamePackages(context) - valid
+        prefs(context).edit()
+            .putStringSet(KEY_USER_MARKED_GAME_PACKAGES, marked)
+            .putStringSet(KEY_USER_UNMARKED_GAME_PACKAGES, unmarked)
+            .apply()
+        setGameAutoPerformancePackages(context, current + valid)
+        return addedCount
     }
 
     fun removeGameAutoPerformancePackage(context: Context, packageName: String) {

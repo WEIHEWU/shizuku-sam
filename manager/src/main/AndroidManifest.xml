@@ -75,6 +75,18 @@
 
     <queries>
         <package android:name="moe.shizuku.privileged.api" />
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.INFO" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+        </intent>
     </queries>
 
     <application
@@ -139,6 +151,7 @@
 
         <activity
             android:name=".starter.StarterActivity"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|fontScale"
             android:theme="@style/Theme.App.ModalDialog"
             android:launchMode="singleTop"
             android:label="@string/starter" />

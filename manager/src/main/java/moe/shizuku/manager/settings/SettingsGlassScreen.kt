@@ -7,9 +7,16 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
+import androidx.compose.ui.text.font.FontFamily
+import moe.shizuku.manager.adb.LocalNetworkGate
+import moe.shizuku.manager.utils.StartupCoordinator
+import rikka.core.util.ClipboardUtils
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -100,6 +107,8 @@ fun SettingsGlassScreen(
     var showPortDialog by remember { mutableStateOf(false) }
     var showNightModeDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
+    var showConnectionDiagDialog by remember { mutableStateOf(false) }
+    val coordinatorSnap by StartupCoordinator.state.collectAsState()
 
     var startupExpanded by remember { mutableStateOf(false) }
     var appearanceExpanded by remember { mutableStateOf(false) }
@@ -422,6 +431,16 @@ fun SettingsGlassScreen(
                         )
                         SettingsMiuixActionRow(
                             isDark = effectiveDark,
+                            icon = painterResource(R.drawable.ic_terminal_24),
+                            iconTint = if (effectiveDark) Color(0xFFFBBF24) else Color(0xFFD97706),
+                            title = "系统环境与连接诊断",
+                            subtitle = "查看本地网络权限 (LNP)、实际连接 host:port、端口探测、状态机与重连计数，支持复制日志",
+                            valueText = coordinatorSnap.phase.label,
+                            groupExpanded = aboutExpanded,
+                            onClick = { showConnectionDiagDialog = true }
+                        )
+                        SettingsMiuixActionRow(
+                            isDark = effectiveDark,
                             icon = painterResource(R.drawable.ic_baseline_link_24),
                             iconTint = if (effectiveDark) Color(0xFF38BDF8) else Color(0xFF0284C7),
                             title = "GitHub 开源仓库",
@@ -672,6 +691,96 @@ fun SettingsGlassScreen(
                 onClick = { showLanguageDialog = false },
                 modifier = Modifier.fillMaxWidth()
             )
+        }
+    }
+
+    var diagRefreshTick by remember(showConnectionDiagDialog) { mutableIntStateOf(0) }
+    val diagPermSummary = remember(showConnectionDiagDialog, diagRefreshTick, coordinatorSnap) {
+        if (showConnectionDiagDialog) LocalNetworkGate.diagnosticStatusText(context) else ""
+    }
+    val diagReportText = remember(showConnectionDiagDialog, diagRefreshTick, coordinatorSnap) {
+        if (showConnectionDiagDialog) StartupCoordinator.buildDiagnosticReport(context) else ""
+    }
+    CenteredAppDialog(
+        show = showConnectionDiagDialog,
+        title = "系统环境与连接诊断",
+        summary = "权限：$diagPermSummary · 目标：${coordinatorSnap.lastConnectEndpoint}",
+        onDismissRequest = { showConnectionDiagDialog = false }
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 120.dp, max = 240.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(if (effectiveDark) Color(0x38384850) else Color(0xFFF3F6FA))
+                    .border(1.dp, if (effectiveDark) TitaniumDark.Hairline else GlassLight.Hairline, RoundedCornerShape(14.dp))
+                    .verticalScroll(rememberScrollState())
+                    .padding(12.dp)
+            ) {
+                SelectionContainer {
+                    Text(
+                        text = diagReportText,
+                        fontSize = 11.5.sp,
+                        lineHeight = 16.5.sp,
+                        fontFamily = FontFamily.Monospace,
+                        color = MiuixTheme.colorScheme.onSurface
+                    )
+                }
+            }
+
+            if (!LocalNetworkGate.hasPermission(context)) {
+                GlassPillButton(
+                    text = "去系统设置开启本地网络权限",
+                    isDark = effectiveDark,
+                    style = GlassButtonStyle.Prominent,
+                    onClick = { LocalNetworkGate.openAppPermissionSettings(context) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                GlassPillButton(
+                    text = if (coordinatorSnap.retryStoppedByUser) "恢复自动重连" else "停止重试",
+                    isDark = effectiveDark,
+                    style = GlassButtonStyle.Regular,
+                    onClick = {
+                        if (coordinatorSnap.retryStoppedByUser) {
+                            StartupCoordinator.resumeAutoRetry()
+                            Toast.makeText(context, "已恢复自动重连", Toast.LENGTH_SHORT).show()
+                        } else {
+                            StartupCoordinator.stopAutoRetry(context)
+                            Toast.makeText(context, "已停止后台自动重试", Toast.LENGTH_SHORT).show()
+                        }
+                        diagRefreshTick++
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+                GlassPillButton(
+                    text = "复制日志",
+                    isDark = effectiveDark,
+                    style = GlassButtonStyle.Prominent(activePrimaryColor),
+                    onClick = {
+                        if (ClipboardUtils.put(context, diagReportText)) {
+                            Toast.makeText(context, "已复制诊断报告与日志", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+                GlassPillButton(
+                    text = "关闭",
+                    isDark = effectiveDark,
+                    style = GlassButtonStyle.Regular,
+                    onClick = { showConnectionDiagDialog = false },
+                    modifier = Modifier.weight(0.8f)
+                )
+            }
         }
     }
 }

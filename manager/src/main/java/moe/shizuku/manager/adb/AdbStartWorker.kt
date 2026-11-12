@@ -18,6 +18,7 @@ import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Observer
+import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
@@ -40,7 +41,9 @@ import moe.shizuku.manager.ShizukuSettings
 import moe.shizuku.manager.starter.Starter
 import moe.shizuku.manager.utils.EnvironmentUtils
 import moe.shizuku.manager.utils.ShizukuStateMachine
+import moe.shizuku.manager.utils.StartupCoordinator
 import rikka.shizuku.Shizuku
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 
 @RequiresApi(Build.VERSION_CODES.R)
@@ -50,11 +53,34 @@ class AdbStartWorker(
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
+        val allowEnableWifi = inputData.getBoolean(KEY_ALLOW_ENABLE_WIFI, false)
+        val isBackground = !allowEnableWifi
         try {
-            if (Shizuku.pingBinder()) return Result.success()
+            if (Shizuku.pingBinder()) {
+                StartupCoordinator.onStartSucceeded("ADB")
+                return Result.success()
+            }
+
+            if (isBackground && StartupCoordinator.isAutoRetryStopped()) {
+                StartupCoordinator.recordLog("ADB_WORKER", "SKIP doWork: retryStoppedByUser=true")
+                return Result.failure()
+            }
+
+            if (!LocalNetworkGate.checkOrSkip(
+                    caller = "AdbStartWorker.doWork",
+                    port = -1,
+                    context = applicationContext,
+                    isBackground = isBackground
+                )
+            ) {
+                return Result.failure()
+            }
+
+            if (!StartupCoordinator.tryBeginStart("ADB", userInitiated = allowEnableWifi, caller = "AdbStartWorker.doWork")) {
+                return Result.failure()
+            }
 
             val cr = applicationContext.contentResolver
-            val allowEnableWifi = inputData.getBoolean(KEY_ALLOW_ENABLE_WIFI, false)
 
             if (allowEnableWifi &&
                 applicationContext.checkSelfPermission(WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED
@@ -69,9 +95,19 @@ class AdbStartWorker(
             if (ShizukuSettings.getTcpMode()) {
                 val desiredPort = ShizukuSettings.getTcpPort()
                 if (desiredPort in 1..65535) {
-                    if (AdbPortProber.isPortOpen(desiredPort, 600)) {
-                        AdbStarter.startAdb(applicationContext, desiredPort)
-                        Starter.waitForBinder()
+                    val ep = AdbPortProber.probeOpenEndpoint(
+                        port = desiredPort,
+                        timeoutMs = 600,
+                        caller = "AdbStartWorker.tcpMode",
+                        context = applicationContext,
+                        isBackground = isBackground
+                    )
+                    if (ep != null) {
+                        AdbStarter.startAdb(applicationContext, ep.first, ep.second)
+                        if (!Starter.waitForBinder()) {
+                            throw TimeoutException("等待 Shizuku 服务响应超时 (${ep.first}:${ep.second})")
+                        }
+                        StartupCoordinator.onStartSucceeded("ADB")
                         return Result.success()
                     }
                 }
@@ -83,7 +119,7 @@ class AdbStartWorker(
             }
 
             val savedPort = ShizukuSettings.getLastPort()
-            val isWifiOk = !EnvironmentUtils.isWifiRequired() || ShizukuSettings.isForceStartWadbEnabled()
+            val isWifiOk = !EnvironmentUtils.isWifiRequired(applicationContext) || ShizukuSettings.isForceStartWadbEnabled()
 
             // force_start_wadb fast-path: probe the default ADB TCP port when no port is already
             // known from the system. Handles devices (e.g. Vivo/FunTouchOS) that block mDNS
@@ -91,26 +127,61 @@ class AdbStartWorker(
             // session, we connect directly without going through mDNS discovery.
             if (ShizukuSettings.isForceStartWadbEnabled() && tcpPort <= 0 && savedPort <= 0) {
                 val probePort = ShizukuSettings.getTcpPort().takeIf { it in 1..65535 } ?: 5555
-                if (AdbPortProber.isPortOpen(probePort, 400)) {
-                    AdbStarter.startAdb(applicationContext, probePort)
-                    Starter.waitForBinder()
+                val ep = AdbPortProber.probeOpenEndpoint(
+                    port = probePort,
+                    timeoutMs = 400,
+                    caller = "AdbStartWorker.forceWadb",
+                    context = applicationContext,
+                    isBackground = isBackground
+                )
+                if (ep != null) {
+                    AdbStarter.startAdb(applicationContext, ep.first, ep.second)
+                    if (!Starter.waitForBinder()) {
+                        throw TimeoutException("等待 Shizuku 服务响应超时 (${ep.first}:${ep.second})")
+                    }
+                    StartupCoordinator.onStartSucceeded("ADB")
                     return Result.success()
                 }
             }
 
-            val port = when {
-                tcpPort > 0 && isWifiOk && AdbPortProber.isPortOpen(tcpPort, 400) -> tcpPort
-                savedPort > 0 && isWifiOk && AdbPortProber.isPortOpen(savedPort, 400) -> savedPort
-                else -> {
-                    val isWifiAdbEnabled = Settings.Global.getInt(cr, "adb_wifi_enabled", 0) == 1
-                    if (!allowEnableWifi && !isWifiAdbEnabled) {
-                        Log.i(AppConstants.TAG, "doWork: adb_wifi_enabled is 0 and allowEnableWifi=false; aborting background start")
-                        return Result.failure()
-                    }
-                    callbackFlow {
-                        val adbMdns = AdbMdns(applicationContext, AdbMdns.TLS_CONNECT, Observer { (_, p) ->
-                            if (p > 0) trySend(p)
-                        })
+            val tcpEndpoint = if (tcpPort > 0 && isWifiOk) {
+                AdbPortProber.probeOpenEndpoint(
+                    port = tcpPort,
+                    timeoutMs = 400,
+                    caller = "AdbStartWorker.tcpPort",
+                    context = applicationContext,
+                    isBackground = isBackground
+                )
+            } else null
+
+            val savedEndpoint = if (tcpEndpoint == null && savedPort > 0 && isWifiOk) {
+                AdbPortProber.probeOpenEndpoint(
+                    port = savedPort,
+                    timeoutMs = 400,
+                    caller = "AdbStartWorker.savedPort",
+                    context = applicationContext,
+                    isBackground = isBackground
+                )
+            } else null
+
+            val (resolvedHost, port) = tcpEndpoint ?: savedEndpoint ?: run {
+                val isWifiAdbEnabled = Settings.Global.getInt(cr, "adb_wifi_enabled", 0) == 1
+                if (!allowEnableWifi && !isWifiAdbEnabled) {
+                    Log.i(AppConstants.TAG, "doWork: adb_wifi_enabled is 0 and allowEnableWifi=false; aborting background start")
+                    StartupCoordinator.onStartFailed(
+                        StartupCoordinator.FailureReason.ADB_WIFI_DISABLED,
+                        "系统无线调试开关处于关闭状态",
+                        userInitiated = false,
+                        caller = "AdbStartWorker.doWork"
+                    )
+                    return Result.failure()
+                }
+                callbackFlow {
+                    val adbMdns = AdbMdns(applicationContext, AdbMdns.TLS_CONNECT, Observer { (_, p) ->
+                        if (p > 0) {
+                            trySend("127.0.0.1" to p)
+                        }
+                    })
 
                         var awaitingAuth = false
                         var timeoutJob: Job? = null
@@ -212,20 +283,24 @@ class AdbStartWorker(
                             unlockReceiver?.let { runCatching { applicationContext.unregisterReceiver(it) } }
                         }
                     }.first()
-                }
             }
 
-            Log.i(AppConstants.TAG, "doWork: resolved port $port, starting ADB client")
-            AdbStarter.startAdb(applicationContext, port)
-            Starter.waitForBinder()
+            Log.i(AppConstants.TAG, "doWork: resolved endpoint $resolvedHost:$port, starting ADB client")
+            StartupCoordinator.recordLog("ADB_WORKER", "Resolved endpoint=$resolvedHost:$port")
+            AdbStarter.startAdb(applicationContext, resolvedHost, port)
+            if (!Starter.waitForBinder()) {
+                throw TimeoutException("等待 Shizuku 服务响应超时 ($resolvedHost:$port)")
+            }
+            StartupCoordinator.onStartSucceeded("ADB")
             runCatching {
                 (applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager)
                     ?.cancel(NOTIFICATION_ID)
             }
-            Log.i(AppConstants.TAG, "doWork: Shizuku service successfully started and binder ready on port $port")
+            Log.i(AppConstants.TAG, "doWork: Shizuku service successfully started and binder ready on $resolvedHost:$port")
 
             return Result.success()
         } catch (e: CancellationException) {
+            StartupCoordinator.releaseInFlightIfIdle()
             throw e
         } catch (e: Exception) {
             Log.w(AppConstants.TAG, "AdbStartWorker failed on runAttempt $runAttemptCount", e)
@@ -233,8 +308,15 @@ class AdbStartWorker(
                 ShizukuStateMachine.set(ShizukuStateMachine.State.STOPPED)
             }
             return if (ShizukuStateMachine.update() == ShizukuStateMachine.State.RUNNING) {
+                StartupCoordinator.onStartSucceeded("ADB")
                 Result.success()
             } else {
+                StartupCoordinator.onStartFailed(
+                    reason = StartupCoordinator.classifyThrowable(e),
+                    detail = e.localizedMessage ?: e.javaClass.simpleName,
+                    userInitiated = allowEnableWifi,
+                    caller = "AdbStartWorker.doWork"
+                )
                 Result.failure()
             }
         }
@@ -251,14 +333,30 @@ class AdbStartWorker(
                 if (um != null && !um.isUserUnlocked) return
             }
 
+            if (!allowEnableWifi && StartupCoordinator.isAutoRetryStopped()) {
+                StartupCoordinator.recordLog("ADB_WORKER", "SKIP enqueue: retryStoppedByUser=true")
+                return
+            }
+
+            if (!LocalNetworkGate.checkOrSkip(
+                    caller = "AdbStartWorker.enqueue",
+                    port = -1,
+                    context = context,
+                    isBackground = !allowEnableWifi
+                )
+            ) {
+                return
+            }
+
             val cb = Constraints.Builder()
-            if (EnvironmentUtils.isWifiRequired() && !ShizukuSettings.isForceStartWadbEnabled()) {
+            if (EnvironmentUtils.isWifiRequired(context) && !ShizukuSettings.isForceStartWadbEnabled()) {
                 cb.setRequiredNetworkType(NetworkType.UNMETERED)
             }
             val constraints = cb.build()
 
             val request = OneTimeWorkRequestBuilder<AdbStartWorker>()
                 .setConstraints(constraints)
+                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 15, TimeUnit.SECONDS)
                 .setInputData(workDataOf(KEY_ALLOW_ENABLE_WIFI to allowEnableWifi))
                 .build()
 

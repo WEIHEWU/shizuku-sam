@@ -20,7 +20,7 @@ subprojects {
             ndkVersion = "29.0.13113456"
             defaultConfig {
                 minSdk = 26
-                targetSdk = 37
+                targetSdk = 36
             }
             compileOptions {
                 sourceCompatibility = JavaVersion.VERSION_21
@@ -41,7 +41,7 @@ try {
 } catch (Throwable ignored) {
 }
 ext {
-    versionCode = 130841
-    versionName = "13.8.41"
+    versionCode = 130842
+    versionName = "13.8.42"
 }
 

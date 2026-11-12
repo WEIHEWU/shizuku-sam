@@ -44,7 +44,9 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
+import android.os.Process
 import android.provider.Settings
+import moe.shizuku.manager.utils.AppIconCache
 import android.text.InputType
 import android.text.TextUtils
 import android.text.Editable
@@ -314,6 +316,7 @@ open class MaxHzActivity : AppBarActivity() {
 
     private enum class AppListFilter {
         ALL,
+        GAME,
         USER,
         SYSTEM
     }
@@ -3588,6 +3591,7 @@ open class MaxHzActivity : AppBarActivity() {
                     loadDozeWhitelistTargetApps(effectiveWhitelist)
                 }.filter { app ->
                     when (appFilter) {
+                        AppListFilter.GAME -> app.isGame
                         AppListFilter.USER -> !app.systemApp
                         AppListFilter.SYSTEM -> app.systemApp
                         AppListFilter.ALL -> true
@@ -5459,6 +5463,7 @@ open class MaxHzActivity : AppBarActivity() {
 
                     val matchesFilter = when (selectedFilter) {
                         AppListFilter.ALL -> true
+                        AppListFilter.GAME -> app.isGame
                         AppListFilter.USER -> !app.systemApp
                         AppListFilter.SYSTEM -> app.systemApp
                     }
@@ -7458,7 +7463,8 @@ open class MaxHzActivity : AppBarActivity() {
         val systemApp: Boolean = false,
         val trustClass: MaxHzPackagePolicy.AppTrustClass = MaxHzPackagePolicy.AppTrustClass.USER_APP,
         val isGame: Boolean = false,
-        val isLaunchable: Boolean = true
+        val isLaunchable: Boolean = true,
+        val appInfo: ApplicationInfo? = null
     )
 
     private data class AppDisplayInfo(
@@ -7560,66 +7566,290 @@ open class MaxHzActivity : AppBarActivity() {
             .toList()
     }
 
-    private fun appPickerRowView(app: UserAppChoice, showSubtitle: Boolean = false): View {
+    private fun bindAppPickerIcon(iconView: ImageView, app: UserAppChoice) {
+        (iconView.tag as? Job)?.cancel()
+        iconView.tag = null
+        val info = app.appInfo ?: runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                packageManager.getApplicationInfo(
+                    app.packageName,
+                    PackageManager.ApplicationInfoFlags.of(
+                        (PackageManager.MATCH_DISABLED_COMPONENTS or PackageManager.MATCH_UNINSTALLED_PACKAGES).toLong()
+                    )
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                packageManager.getApplicationInfo(
+                    app.packageName,
+                    PackageManager.MATCH_DISABLED_COMPONENTS or PackageManager.MATCH_UNINSTALLED_PACKAGES
+                )
+            }
+        }.getOrNull()
+
+        if (info != null) {
+            val userId = Process.myUid() / 100000
+            iconView.tag = AppIconCache.loadIconBitmapAsync(this, info, userId, iconView)
+        } else {
+            val fallback = runCatching { packageManager.getApplicationIcon(app.packageName) }.getOrNull()
+            if (fallback != null) {
+                iconView.setImageDrawable(fallback)
+            } else {
+                iconView.setImageResource(R.drawable.ic_maxhz_apps_24)
+            }
+        }
+    }
+
+    private fun appPickerRowView(
+        app: UserAppChoice,
+        showSubtitle: Boolean = true,
+        enableMultiSelect: Boolean = false,
+        isChecked: Boolean = false,
+        onToggleCheck: (() -> Unit)? = null
+    ): View {
+        val rowBg = if (isChecked) {
+            rounded(themeColors.primaryContainer, dp(14).toFloat())
+        } else {
+            null
+        }
         return LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
+            orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            minimumHeight = dp(46)
-            setPadding(dp(16), dp(7), dp(16), dp(7))
+            minimumHeight = dp(56)
+            setPadding(dp(12), dp(8), dp(12), dp(8))
+            background = rowBg
             layoutParams = AbsListView.LayoutParams(
                 AbsListView.LayoutParams.MATCH_PARENT,
                 AbsListView.LayoutParams.WRAP_CONTENT
             )
-            addView(TextView(this@MaxHzActivity).apply {
-                text = if (app.isGame) "🎮 ${app.label}" else app.label
-                textSize = 14f
-                setTextColor(themeColors.onSurface)
-                includeFontPadding = false
-                maxLines = 2
-                ellipsize = TextUtils.TruncateAt.END
+
+            val iconView = ImageView(this@MaxHzActivity).apply {
+                scaleType = ImageView.ScaleType.FIT_CENTER
+            }
+            bindAppPickerIcon(iconView, app)
+            addView(iconView, LinearLayout.LayoutParams(dp(38), dp(38)).apply {
+                rightMargin = dp(12)
             })
-            if (showSubtitle) {
+
+            addView(LinearLayout(this@MaxHzActivity).apply {
+                orientation = LinearLayout.VERTICAL
                 addView(TextView(this@MaxHzActivity).apply {
-                    val gameTag = if (app.isGame) "游戏 · " else ""
-                    text = "$gameTag${appKindShort(app.trustClass)} · ${app.packageName}"
-                    textSize = 11.5f
-                    setTextColor(themeColors.onSurfaceVariant)
+                    text = if (app.isGame) "🎮 ${app.label}" else app.label
+                    textSize = 14f
+                    setTextColor(if (isChecked) themeColors.onPrimaryContainer else themeColors.onSurface)
+                    if (isChecked) setTypeface(typeface, android.graphics.Typeface.BOLD)
                     includeFontPadding = false
-                    setPadding(0, dp(3), 0, 0)
-                    maxLines = 2
+                    maxLines = 1
                     ellipsize = TextUtils.TruncateAt.END
                 })
+                if (showSubtitle) {
+                    addView(TextView(this@MaxHzActivity).apply {
+                        val gameTag = if (app.isGame) "游戏 · " else ""
+                        text = "$gameTag${appKindShort(app.trustClass)} · ${app.packageName}"
+                        textSize = 11.5f
+                        setTextColor(if (isChecked) themeColors.onPrimaryContainer else themeColors.onSurfaceVariant)
+                        includeFontPadding = false
+                        setPadding(0, dp(2), 0, 0)
+                        maxLines = 1
+                        ellipsize = TextUtils.TruncateAt.MIDDLE
+                    })
+                }
+            }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+
+            if (enableMultiSelect && onToggleCheck != null) {
+                addView(TextView(this@MaxHzActivity).apply {
+                    text = if (isChecked) "✓ 已选" else "多选"
+                    textSize = 11.5f
+                    setTypeface(typeface, android.graphics.Typeface.BOLD)
+                    setTextColor(if (isChecked) themeColors.onPrimary else themeColors.onSurfaceVariant)
+                    gravity = Gravity.CENTER
+                    includeFontPadding = false
+                    setPadding(dp(10), dp(5), dp(10), dp(5))
+                    background = rounded(
+                        if (isChecked) themeColors.primary else themeColors.surfaceContainerHigh,
+                        dp(999).toFloat()
+                    )
+                    setOnClickListener { v ->
+                        v.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
+                        onToggleCheck()
+                    }
+                }, LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    leftMargin = dp(8)
+                })
             }
+        }
+    }
+
+    protected fun resolveManualPackageChoice(rawPkg: String): UserAppChoice? {
+        val pkg = rawPkg.trim()
+        if (!MaxHzPrefs.isValidPackageName(pkg) || pkg == packageName) return null
+        val info = runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                packageManager.getApplicationInfo(
+                    pkg,
+                    PackageManager.ApplicationInfoFlags.of(
+                        (PackageManager.MATCH_DISABLED_COMPONENTS or PackageManager.MATCH_UNINSTALLED_PACKAGES).toLong()
+                    )
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                packageManager.getApplicationInfo(
+                    pkg,
+                    PackageManager.MATCH_DISABLED_COMPONENTS or PackageManager.MATCH_UNINSTALLED_PACKAGES
+                )
+            }
+        }.getOrNull()
+        val label = if (info != null) safeLoadLabel(info) else pkg
+        val trustClass = if (info != null) MaxHzPackagePolicy.trustClass(this, info) else MaxHzPackagePolicy.trustClass(this, pkg)
+        val systemApp = trustClass != MaxHzPackagePolicy.AppTrustClass.USER_APP
+        rememberAppDisplay(pkg, label, trustClass)
+        val isGame = if (info != null) {
+            MaxHzPackagePolicy.isGameApp(this, info, label)
+        } else {
+            MaxHzPackagePolicy.isGameApp(this, pkg)
+        }
+        return UserAppChoice(
+            label = label,
+            packageName = pkg,
+            systemApp = systemApp,
+            trustClass = trustClass,
+            isGame = isGame,
+            isLaunchable = true,
+            appInfo = info
+        )
+    }
+
+    protected fun showManualPackageInputDialog(
+        initialInput: String = "",
+        dialogTitle: String = "按包名手动添加",
+        markAsGame: Boolean = true,
+        onAdded: (List<UserAppChoice>) -> Unit
+    ) {
+        val inputView = EditText(this).apply {
+            setText(initialInput)
+            if (initialInput.isNotEmpty()) setSelection(initialInput.length)
+            hint = "例如 com.miHoYo.Yuanshen（支持换行或逗号分隔多个包名）"
+            textSize = 13.5f
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            minLines = 2
+            maxLines = 5
+            setTextColor(themeColors.onSurface)
+            setHintTextColor(themeColors.onSurfaceVariant)
+            setPadding(dp(14), dp(12), dp(14), dp(12))
+            background = rounded(themeColors.surfaceContainerHigh, dp(16).toFloat())
+        }
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(8), dp(20), dp(4))
+            addView(TextView(this@MaxHzActivity).apply {
+                text = "即使系统限制了应用列表可见性，只要输入准确包名即可强制加入名单并持久化保存。"
+                textSize = 12.5f
+                setTextColor(themeColors.onSurfaceVariant)
+                setLineSpacing(0f, 1.28f)
+                setPadding(0, 0, 0, dp(10))
+            })
+            addView(inputView, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ))
+        }
+        val manualDialog = MaterialAlertDialogBuilder(this)
+            .setTitle(dialogTitle)
+            .setView(container)
+            .setNegativeButton("取消", null)
+            .setPositiveButton("确认添加", null)
+            .showUnified()
+
+        manualDialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE)?.setOnClickListener {
+            val raw = inputView.text?.toString().orEmpty()
+            val tokens = raw.split('\n', ',', '，', ';', '；', ' ', '\t')
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .distinct()
+            if (tokens.isEmpty()) {
+                Toast.makeText(this, "请输入至少一个有效的应用包名", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            val invalid = tokens.filterNot { MaxHzPrefs.isValidPackageName(it) }
+            if (invalid.isNotEmpty()) {
+                Toast.makeText(
+                    this,
+                    "包名格式不正确：${invalid.first()}（示例：com.tencent.tmgp.sgame）",
+                    Toast.LENGTH_LONG
+                ).show()
+                return@setOnClickListener
+            }
+            val choices = tokens.mapNotNull { pkg ->
+                if (markAsGame) {
+                    MaxHzPrefs.setPackageGameMark(this, pkg, true)
+                }
+                resolveManualPackageChoice(pkg)
+            }
+            if (choices.isEmpty()) {
+                Toast.makeText(this, "不能添加本应用自身包名", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            manualDialog.dismiss()
+            onAdded(choices)
         }
     }
 
     private fun appPickerContentView(
         apps: List<UserAppChoice>,
         description: String?,
+        channelWarning: String? = null,
+        enableGameFeatures: Boolean = false,
+        onManualAddRequest: ((prefill: String) -> Unit)? = null,
+        onBatchSelected: ((List<UserAppChoice>) -> Unit)? = null,
         onSelected: (UserAppChoice) -> Unit
     ): View {
+        val allItems = apps.toMutableList()
         val visibleApps = mutableListOf<UserAppChoice>()
-        var selectedFilter = if (apps.any { !it.systemApp }) AppListFilter.USER else AppListFilter.ALL
+        val selectedPkgs = linkedSetOf<String>()
+        // 默认展示「全部应用」，筛选仅切换视图，绝不把应用从「全部」中隐藏
+        var selectedFilter = AppListFilter.ALL
         var searchQuery = ""
-        var showDialogSubtitles = false
-        val expandedRowPkgs = mutableSetOf<String>()
         lateinit var filterContainer: LinearLayout
+        lateinit var listView: ListView
+        lateinit var emptyContainer: LinearLayout
+        lateinit var emptyHintText: TextView
+        lateinit var emptyManualBtn: TextView
+        lateinit var batchActionBar: LinearLayout
+        lateinit var batchConfirmBtn: TextView
         lateinit var listAdapter: ArrayAdapter<UserAppChoice>
-        var descView: TextView? = null
         var redrawFilters: () -> Unit = {}
 
+        val isLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        val maxListHeightPx = (resources.displayMetrics.heightPixels * if (isLandscape) 0.36f else 0.45f)
+            .toInt()
+            .coerceIn(dp(190), dp(420))
+
         fun filteredApps(): List<UserAppChoice> {
-            return apps.filter { app ->
+            return allItems.filter { app ->
                 val matchesFilter = when (selectedFilter) {
                     AppListFilter.ALL -> true
+                    AppListFilter.GAME -> app.isGame
                     AppListFilter.USER -> !app.systemApp
                     AppListFilter.SYSTEM -> app.systemApp
                 }
                 if (!matchesFilter) return@filter false
                 if (searchQuery.isBlank()) return@filter true
-                val query = searchQuery.lowercase(Locale.getDefault())
-                app.label.lowercase(Locale.getDefault()).contains(query) ||
-                    app.packageName.lowercase(Locale.getDefault()).contains(query)
+                MaxHzPackagePolicy.matchesAppQuery(app.label, app.packageName, searchQuery)
+            }
+        }
+
+        fun syncBatchBar() {
+            if (!enableGameFeatures || onBatchSelected == null) {
+                batchActionBar.visibility = View.GONE
+                return
+            }
+            if (selectedPkgs.isEmpty()) {
+                batchActionBar.visibility = View.GONE
+            } else {
+                batchActionBar.visibility = View.VISIBLE
+                batchConfirmBtn.text = "添加已选 (${selectedPkgs.size} 款)"
             }
         }
 
@@ -7627,6 +7857,39 @@ open class MaxHzActivity : AppBarActivity() {
             visibleApps.clear()
             visibleApps.addAll(filteredApps())
             listAdapter.notifyDataSetChanged()
+
+            if (visibleApps.isEmpty()) {
+                listView.visibility = View.GONE
+                emptyContainer.visibility = View.VISIBLE
+                val trimmedQuery = searchQuery.trim()
+                emptyHintText.text = when {
+                    allItems.isEmpty() -> "未能从系统读取到可展示的应用列表（可能受限于 One UI / Android 应用可见性策略）。您仍可直接按包名手动添加任意游戏。"
+                    trimmedQuery.isNotEmpty() -> "未找到匹配「$trimmedQuery」的应用。\n若应用被系统隐藏或安装在分身空间，可直接按包名手动添加。"
+                    selectedFilter == AppListFilter.GAME -> "当前筛选下暂无自动识别的游戏。\n可切回「全部」查看所有应用，长按任意应用可标记为 🎮 游戏，或直接按包名添加。"
+                    else -> "当前筛选条件下暂无应用。"
+                }
+                if (onManualAddRequest != null) {
+                    emptyManualBtn.visibility = View.VISIBLE
+                    emptyManualBtn.text = if (MaxHzPrefs.isValidPackageName(trimmedQuery)) {
+                        "+ 直接添加包名「$trimmedQuery」"
+                    } else {
+                        "+ 按包名手动输入添加"
+                    }
+                } else {
+                    emptyManualBtn.visibility = View.GONE
+                }
+            } else {
+                emptyContainer.visibility = View.GONE
+                listView.visibility = View.VISIBLE
+                val estimatedContentPx = visibleApps.size * dp(60) + dp(8)
+                val targetHeight = minOf(maxListHeightPx, estimatedContentPx.coerceAtLeast(dp(140)))
+                val lp = listView.layoutParams
+                if (lp != null && lp.height != targetHeight) {
+                    lp.height = targetHeight
+                    listView.layoutParams = lp
+                }
+            }
+            syncBatchBar()
         }
 
         fun applyFilter(filter: AppListFilter) {
@@ -7655,81 +7918,175 @@ open class MaxHzActivity : AppBarActivity() {
 
         fun updateFilters() {
             filterContainer.removeAllViews()
-            listOf(
-                AppListFilter.ALL to "全部",
-                AppListFilter.USER to "用户应用",
-                AppListFilter.SYSTEM to "系统应用"
-            ).forEachIndexed { index, (filter, label) ->
+            val gameCount = allItems.count { it.isGame }
+            val tabs = buildList {
+                add(AppListFilter.ALL to "全部")
+                add(AppListFilter.GAME to if (gameCount > 0) "仅游戏($gameCount)" else "仅游戏")
+                add(AppListFilter.USER to "用户应用")
+                add(AppListFilter.SYSTEM to "系统应用")
+            }
+            tabs.forEachIndexed { index, (filter, label) ->
                 filterContainer.addView(filterChip(label, selectedFilter == filter) {
                     selectFilter(filter)
                 }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-                    if (index > 0) leftMargin = dp(8)
+                    if (index > 0) leftMargin = dp(6)
                 })
             }
         }
         redrawFilters = { updateFilters() }
 
-        val listView = ListView(this).apply {
+        fun toggleItemChecked(pkg: String) {
+            if (!selectedPkgs.remove(pkg)) {
+                selectedPkgs.add(pkg)
+            }
+            listAdapter.notifyDataSetChanged()
+            syncBatchBar()
+        }
+
+        listView = ListView(this).apply {
             dividerHeight = 0
             listAdapter = object : ArrayAdapter<UserAppChoice>(this@MaxHzActivity, android.R.layout.simple_list_item_1, visibleApps) {
                 override fun getView(position: Int, convertView: View?, parent: android.view.ViewGroup): View {
                     val app = getItem(position) ?: visibleApps[position]
-                    return appPickerRowView(app, showDialogSubtitles || expandedRowPkgs.contains(app.packageName))
+                    val checked = app.packageName in selectedPkgs
+                    return appPickerRowView(
+                        app = app,
+                        showSubtitle = true,
+                        enableMultiSelect = enableGameFeatures && onBatchSelected != null,
+                        isChecked = checked,
+                        onToggleCheck = if (enableGameFeatures && onBatchSelected != null) {
+                            { toggleItemChecked(app.packageName) }
+                        } else null
+                    )
                 }
             }
             adapter = listAdapter
             setOnItemClickListener { _, _, which, _ ->
-                visibleApps.getOrNull(which)?.let(onSelected)
+                val app = visibleApps.getOrNull(which) ?: return@setOnItemClickListener
+                if (enableGameFeatures && onBatchSelected != null && selectedPkgs.isNotEmpty()) {
+                    toggleItemChecked(app.packageName)
+                } else {
+                    onSelected(app)
+                }
             }
             setOnItemLongClickListener { _, view, which, _ ->
                 val app = visibleApps.getOrNull(which) ?: return@setOnItemLongClickListener false
                 view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
-                if (!expandedRowPkgs.remove(app.packageName)) {
-                    expandedRowPkgs.add(app.packageName)
+                val nextGameMark = !app.isGame
+                MaxHzPrefs.setPackageGameMark(this@MaxHzActivity, app.packageName, nextGameMark)
+                val idx = allItems.indexOfFirst { it.packageName == app.packageName }
+                if (idx >= 0) {
+                    allItems[idx] = allItems[idx].copy(isGame = nextGameMark)
                 }
-                listAdapter.notifyDataSetChanged()
+                Toast.makeText(
+                    this@MaxHzActivity,
+                    if (nextGameMark) "已将「${app.label}」标记为游戏 🎮" else "已取消「${app.label}」的游戏标记",
+                    Toast.LENGTH_SHORT
+                ).show()
+                updateFilters()
+                refreshList()
                 true
             }
         }
 
+        emptyHintText = TextView(this).apply {
+            textSize = 13f
+            setTextColor(themeColors.onSurfaceVariant)
+            setLineSpacing(0f, 1.3f)
+            gravity = Gravity.CENTER
+        }
+        emptyManualBtn = button("+ 按包名手动输入添加") {
+            val trimmed = searchQuery.trim()
+            onManualAddRequest?.invoke(trimmed)
+        }
+        emptyContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(dp(12), dp(20), dp(12), dp(16))
+            visibility = View.GONE
+            addView(emptyHintText, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = dp(12) })
+            addView(emptyManualBtn, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ))
+        }
+
+        batchConfirmBtn = button("添加已选", role = ButtonRole.PRIMARY) {
+            val chosen = allItems.filter { it.packageName in selectedPkgs }
+            if (chosen.isNotEmpty()) {
+                onBatchSelected?.invoke(chosen)
+            }
+        }
+        val batchClearBtn = button("清空已选") {
+            selectedPkgs.clear()
+            listAdapter.notifyDataSetChanged()
+            syncBatchBar()
+        }
+        batchActionBar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(8), 0, dp(4))
+            visibility = View.GONE
+            addView(batchClearBtn, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.85f).apply {
+                rightMargin = dp(8)
+            })
+            addView(batchConfirmBtn, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.4f))
+        }
+
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(18), 0, dp(18), 0)
+            setPadding(dp(18), 0, dp(18), dp(8))
             addView(LinearLayout(this@MaxHzActivity).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
                 setPadding(0, 0, 0, dp(8))
                 addView(TextView(this@MaxHzActivity).apply {
-                    text = "应用列表（长按单行可查看包名）"
+                    text = "共 ${allItems.size} 款应用 · 长按单行可标记 🎮 游戏"
                     textSize = 11.5f
                     setTextColor(themeColors.onSurfaceVariant)
                 }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-                addView(TextView(this@MaxHzActivity).apply {
-                    styleOptionBTogglePill(this, showDialogSubtitles)
-                    setOnClickListener { v ->
-                        v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
-                        showDialogSubtitles = !showDialogSubtitles
-                        expandedRowPkgs.clear()
-                        descView?.visibility = if (showDialogSubtitles) View.VISIBLE else View.GONE
-                        styleOptionBTogglePill(this, showDialogSubtitles)
-                        listAdapter.notifyDataSetChanged()
-                    }
-                })
+                if (onManualAddRequest != null) {
+                    addView(TextView(this@MaxHzActivity).apply {
+                        text = "+ 按包名添加"
+                        textSize = 11.5f
+                        setTypeface(typeface, android.graphics.Typeface.BOLD)
+                        setTextColor(themeColors.primary)
+                        setPadding(dp(10), dp(5), dp(10), dp(5))
+                        background = rounded(themeColors.primaryContainer, dp(999).toFloat())
+                        setOnClickListener {
+                            onManualAddRequest.invoke(searchQuery.trim())
+                        }
+                    })
+                }
             })
+            channelWarning?.takeIf { it.isNotBlank() }?.let { warn ->
+                addView(TextView(this@MaxHzActivity).apply {
+                    text = warn
+                    textSize = 12f
+                    setTextColor(themeColors.onWarningContainer)
+                    setLineSpacing(0f, 1.25f)
+                    setPadding(dp(10), dp(8), dp(10), dp(8))
+                    background = rounded(themeColors.warningContainer, dp(12).toFloat())
+                }, LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { bottomMargin = dp(8) })
+            }
             description?.takeIf { it.isNotBlank() }?.let {
-                descView = TextView(this@MaxHzActivity).apply {
+                addView(TextView(this@MaxHzActivity).apply {
                     text = it
-                    textSize = 13f
+                    textSize = 12f
                     setTextColor(themeColors.onSurfaceVariant)
                     setLineSpacing(0f, 1.25f)
-                    setPadding(0, 0, 0, dp(12))
-                    visibility = View.GONE
-                }
-                addView(descView)
+                    setPadding(0, 0, 0, dp(8))
+                })
             }
             addView(EditText(this@MaxHzActivity).apply {
-                hint = "搜索应用"
-                textSize = 14f
+                hint = "搜索应用名、包名或拼音首字母"
+                textSize = 13.5f
                 setSingleLine(true)
                 inputType = InputType.TYPE_CLASS_TEXT
                 setTextColor(themeColors.onSurface)
@@ -7738,7 +8095,7 @@ open class MaxHzActivity : AppBarActivity() {
                 gravity = Gravity.CENTER_VERTICAL
                 setPadding(dp(14), 0, dp(14), 0)
                 background = rounded(themeColors.surfaceContainerHigh, dp(22).toFloat())
-                minHeight = dp(44)
+                minHeight = dp(42)
                 addTextChangedListener(object : TextWatcher {
                     override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
                     override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
@@ -7749,16 +8106,24 @@ open class MaxHzActivity : AppBarActivity() {
                 })
             }, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(44)
-            ).apply { bottomMargin = dp(10) })
+                dp(42)
+            ).apply { bottomMargin = dp(8) })
             filterContainer = LinearLayout(this@MaxHzActivity).apply {
                 orientation = LinearLayout.HORIZONTAL
-                setPadding(0, 0, 0, dp(10))
+                setPadding(0, 0, 0, dp(8))
             }
             addView(filterContainer)
             addView(listView, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(420)
+                maxListHeightPx
+            ))
+            addView(emptyContainer, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ))
+            addView(batchActionBar, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
             ))
             updateFilters()
             refreshList()
@@ -7772,20 +8137,33 @@ open class MaxHzActivity : AppBarActivity() {
             .setNegativeButton("取消", null)
             .showUnified()
         lifecycleScope.launch {
-            val apps = withContext(Dispatchers.IO) { loadRefreshRateTargetApps() }
+            val (apps, warn) = withContext(Dispatchers.IO) { loadRefreshRateTargetAppsWithStatus() }
             if (!loadingDialog.isShowing) return@launch
             loadingDialog.dismiss()
-            if (apps.isEmpty()) {
-                statusTextLater("没有识别到可设置刷新率的应用。请确认应用列表权限。")
-                return@launch
-            }
             lateinit var dialog: androidx.appcompat.app.AlertDialog
             dialog = MaterialAlertDialogBuilder(this@MaxHzActivity)
                 .setTitle(R.string.rules_select_app_hint)
-                .setView(appPickerContentView(apps, null) { app ->
-                    onSelected(app.packageName, app.label)
-                    dialog.dismiss()
-                })
+                .setView(appPickerContentView(
+                    apps = apps,
+                    description = null,
+                    channelWarning = warn,
+                    enableGameFeatures = false,
+                    onManualAddRequest = { prefill ->
+                        showManualPackageInputDialog(
+                            initialInput = prefill,
+                            dialogTitle = "按包名手动选择应用",
+                            markAsGame = false
+                        ) { manualList ->
+                            val first = manualList.firstOrNull() ?: return@showManualPackageInputDialog
+                            onSelected(first.packageName, first.label)
+                            if (dialog.isShowing) dialog.dismiss()
+                        }
+                    },
+                    onSelected = { app ->
+                        onSelected(app.packageName, app.label)
+                        dialog.dismiss()
+                    }
+                ))
                 .showUnified()
                 .also {
                     it.setOnDismissListener {
@@ -7797,29 +8175,51 @@ open class MaxHzActivity : AppBarActivity() {
 
     protected fun showGameAutoAppPicker(onSelected: (UserAppChoice) -> Unit) {
         val loadingDialog = MaterialAlertDialogBuilder(this)
-            .setTitle("添加游戏")
-            .setView(emptyText("正在加载应用列表..."))
+            .setTitle("添加游戏应用")
+            .setView(emptyText("正在扫描已安装应用..."))
             .setNegativeButton("取消", null)
             .showUnified()
         lifecycleScope.launch {
             try {
-                val apps = withContext(Dispatchers.IO) { loadGameAutoTargetApps() }
+                val (apps, channelWarning) = withContext(Dispatchers.IO) { loadGameAutoTargetAppsWithStatus() }
                 if (!loadingDialog.isShowing) return@launch
                 loadingDialog.dismiss()
-                if (apps.isEmpty()) {
-                    statusTextLater("没有可添加的应用。")
-                    return@launch
-                }
                 lateinit var dialog: androidx.appcompat.app.AlertDialog
                 dialog = MaterialAlertDialogBuilder(this@MaxHzActivity)
-                    .setTitle("添加游戏")
+                    .setTitle("添加游戏应用")
                     .setView(appPickerContentView(
-                        apps,
-                        "已识别的游戏优先置顶（带 🎮 标识），也可选择其他需要高性能的应用。"
-                    ) { app ->
-                        onSelected(app)
-                        dialog.dismiss()
-                    })
+                        apps = apps,
+                        description = "支持选择任意已安装应用（带 🎮 的游戏优先置顶）；点右侧「多选」可批量加入，找不到也可点右上角按包名添加。",
+                        channelWarning = channelWarning,
+                        enableGameFeatures = true,
+                        onManualAddRequest = { prefill ->
+                            if (MaxHzPrefs.isValidPackageName(prefill) && prefill != packageName) {
+                                MaxHzPrefs.setPackageGameMark(this@MaxHzActivity, prefill, true)
+                                val choice = resolveManualPackageChoice(prefill)
+                                if (choice != null) {
+                                    onSelected(choice)
+                                    if (dialog.isShowing) dialog.dismiss()
+                                    return@appPickerContentView
+                                }
+                            }
+                            showManualPackageInputDialog(
+                                initialInput = prefill,
+                                dialogTitle = "按包名手动添加游戏",
+                                markAsGame = true
+                            ) { manualChoices ->
+                                manualChoices.forEach(onSelected)
+                                if (dialog.isShowing) dialog.dismiss()
+                            }
+                        },
+                        onBatchSelected = { batch ->
+                            batch.forEach(onSelected)
+                            dialog.dismiss()
+                        },
+                        onSelected = { app ->
+                            onSelected(app)
+                            dialog.dismiss()
+                        }
+                    ))
                     .showUnified()
                     .also {
                         it.setOnDismissListener {
@@ -7828,7 +8228,18 @@ open class MaxHzActivity : AppBarActivity() {
                     }
             } catch (e: Throwable) {
                 if (loadingDialog.isShowing) loadingDialog.dismiss()
-                statusTextLater("加载应用列表失败：${e.message ?: e.javaClass.simpleName}")
+                // 即使扫描过程异常，也直接提供手动输入包名兜底，绝不把用户挡在门外
+                Toast.makeText(
+                    this@MaxHzActivity,
+                    "读取应用列表受限（${e.message ?: e.javaClass.simpleName}），已切换为手动输入包名",
+                    Toast.LENGTH_LONG
+                ).show()
+                showManualPackageInputDialog(
+                    dialogTitle = "按包名手动添加游戏",
+                    markAsGame = true
+                ) { manualChoices ->
+                    manualChoices.forEach(onSelected)
+                }
             }
         }
     }
@@ -7852,7 +8263,7 @@ open class MaxHzActivity : AppBarActivity() {
                 .setTitle("添加到待机护栏")
                 .setView(appPickerContentView(
                     apps,
-                    "默认优先显示用户应用。系统组件请谨慎添加。"
+                    "默认展示全部应用，系统组件请谨慎添加。"
                 ) { app ->
                     onSelected(app)
                     dialog.dismiss()
@@ -7861,34 +8272,122 @@ open class MaxHzActivity : AppBarActivity() {
         }
     }
 
-    private fun loadRefreshRateTargetApps(): List<UserAppChoice> {
-        val launchableSet = MaxHzPackagePolicy.getLaunchablePackages(this)
-        val apps = try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                packageManager.getInstalledApplications(PackageManager.ApplicationInfoFlags.of(0))
+    /**
+     * 多通道应用发现兜底：
+     * 1. PackageManager.getInstalledApplications（含 MATCH_DISABLED_COMPONENTS / MATCH_UNINSTALLED_PACKAGES，兼容双开/冻结/工作资料）
+     * 2. Intent(ACTION_MAIN) 启动器入口查询（配合 Manifest <queries> 突破 QUERY_ALL_PACKAGES 受限场景）
+     * 3. 当 Shizuku / Root 特权可用时，执行 `pm list packages -3` 补齐被系统隐藏的第三方应用包名
+     */
+    private fun discoverAllAppsMultiChannel(): Pair<Map<String, ApplicationInfo?>, String?> {
+        val discovered = linkedMapOf<String, ApplicationInfo?>()
+        val channelErrors = mutableListOf<String>()
+        val flags = PackageManager.MATCH_DISABLED_COMPONENTS or PackageManager.MATCH_UNINSTALLED_PACKAGES
+
+        // 通道 1：PackageManager.getInstalledApplications
+        try {
+            val installed = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                packageManager.getInstalledApplications(PackageManager.ApplicationInfoFlags.of(flags.toLong()))
             } else {
                 @Suppress("DEPRECATION")
-                packageManager.getInstalledApplications(0)
+                packageManager.getInstalledApplications(flags)
             }
-        } catch (_: Throwable) {
-            emptyList<ApplicationInfo>()
+            for (info in installed) {
+                val pkg = info.packageName ?: continue
+                if (!isPackageNameValid(pkg) || pkg == packageName) continue
+                val apkExists = !info.sourceDir.isNullOrBlank() && runCatching { java.io.File(info.sourceDir).exists() }.getOrDefault(true)
+                val flagInstalled = (info.flags and ApplicationInfo.FLAG_INSTALLED) != 0
+                if (flagInstalled || apkExists) {
+                    discovered[pkg] = info
+                }
+            }
+        } catch (e: Throwable) {
+            channelErrors.add("PackageManager 扫描异常(${e.javaClass.simpleName})")
         }
-        return apps
+
+        // 通道 2：Launcher / Info / Leanback Intent 解析补漏
+        val launchable = MaxHzPackagePolicy.getLaunchablePackages(this)
+        for (pkg in launchable) {
+            if (!isPackageNameValid(pkg) || pkg == packageName || discovered.containsKey(pkg)) continue
+            val info = runCatching {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    packageManager.getApplicationInfo(pkg, PackageManager.ApplicationInfoFlags.of(flags.toLong()))
+                } else {
+                    @Suppress("DEPRECATION")
+                    packageManager.getApplicationInfo(pkg, flags)
+                }
+            }.getOrNull()
+            discovered[pkg] = info
+        }
+
+        // 通道 3：Shizuku / Root 特权可用时通过 `pm list packages -3` 补漏
+        if (MaxHzShell.isReady()) {
+            runCatching {
+                val res = MaxHzShell.exec("pm list packages -3 2>/dev/null")
+                if (res.code == 0 && res.out.isNotBlank()) {
+                    res.out.lineSequence()
+                        .map { it.trim().removePrefix("package:").trim() }
+                        .filter { isPackageNameValid(it) && it != packageName }
+                        .forEach { pkg ->
+                            if (!discovered.containsKey(pkg)) {
+                                val info = runCatching {
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                        packageManager.getApplicationInfo(pkg, PackageManager.ApplicationInfoFlags.of(flags.toLong()))
+                                    } else {
+                                        @Suppress("DEPRECATION")
+                                        packageManager.getApplicationInfo(pkg, flags)
+                                    }
+                                }.getOrNull()
+                                discovered[pkg] = info
+                            }
+                        }
+                }
+            }.onFailure { e ->
+                channelErrors.add("Shell 补漏异常(${e.javaClass.simpleName})")
+            }
+        }
+
+        val userVisibleCount = discovered.count { (pkg, info) ->
+            if (info != null) MaxHzPackagePolicy.isUserInstalledApp(this, info)
+            else !MaxHzPackagePolicy.isSystemRelated(this, pkg)
+        }
+        val warning = when {
+            discovered.isEmpty() ->
+                "系统未返回任何已安装应用${if (channelErrors.isNotEmpty()) "（${channelErrors.joinToString("；")}）" else ""}，请使用「按包名添加」手动输入。"
+            userVisibleCount == 0 && !MaxHzShell.isReady() ->
+                "当前系统可能限制了读取第三方应用列表权限，启动 Shizuku/Root 后可自动补齐，或直接点右上角「+ 按包名添加」。"
+            channelErrors.isNotEmpty() ->
+                "部分应用扫描通道受限（${channelErrors.joinToString("；")}），若缺少应用可按包名手动添加。"
+            else -> null
+        }
+        return discovered to warning
+    }
+
+    private fun loadRefreshRateTargetApps(): List<UserAppChoice> =
+        loadRefreshRateTargetAppsWithStatus().first
+
+    private fun loadRefreshRateTargetAppsWithStatus(): Pair<List<UserAppChoice>, String?> {
+        val launchableSet = MaxHzPackagePolicy.getLaunchablePackages(this)
+        val (discovered, warning) = discoverAllAppsMultiChannel()
+        val list = discovered.entries
             .asSequence()
-            .filter { it.enabled }
-            .filter { MaxHzPackagePolicy.isRefreshRateTargetApp(this, it) }
-            .map {
-                val label = safeLoadLabel(it)
-                val trustClass = MaxHzPackagePolicy.trustClass(this, it)
+            .filter { (pkg, info) ->
+                if (info != null) MaxHzPackagePolicy.isRefreshRateTargetApp(this, info)
+                else pkg != "android" && pkg != "com.android.systemui"
+            }
+            .map { (pkg, info) ->
+                val label = if (info != null) safeLoadLabel(info) else pkg
+                val trustClass = if (info != null) MaxHzPackagePolicy.trustClass(this, info) else MaxHzPackagePolicy.trustClass(this, pkg)
                 val systemApp = trustClass != MaxHzPackagePolicy.AppTrustClass.USER_APP
-                rememberAppDisplay(it.packageName, label, trustClass)
+                val isGame = if (info != null) MaxHzPackagePolicy.isGameApp(this, info, label) else MaxHzPackagePolicy.isGameApp(this, pkg)
+                rememberAppDisplay(pkg, label, trustClass)
                 UserAppChoice(
                     label = label,
-                    packageName = it.packageName,
+                    packageName = pkg,
                     systemApp = systemApp,
                     trustClass = trustClass,
-                    isGame = MaxHzPackagePolicy.isGameApp(this, it),
-                    isLaunchable = it.packageName in launchableSet
+                    isGame = isGame,
+                    isLaunchable = pkg in launchableSet || info == null,
+                    appInfo = info
                 )
             }
             .distinctBy { it.packageName }
@@ -7898,6 +8397,7 @@ open class MaxHzActivity : AppBarActivity() {
                     .thenBy(String.CASE_INSENSITIVE_ORDER) { it.label }
             )
             .toList()
+        return list to warning
     }
 
     private fun loadNightWakeupGuardTargetApps(): List<UserAppChoice> {
@@ -7929,8 +8429,9 @@ open class MaxHzActivity : AppBarActivity() {
                     packageName = it.packageName,
                     systemApp = systemApp,
                     trustClass = trustClass,
-                    isGame = MaxHzPackagePolicy.isGameApp(this, it),
-                    isLaunchable = it.packageName in launchableSet
+                    isGame = MaxHzPackagePolicy.isGameApp(this, it, label),
+                    isLaunchable = it.packageName in launchableSet,
+                    appInfo = it
                 )
             }
             .distinctBy { it.packageName }
@@ -7948,39 +8449,38 @@ open class MaxHzActivity : AppBarActivity() {
         }.getOrNull() ?: info.packageName
     }
 
-    private fun loadGameAutoTargetApps(): List<UserAppChoice> {
+    private fun loadGameAutoTargetApps(): List<UserAppChoice> =
+        loadGameAutoTargetAppsWithStatus().first
+
+    private fun loadGameAutoTargetAppsWithStatus(): Pair<List<UserAppChoice>, String?> {
         val existing = MaxHzPrefs.gameAutoPerformancePackages(this).toSet()
         val launchableSet = MaxHzPackagePolicy.getLaunchablePackages(this)
-        val apps = try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                packageManager.getInstalledApplications(PackageManager.ApplicationInfoFlags.of(0L))
-            } else {
-                @Suppress("DEPRECATION")
-                packageManager.getInstalledApplications(0)
-            }
-        } catch (_: Throwable) {
-            emptyList<ApplicationInfo>()
-        }
-        return apps
+        val (discovered, warning) = discoverAllAppsMultiChannel()
+        val list = discovered.entries
             .asSequence()
-            .filter { it.enabled }
-            .filter { isPackageNameValid(it.packageName) }
-            .filter { (it.flags and ApplicationInfo.FLAG_HAS_CODE) != 0 }
-            .filterNot { it.packageName == packageName }
-            .filterNot { it.packageName in existing }
-            .map {
-                val label = safeLoadLabel(it)
-                val trustClass = MaxHzPackagePolicy.trustClass(this, it)
+            .filterNot { (pkg, _) -> pkg in existing }
+            .filter { (pkg, info) ->
+                if (info == null) {
+                    pkg != "android" && pkg != "com.android.systemui"
+                } else {
+                    // 用户安装的应用 100% 保留（不过滤 FLAG_HAS_CODE 或临时冻结状态），仅系统应用过滤纯资源空壳包
+                    MaxHzPackagePolicy.isRefreshRateTargetApp(this, info)
+                }
+            }
+            .map { (pkg, info) ->
+                val label = if (info != null) safeLoadLabel(info) else pkg
+                val trustClass = if (info != null) MaxHzPackagePolicy.trustClass(this, info) else MaxHzPackagePolicy.trustClass(this, pkg)
                 val systemApp = trustClass != MaxHzPackagePolicy.AppTrustClass.USER_APP
-                val isGame = MaxHzPackagePolicy.isGameApp(this, it)
-                rememberAppDisplay(it.packageName, label, trustClass)
+                val isGame = if (info != null) MaxHzPackagePolicy.isGameApp(this, info, label) else MaxHzPackagePolicy.isGameApp(this, pkg)
+                rememberAppDisplay(pkg, label, trustClass)
                 UserAppChoice(
                     label = label,
-                    packageName = it.packageName,
+                    packageName = pkg,
                     systemApp = systemApp,
                     trustClass = trustClass,
                     isGame = isGame,
-                    isLaunchable = it.packageName in launchableSet
+                    isLaunchable = pkg in launchableSet || info == null,
+                    appInfo = info
                 )
             }
             .distinctBy { it.packageName }
@@ -7991,6 +8491,7 @@ open class MaxHzActivity : AppBarActivity() {
                     .thenBy(String.CASE_INSENSITIVE_ORDER) { it.label }
             )
             .toList()
+        return list to warning
     }
 
     private fun isSystemApp(info: ApplicationInfo): Boolean {
@@ -10702,32 +11203,38 @@ open class MaxHzActivity : AppBarActivity() {
                     "启用游戏自动切换",
                     isServiceEnabled
                 ) { enabled ->
-                    if (enabled) {
-                        if (!MaxHzShell.isReady()) {
-                            Toast.makeText(this@MaxHzActivity, R.string.toast_service_not_running_start_first, Toast.LENGTH_SHORT).show()
-                            renderDetail()
-                            return@switchRow
-                        }
-                        if (!isAccessibilityReady) {
-                            Toast.makeText(this@MaxHzActivity, "无障碍服务尚未开启，请先开启无障碍服务", Toast.LENGTH_SHORT).show()
-                            AccessibilityHelper.openInstantSwitchSettings(this@MaxHzActivity)
-                            renderDetail()
-                            return@switchRow
-                        }
-                    }
                     MaxHzPrefs.setGameAutoPerformanceEnabled(this@MaxHzActivity, enabled)
                     updateMaxHzServiceState()
                     if (enabled) {
-                        Toast.makeText(this@MaxHzActivity, "游戏自动切换已开启", Toast.LENGTH_SHORT).show()
+                        when {
+                            !MaxHzShell.isReady() ->
+                                Toast.makeText(this@MaxHzActivity, "已开启游戏自动切换（当前服务未运行，启动 Shizuku/Root 后自动生效）", Toast.LENGTH_SHORT).show()
+                            !isAccessibilityReady -> {
+                                Toast.makeText(this@MaxHzActivity, "已开启配置，请进一步开启无障碍服务以识别前台游戏", Toast.LENGTH_SHORT).show()
+                            }
+                            else ->
+                                Toast.makeText(this@MaxHzActivity, "游戏自动切换已开启", Toast.LENGTH_SHORT).show()
+                        }
                     } else {
                         Toast.makeText(this@MaxHzActivity, "游戏自动切换已关闭", Toast.LENGTH_SHORT).show()
                     }
                     renderDetail()
                 }, dp(12))
 
+                if (!MaxHzShell.isReady()) {
+                    addSpacedView(TextView(this@MaxHzActivity).apply {
+                        text = "服务未运行也可先配置游戏名单与每游戏独立档位，Shizuku / Root 服务就绪后自动生效。"
+                        textSize = 12.5f
+                        setTextColor(themeColors.onWarningContainer)
+                        setPadding(dp(12), dp(10), dp(12), dp(10))
+                        setLineSpacing(0f, 1.25f)
+                        background = rounded(themeColors.warningContainer, dp(14).toFloat())
+                    }, dp(8))
+                }
+
                 if (!isAccessibilityReady) {
                     addSpacedView(TextView(this@MaxHzActivity).apply {
-                        text = "无障碍即时切换服务未开启，无法识别前台游戏。\n点击此处立即前往开启无障碍服务"
+                        text = "无障碍即时切换服务未开启，无法自动感知前台游戏（名单可先配置）。\n点击此处立即前往开启无障碍服务"
                         textSize = 12.5f
                         setTextColor(themeColors.onWarningContainer)
                         setPadding(dp(12), dp(10), dp(12), dp(10))
@@ -10773,28 +11280,16 @@ open class MaxHzActivity : AppBarActivity() {
                 bindOptionBSubtitle(this, targetDescSub)
                 addSpacedView(horizontalActions(
                     button(if (currentTarget == MaxHzPrefs.GAME_PROFILE_DEFAULT) "系统默认 ✓" else "系统默认") {
-                        if (!MaxHzShell.isReady()) {
-                            Toast.makeText(this@MaxHzActivity, R.string.toast_service_not_running_start_first, Toast.LENGTH_SHORT).show()
-                            return@button
-                        }
                         MaxHzPrefs.setGameAutoTargetProfile(this@MaxHzActivity, MaxHzPrefs.GAME_PROFILE_DEFAULT)
                         Toast.makeText(this@MaxHzActivity, "默认进游戏模式已设为：系统默认", Toast.LENGTH_SHORT).show()
                         renderDetail()
                     },
                     button(if (currentTarget == MaxHzPrefs.GAME_PROFILE_SAVER) "省电自适应高刷 ✓" else "省电自适应高刷") {
-                        if (!MaxHzShell.isReady()) {
-                            Toast.makeText(this@MaxHzActivity, R.string.toast_service_not_running_start_first, Toast.LENGTH_SHORT).show()
-                            return@button
-                        }
                         MaxHzPrefs.setGameAutoTargetProfile(this@MaxHzActivity, MaxHzPrefs.GAME_PROFILE_SAVER)
                         Toast.makeText(this@MaxHzActivity, "默认进游戏模式已设为：省电自适应高刷", Toast.LENGTH_SHORT).show()
                         renderDetail()
                     },
                     button(if (currentTarget == MaxHzPrefs.GAME_PROFILE_PERFORMANCE) "游戏性能模式 ✓" else "游戏性能模式") {
-                        if (!MaxHzShell.isReady()) {
-                            Toast.makeText(this@MaxHzActivity, R.string.toast_service_not_running_start_first, Toast.LENGTH_SHORT).show()
-                            return@button
-                        }
                         MaxHzPrefs.setGameAutoTargetProfile(this@MaxHzActivity, MaxHzPrefs.GAME_PROFILE_PERFORMANCE)
                         Toast.makeText(this@MaxHzActivity, "默认进游戏模式已设为：游戏性能模式", Toast.LENGTH_SHORT).show()
                         renderDetail()
@@ -10844,26 +11339,42 @@ open class MaxHzActivity : AppBarActivity() {
 
                 val actionButtons = mutableListOf<View>()
                 actionButtons.add(button("添加游戏") {
-                    if (!MaxHzShell.isReady()) {
-                        Toast.makeText(this@MaxHzActivity, R.string.toast_service_not_running_start_first, Toast.LENGTH_SHORT).show()
-                        return@button
-                    }
-                    if (!isAccessibilityReady) {
-                        Toast.makeText(this@MaxHzActivity, "无障碍服务尚未开启，请先开启无障碍服务", Toast.LENGTH_SHORT).show()
-                        AccessibilityHelper.openInstantSwitchSettings(this@MaxHzActivity)
-                        return@button
-                    }
                     showGameAutoAppPicker { app ->
                         MaxHzPrefs.addGameAutoPerformancePackage(this@MaxHzActivity, app.packageName)
-                        Toast.makeText(this@MaxHzActivity, "已加入 ${app.label}（点击右侧模式按钮可单独切换默认/性能）", Toast.LENGTH_SHORT).show()
+                        if (MaxHzShell.isReady()) {
+                            lifecycleScope.launch(Dispatchers.IO) {
+                                runCatching { MaxHzController.configureGameStaticIntervention(app.packageName, true) }
+                            }
+                        }
+                        Toast.makeText(this@MaxHzActivity, "已加入 ${app.label}（点击右侧模式胶囊可单独切换档位）", Toast.LENGTH_SHORT).show()
+                        renderDetail()
+                    }
+                })
+                actionButtons.add(button("按包名添加") {
+                    showManualPackageInputDialog(
+                        dialogTitle = "按包名手动添加游戏",
+                        markAsGame = true
+                    ) { manualChoices ->
+                        val added = MaxHzPrefs.addGameAutoPerformancePackages(
+                            this@MaxHzActivity,
+                            manualChoices.map { it.packageName }
+                        )
+                        if (MaxHzShell.isReady()) {
+                            lifecycleScope.launch(Dispatchers.IO) {
+                                manualChoices.forEach { ch ->
+                                    runCatching { MaxHzController.configureGameStaticIntervention(ch.packageName, true) }
+                                }
+                            }
+                        }
+                        Toast.makeText(
+                            this@MaxHzActivity,
+                            if (added > 0) "已按包名添加 $added 款应用" else "该包名已在游戏名单中",
+                            Toast.LENGTH_SHORT
+                        ).show()
                         renderDetail()
                     }
                 })
                 actionButtons.add(button("添加到快捷栏") {
-                    if (!MaxHzShell.isReady()) {
-                        Toast.makeText(this@MaxHzActivity, R.string.toast_service_not_running_start_first, Toast.LENGTH_SHORT).show()
-                        return@button
-                    }
                     requestGameModeTile()
                 })
                 if (packages.isNotEmpty()) {

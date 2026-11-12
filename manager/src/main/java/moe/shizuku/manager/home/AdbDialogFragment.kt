@@ -26,6 +26,7 @@ import moe.shizuku.manager.R
 import moe.shizuku.manager.ShizukuSettings
 import moe.shizuku.manager.adb.AdbMdns
 import moe.shizuku.manager.adb.AdbPortProber
+import moe.shizuku.manager.adb.LocalNetworkGate
 import moe.shizuku.manager.databinding.AdbDialogBinding
 import moe.shizuku.manager.starter.StarterActivity
 import moe.shizuku.manager.utils.EnvironmentUtils
@@ -86,8 +87,19 @@ class AdbDialogFragment : DialogFragment() {
     }
 
     private fun onDialogShow(dialog: AlertDialog) {
-        adbMdns.start()
         val context = dialog.context
+        if (!LocalNetworkGate.checkOrSkip("AdbDialogFragment.onDialogShow", -1, context)) {
+            binding.tvSearchStatus.text = "尚未授予「本地网络」权限，已暂停扫描以避免系统反复弹出设备选择框。\n请点击下方按钮前往应用权限页开启「本地网络」后再试。"
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).apply {
+                text = "去系统设置开启"
+                setOnClickListener {
+                    LocalNetworkGate.openAppPermissionSettings(context)
+                    dismissAllowingStateLoss()
+                }
+            }
+            return
+        }
+        adbMdns.start()
 
         val isDark = (context.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
         val isBlack = isDark && moe.shizuku.manager.app.ThemeHelper.isBlackNightTheme(context)
@@ -143,15 +155,19 @@ class AdbDialogFragment : DialogFragment() {
             binding.tvSearchStatus.text = "正在搜索无线调试服务...\n请在系统开发者选项中手动开启「无线调试」或连接外部 Wi-Fi。"
         }
 
-        // 持续轮询本地回环接口（127.0.0.1）候选端口（5555、lastPort、tlsPort）
-        // 对齐 ShizukuPlus：不设提前超时，只要发现端口立即秒连
+        // 持续轮询候选回环端口（127.0.0.1），只要发现开放端口立即秒连
         loopbackJob = lifecycleScope.launch(Dispatchers.IO) {
             while (isActive) {
-                val candidatePort = AdbPortProber.findActiveLoopbackPort(context, timeoutMs = 150)
-                if (candidatePort > 0) {
+                if (!LocalNetworkGate.hasPermission(context)) break
+                val candidateEndpoint = AdbPortProber.findActiveEndpoint(
+                    context = context,
+                    timeoutMs = 150,
+                    caller = "AdbDialogFragment.endpointPoll"
+                )
+                if (candidateEndpoint != null && candidateEndpoint.second > 0) {
                     withContext(Dispatchers.Main) {
                         if (isAdded && !isStateSaved) {
-                            startAndDismiss("127.0.0.1", candidatePort)
+                            startAndDismiss("127.0.0.1", candidateEndpoint.second)
                         }
                     }
                     break
@@ -171,11 +187,11 @@ class AdbDialogFragment : DialogFragment() {
             }
         }
 
-        endpoint.observe(this) { (host, port) ->
-            if (host.isBlank() || port > 65535 || port < 1) return@observe
+        endpoint.observe(this) { (_, port) ->
+            if (port > 65535 || port < 1) return@observe
             endpoint.removeObservers(this)
             loopbackJob?.cancel()
-            startAndDismiss(host, port)
+            startAndDismiss("127.0.0.1", port)
         }
     }
 

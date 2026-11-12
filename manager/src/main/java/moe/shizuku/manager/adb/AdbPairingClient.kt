@@ -201,6 +201,10 @@ class AdbPairingClient(private val host: String, private val port: Int, private 
     }
 
     private fun setupTlsConnection() {
+        if (!LocalNetworkGate.checkOrSkip(caller = "AdbPairingClient.setupTlsConnection", port = port, host = host)) {
+            throw LocalNetworkGate.LocalNetworkPermissionException("本地网络权限未授予，已跳过配对连接 $host:$port")
+        }
+        Log.i(TAG, "Connecting pairing TLS socket -> $host:$port")
         socket = Socket(host, port)
         socket.tcpNoDelay = true
 

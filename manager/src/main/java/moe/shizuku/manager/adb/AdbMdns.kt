@@ -15,6 +15,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.IOException
+import java.net.Inet4Address
 import java.net.InetSocketAddress
 import java.net.NetworkInterface
 import java.net.ServerSocket
@@ -29,6 +30,11 @@ class AdbMdns(
     private var running = false
     private var serviceName: String? = null
 
+    /**
+     * mDNS 解析出的服务地址（对齐 ShizukuPlus）：
+     * 回环地址归一化保持 `"127.0.0.1"`；当 `adbd` 在 mDNS 中广播本机非回环网卡地址时记录于此，
+     * 供配对路径（`TLS_PAIRING`）连接真实接口地址，而常规启动（`TLS_CONNECT`）仅取端口并连接 `127.0.0.1`。
+     */
     @Volatile
     var resolvedHost: String = "127.0.0.1"
         private set
@@ -42,6 +48,15 @@ class AdbMdns(
 
     fun start() {
         if (running) return
+        if (!LocalNetworkGate.checkOrSkip(
+                caller = "AdbMdns.start($serviceType)",
+                port = -1,
+                context = context,
+                requiresLocalNetwork = true
+            )
+        ) {
+            return
+        }
         running = true
         if (!registered) {
             nsdManager.discoverServices(serviceType, NsdManager.PROTOCOL_DNS_SD, listener)
@@ -82,21 +97,36 @@ class AdbMdns(
     private fun onServiceResolved(resolvedService: NsdServiceInfo) {
         val hostAddress = resolvedService.hostAddressCompat()
         val isLocal = hostAddress == "127.0.0.1" || hostAddress == "::1" || resolvedService.isLoopbackCompat()
+        val normalizedCandidate = if (isLocal || hostAddress.isNullOrBlank()) {
+            "127.0.0.1"
+        } else {
+            hostAddress.substringBefore('%')
+        }
 
-        if (running && (isLocal || (hostAddress != null && NetworkInterface.getNetworkInterfaces()
-                .asSequence()
-                .any { networkInterface ->
-                    networkInterface.inetAddresses
-                        .asSequence()
-                        .any { hostAddress == it.hostAddress }
-                }))
-            && isPortAvailable(resolvedService.port)
-        ) {
+        val belongsToThisDevice = isLocal || (hostAddress != null && NetworkInterface.getNetworkInterfaces()
+            ?.asSequence()
+            ?.any { networkInterface ->
+                networkInterface.inetAddresses
+                    .asSequence()
+                    .any { addr ->
+                        val ifAddr = addr.hostAddress ?: return@any false
+                        ifAddr == hostAddress || ifAddr.substringBefore('%') == normalizedCandidate
+                    }
+            } == true)
+
+        val portReady = if (serviceType == TLS_PAIRING) {
+            true
+        } else {
+            isLoopbackPortAvailable(resolvedService.port)
+        }
+
+        if (running && belongsToThisDevice && portReady) {
             serviceName = resolvedService.serviceName
-            val normalizedHost = if (isLocal || hostAddress == null) "127.0.0.1" else hostAddress
-            resolvedHost = normalizedHost
-            observer.onChanged(normalizedHost to resolvedService.port)
-        } else if (running && attempts < 5 && !restartScheduled) {
+            resolvedHost = normalizedCandidate
+            val callbackHost = if (serviceType == TLS_PAIRING) normalizedCandidate else "127.0.0.1"
+            Log.i(TAG, "mDNS resolved $serviceType -> resolvedHost=$normalizedCandidate callback=$callbackHost:${resolvedService.port}")
+            observer.onChanged(callbackHost to resolvedService.port)
+        } else if (running && belongsToThisDevice && attempts < 5 && !restartScheduled) {
             attempts++
             restartScheduled = true
             val delayMs = attempts * 1000L
@@ -111,20 +141,40 @@ class AdbMdns(
                 }
                 delay(100L)
                 if (!registered && running) {
-                    nsdManager.discoverServices(serviceType, NsdManager.PROTOCOL_DNS_SD, listener)
+                    if (LocalNetworkGate.checkOrSkip(
+                            caller = "AdbMdns.restart($serviceType)",
+                            port = -1,
+                            context = context,
+                            requiresLocalNetwork = true
+                        )
+                    ) {
+                        nsdManager.discoverServices(serviceType, NsdManager.PROTOCOL_DNS_SD, listener)
+                    } else {
+                        running = false
+                    }
                 }
                 restartScheduled = false
             }
         }
     }
 
-    private fun isPortAvailable(port: Int) = try {
-        ServerSocket().use {
-            it.bind(InetSocketAddress("127.0.0.1", port), 1)
-            false
+    private fun isLoopbackPortAvailable(port: Int): Boolean {
+        if (port !in 1..65535) return false
+        val boundOnLoopback = try {
+            ServerSocket().use {
+                it.bind(InetSocketAddress("127.0.0.1", port), 1)
+                false
+            }
+        } catch (_: IOException) {
+            true
         }
-    } catch (_: IOException) {
-        true
+        return boundOnLoopback && AdbPortProber.isPortOpen(
+            port = port,
+            timeoutMs = 150,
+            caller = "AdbMdns.isLoopbackPortAvailable",
+            context = context,
+            host = "127.0.0.1"
+        )
     }
 
     @Suppress("DEPRECATION")
@@ -138,7 +188,9 @@ class AdbMdns(
 
     private fun NsdServiceInfo.hostAddressCompat(): String? {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            hostAddresses.firstOrNull()?.hostAddress
+            (hostAddresses.firstOrNull { !it.isLoopbackAddress && it is Inet4Address }
+                ?: hostAddresses.firstOrNull { !it.isLoopbackAddress }
+                ?: hostAddresses.firstOrNull())?.hostAddress
         } else {
             @Suppress("DEPRECATION")
             host?.hostAddress

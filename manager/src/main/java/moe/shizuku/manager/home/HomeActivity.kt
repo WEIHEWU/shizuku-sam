@@ -55,6 +55,8 @@ import moe.shizuku.manager.adb.AdbPairingAccessibilityService
 import moe.shizuku.manager.adb.AdbPairingDetector
 import moe.shizuku.manager.adb.AdbPairingTutorialActivity
 import moe.shizuku.manager.adb.AdbPortProber
+import moe.shizuku.manager.adb.LocalNetworkGate
+import moe.shizuku.manager.utils.StartupCoordinator
 import moe.shizuku.manager.utils.DhizukuHelper
 import moe.shizuku.manager.utils.HotspotHelper
 import moe.shizuku.manager.databinding.AboutDialogBinding
@@ -90,6 +92,8 @@ abstract class HomeActivity : MaxHzActivity() {
     companion object {
         const val EXTRA_START_SERVICE_VIA_WADB = "moe.shizuku.manager.intent.extra.START_SERVICE_VIA_WADB"
     }
+
+    private val localNetRequester = LocalNetworkGate.Requester(this)
 
     private val binderReceivedListener = Shizuku.OnBinderReceivedListener {
         checkServerStatus()
@@ -196,38 +200,32 @@ abstract class HomeActivity : MaxHzActivity() {
             val rootAvail = MaxHzShell.isRootAvailable()
             val wifi = HotspotHelper.isWifiConnected(this@HomeActivity)
             val hotspot = HotspotHelper.isHotspotActive(this@HomeActivity)
-            val port = AdbPortProber.findActiveLoopbackPort(this@HomeActivity)
             withContext(Dispatchers.Main) {
                 isRootAvailableState.value = rootAvail
                 isWifiConnectedState.value = wifi
                 isHotspotActiveState.value = hotspot
-                activeAdbPortState.intValue = port
             }
         }
 
-        if (intent?.getBooleanExtra("open_night_guard", false) == true) {
-            pushDetail("待机异常唤醒排查") { nightWakeupGuardSection() }
-        }
-        if (intent?.getBooleanExtra("EXTRA_AUTO_START_AFTER_PAIRING", false) == true ||
-            intent?.getBooleanExtra(EXTRA_START_SERVICE_VIA_WADB, false) == true
-        ) {
-            intent?.removeExtra(EXTRA_START_SERVICE_VIA_WADB)
-            lifecycleScope.launch {
-                delay(350)
-                handleWirelessAdbStartClick()
-            }
-        }
+        handleIncomingSpecialIntents(intent)
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        handleIncomingSpecialIntents(intent)
+    }
+
+    private fun handleIncomingSpecialIntents(intent: Intent?) {
+        if (intent == null) return
         if (intent.getBooleanExtra("open_night_guard", false)) {
+            intent.removeExtra("open_night_guard")
             pushDetail("待机异常唤醒排查") { nightWakeupGuardSection() }
         }
         if (intent.getBooleanExtra("EXTRA_AUTO_START_AFTER_PAIRING", false) ||
             intent.getBooleanExtra(EXTRA_START_SERVICE_VIA_WADB, false)
         ) {
+            intent.removeExtra("EXTRA_AUTO_START_AFTER_PAIRING")
             intent.removeExtra(EXTRA_START_SERVICE_VIA_WADB)
             lifecycleScope.launch {
                 delay(350)
@@ -736,12 +734,12 @@ abstract class HomeActivity : MaxHzActivity() {
         },
         onSaveAppRule = { rule ->
             val hasPrivilege = isServiceRunning() || isRootAvailableState.value
+            MaxHzPrefs.saveAppRefreshRule(this, rule)
+            appRulesState.value = MaxHzPrefs.appRefreshRules(this)
+            updateMaxHzServiceState()
             if (!hasPrivilege) {
-                Toast.makeText(this, R.string.toast_service_not_running_start_first, Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "规则已保存（服务未运行，启动 Shizuku/Root 后自动生效）", Toast.LENGTH_SHORT).show()
             } else {
-                MaxHzPrefs.saveAppRefreshRule(this, rule)
-                appRulesState.value = MaxHzPrefs.appRefreshRules(this)
-                updateMaxHzServiceState()
                 Toast.makeText(this, R.string.rules_toast_saved, Toast.LENGTH_SHORT).show()
                 if (!AccessibilityHelper.isInstantSwitchEnabled(this)) {
                     AccessibilityHelper.handleInstantSwitchClick(this) {
@@ -780,19 +778,38 @@ abstract class HomeActivity : MaxHzActivity() {
         },
         onCalibrateLtpoAdaptiveClick = { handleCalibrateLtpoAdaptiveClick() },
         onSelectAppForGameAuto = { callback ->
-            val hasPrivilege = isServiceRunning() || isRootAvailableState.value
-            if (!hasPrivilege) {
-                Toast.makeText(this, R.string.toast_service_not_running_start_first, Toast.LENGTH_SHORT).show()
-            } else {
-                showGameAutoAppPicker { app ->
-                    callback(app.packageName, app.label)
-                }
+            showGameAutoAppPicker { app ->
+                callback(app.packageName, app.label)
+            }
+        },
+        onManualAddGamePackages = { callback ->
+            showManualPackageInputDialog(
+                dialogTitle = "按包名手动添加游戏",
+                markAsGame = true
+            ) { choices ->
+                choices.forEach { callback(it.packageName, it.label) }
             }
         },
         onStaticGameIntervention = { pkg, enable ->
-            lifecycleScope.launch(Dispatchers.IO) {
-                runCatching { MaxHzController.configureGameStaticIntervention(pkg, enable) }
+            if (isServiceRunning() || isRootAvailableState.value || runCatching { MaxHzShell.isReady() }.getOrDefault(false)) {
+                lifecycleScope.launch(Dispatchers.IO) {
+                    runCatching { MaxHzController.configureGameStaticIntervention(pkg, enable) }
+                }
             }
+        },
+        onRequestLocalNetPermissionClick = {
+            localNetRequester.requestIfNeeded(
+                caller = "HeroCard.requestLocalNet",
+                onGranted = { checkServerStatus() }
+            )
+        },
+        onStopAutoRetryClick = {
+            StartupCoordinator.stopAutoRetry(this)
+            Toast.makeText(this, "已停止后台自动重连", Toast.LENGTH_SHORT).show()
+        },
+        onResumeAutoRetryClick = {
+            StartupCoordinator.resumeAutoRetry()
+            Toast.makeText(this, "已恢复后台自动重连", Toast.LENGTH_SHORT).show()
         },
         onApplyQuickDozeConfig = { enabled, minutes, noMaint, onResult ->
             val hasPrivilege = isServiceRunning() || isRootAvailableState.value
@@ -1269,21 +1286,24 @@ abstract class HomeActivity : MaxHzActivity() {
 
     private fun handleToggleGameAutoSwitch(on: Boolean) {
         val hasPrivilege = isServiceRunning() || isRootAvailableState.value
-        if (on && !hasPrivilege) {
-            gameAutoSwitchState.value = false
-            Toast.makeText(this, R.string.toast_service_not_running_start_first, Toast.LENGTH_SHORT).show()
-            return
-        }
-        if (on && !AccessibilityHelper.isInstantSwitchEnabled(this)) {
-            gameAutoSwitchState.value = false
-            Toast.makeText(this, "无障碍服务尚未开启，请先开启无障碍服务", Toast.LENGTH_SHORT).show()
-            AccessibilityHelper.openInstantSwitchSettings(this)
-            return
-        }
+        val hasA11y = AccessibilityHelper.isInstantSwitchEnabled(this)
         gameAutoSwitchState.value = on
         MaxHzPrefs.setGameAutoPerformanceEnabled(this, on)
-        Toast.makeText(this, if (on) R.string.toast_game_auto_enabled else R.string.toast_game_auto_disabled, Toast.LENGTH_SHORT).show()
         updateMaxHzServiceState()
+        if (on) {
+            when {
+                !hasPrivilege ->
+                    Toast.makeText(this, "已保存开启配置，Shizuku / Root 服务启动后将自动生效", Toast.LENGTH_SHORT).show()
+                !hasA11y -> {
+                    Toast.makeText(this, "已开启游戏自动配置，请进一步开启无障碍以感知前台游戏", Toast.LENGTH_SHORT).show()
+                    AccessibilityHelper.openInstantSwitchSettings(this)
+                }
+                else ->
+                    Toast.makeText(this, R.string.toast_game_auto_enabled, Toast.LENGTH_SHORT).show()
+            }
+        } else {
+            Toast.makeText(this, R.string.toast_game_auto_disabled, Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun handleToggleFpsMonitor(on: Boolean) {
@@ -1979,9 +1999,18 @@ abstract class HomeActivity : MaxHzActivity() {
         }
     }
 
+    internal fun triggerWirelessAdbStartFromUser() {
+        handleWirelessAdbStartClick()
+    }
+
+    internal fun triggerWirelessAdbPairFromUser() {
+        handleWirelessAdbPairClick()
+    }
+
     /**
      * 通过无线调试「启动」服务：Android 11+ 弹 AdbDialogFragment（自动发现 ADB 端口并启动，
      * 端口可用时点端口号也可直接启动）；旧版本走 TCP 端口直连。
+     * 仅在用户主动点击时请求一次本地网络运行时权限，被拒后引导去系统设置开启。
      */
     private fun handleWirelessAdbStartClick() {
         if (rikka.shizuku.Shizuku.pingBinder()) {
@@ -1994,6 +2023,13 @@ abstract class HomeActivity : MaxHzActivity() {
             return
         }
 
+        localNetRequester.requestIfNeeded(
+            caller = "HomeActivity.wirelessStart",
+            onGranted = { proceedWirelessAdbStart() }
+        )
+    }
+
+    private fun proceedWirelessAdbStart() {
         if (checkSelfPermission(android.Manifest.permission.WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED) {
             runCatching {
                 Settings.Global.putLong(contentResolver, "adb_allowed_connection_time", 0L)
@@ -2004,19 +2040,28 @@ abstract class HomeActivity : MaxHzActivity() {
         lifecycleScope.launch {
             val detectedPort = activeAdbPortState.intValue
             val isValidDetectedPort = detectedPort > 0
-            val activePort = withContext(Dispatchers.IO) {
-                if (isValidDetectedPort && AdbPortProber.isPortOpen(detectedPort, 200)) {
-                    detectedPort
-                } else {
-                    AdbPortProber.findActiveLoopbackPort(this@HomeActivity, 200)
-                }
+            val activeEndpoint = withContext(Dispatchers.IO) {
+                val detectedHit = if (isValidDetectedPort) {
+                    AdbPortProber.probeOpenEndpoint(
+                        port = detectedPort,
+                        timeoutMs = 200,
+                        caller = "HomeActivity.wirelessStart",
+                        context = this@HomeActivity
+                    )
+                } else null
+                detectedHit ?: AdbPortProber.findActiveEndpoint(
+                    context = this@HomeActivity,
+                    timeoutMs = 200,
+                    caller = "HomeActivity.wirelessStart",
+                    isBackground = false
+                )
             }
 
-            if (activePort > 0) {
+            if (activeEndpoint != null && activeEndpoint.second > 0) {
                 val intent = Intent(this@HomeActivity, StarterActivity::class.java).apply {
                     putExtra(StarterActivity.EXTRA_IS_ROOT, false)
                     putExtra(StarterActivity.EXTRA_HOST, "127.0.0.1")
-                    putExtra(StarterActivity.EXTRA_PORT, activePort)
+                    putExtra(StarterActivity.EXTRA_PORT, activeEndpoint.second)
                 }
                 startActivity(intent)
                 return@launch
@@ -2043,12 +2088,17 @@ abstract class HomeActivity : MaxHzActivity() {
      */
     private fun handleWirelessAdbPairClick() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            val hasExternalDisplay = (display?.displayId ?: -1) > 0
-            if (hasExternalDisplay) {
-                AdbPairDialogFragment().show(supportFragmentManager)
-            } else {
-                startActivity(Intent(this, AdbPairingTutorialActivity::class.java))
-            }
+            localNetRequester.requestIfNeeded(
+                caller = "HomeActivity.wirelessPair",
+                onGranted = {
+                    val hasExternalDisplay = (display?.displayId ?: -1) > 0
+                    if (hasExternalDisplay) {
+                        AdbPairDialogFragment().show(supportFragmentManager)
+                    } else {
+                        startActivity(Intent(this, AdbPairingTutorialActivity::class.java))
+                    }
+                }
+            )
             return
         }
         Toast.makeText(this, R.string.toast_wireless_pairing_requires_android_11, Toast.LENGTH_SHORT).show()
@@ -2210,7 +2260,12 @@ abstract class HomeActivity : MaxHzActivity() {
             val rootAvail = MaxHzShell.isRootAvailable()
             val wifi = HotspotHelper.isWifiConnected(this@HomeActivity)
             val hotspot = HotspotHelper.isHotspotActive(this@HomeActivity)
-            val port = AdbPortProber.findActiveLoopbackPort(this@HomeActivity)
+            val port = AdbPortProber.findActiveLoopbackPort(
+                context = this@HomeActivity,
+                timeoutMs = 150,
+                caller = "HomeActivity.checkServerStatus",
+                isBackground = true
+            )
             withContext(Dispatchers.Main) {
                 isRootAvailableState.value = rootAvail
                 isWifiConnectedState.value = wifi

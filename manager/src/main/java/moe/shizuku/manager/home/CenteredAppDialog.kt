@@ -19,6 +19,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
@@ -90,6 +91,7 @@ fun CenteredAppDialog(
             }
         }
 
+        val maxDialogHeightDp = (LocalConfiguration.current.screenHeightDp * 0.68f).coerceAtLeast(260f).dp
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -101,6 +103,8 @@ fun CenteredAppDialog(
                 modifier = Modifier
                     .widthIn(max = 500.dp)
                     .fillMaxWidth()
+                    .wrapContentHeight()
+                    .heightIn(max = maxDialogHeightDp)
                     .clip(dialogShape)
                     .shadow(
                         elevation = 24.dp,

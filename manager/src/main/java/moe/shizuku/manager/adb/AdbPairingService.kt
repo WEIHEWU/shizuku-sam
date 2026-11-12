@@ -92,13 +92,28 @@ class AdbPairingService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == startAction || intent?.action == replyAction) {
+            if (!LocalNetworkGate.checkOrSkip(
+                    caller = "AdbPairingService.${intent.action}",
+                    port = -1,
+                    context = this,
+                    isBackground = true
+                )
+            ) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
+                return START_NOT_STICKY
+            }
+        }
         val notification = when (intent?.action) {
             startAction -> {
                 onStart()
             }
             replyAction -> {
                 val code = RemoteInput.getResultsFromIntent(intent)?.getCharSequence(remoteInputResultKey) ?: ""
-                val host = intent.getStringExtra(hostKey) ?: "127.0.0.1"
+                val host = intent.getStringExtra(hostKey)?.takeIf { it.isNotBlank() }
+                    ?: adbMdns?.resolvedHost?.takeIf { it.isNotBlank() }
+                    ?: "127.0.0.1"
                 val port = intent.getIntExtra(portKey, -1)
                 if (port != -1) {
                     onInput(code.toString(), host, port)
@@ -175,6 +190,7 @@ class AdbPairingService : Service() {
                 return@launch
             }
 
+            Log.i(tag, "Initiating pairing with endpoint $host:$port")
             AdbPairingClient(host, port, code, key).runCatching {
                 start()
             }.onFailure {

@@ -48,6 +48,7 @@ public class ShizukuSettings {
     public static final String KEY_KNOWN_CLIENT_PACKAGES = "known_client_packages";
     public static final String TCP_MODE = "tcp_mode";
     public static final String TCP_PORT = "tcp_port";
+    public static final String LAST_HOST = "last_host";
     public static final String LAST_PORT = "last_port";
     public static final String KEY_AUTO_DISABLE_USB_DEBUGGING = "auto_disable_usb_debugging";
     public static final String KEY_FORCE_START_WADB = "force_start_wadb";
@@ -240,6 +241,22 @@ public class ShizukuSettings {
             editor.remove(TCP_PORT);
         }
         editor.apply();
+    }
+
+    @NonNull
+    public static String getLastHost() {
+        try {
+            String host = getPreferences().getString(LAST_HOST, "");
+            return host != null ? host.trim() : "";
+        } catch (Throwable e) {
+            return "";
+        }
+    }
+
+    public static void setLastHost(@Nullable String host) {
+        if (host != null && !host.trim().isEmpty()) {
+            getPreferences().edit().putString(LAST_HOST, host.trim()).apply();
+        }
     }
 
     public static int getLastPort() {

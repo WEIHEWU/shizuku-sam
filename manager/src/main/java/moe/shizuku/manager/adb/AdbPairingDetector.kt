@@ -33,6 +33,9 @@ object AdbPairingDetector {
     private var requestedAtElapsed = 0L
 
     @Volatile
+    private var pairingHost: String? = null
+
+    @Volatile
     private var pairingPort: Int? = null
 
     @Volatile
@@ -47,7 +50,7 @@ object AdbPairingDetector {
     private val timeoutScheduled = AtomicBoolean(false)
     private var detectorScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    private val ipPortRegex = Regex("""(?:\d{1,3}\.){3}\d{1,3}:(\d{2,5})""")
+    private val ipPortRegex = Regex("""((?:\d{1,3}\.){3}\d{1,3}):(\d{2,5})""")
     private val passwordRegex = Regex("""\b\d{6}\b""")
     private val fiveDigitRegex = Regex("""\b\d{5}\b""")
 
@@ -93,6 +96,7 @@ object AdbPairingDetector {
     }
 
     private fun resetCandidates() {
+        pairingHost = null
         pairingPort = null
         pairingPassword = null
         candidateWindowId = -1
@@ -127,6 +131,7 @@ object AdbPairingDetector {
             candidateWindowId = windowId
         } else if (windowId != candidateWindowId) {
             candidateWindowId = windowId
+            pairingHost = null
             pairingPort = null
             pairingPassword = null
         }
@@ -162,15 +167,28 @@ object AdbPairingDetector {
 
         val portValue = pairingPort
         val codeValue = pairingPassword
+        val hostValue = pairingHost?.trim()?.takeIf { it.isNotEmpty() } ?: "127.0.0.1"
 
         if (portValue != null && codeValue != null && !isPairingInProgress) {
             isPairingInProgress = true
-            Log.i(TAG, "Starting zero-touch pairing: 127.0.0.1:$portValue code=$codeValue")
-            executePairing(portValue, codeValue, service)
+            Log.i(TAG, "Starting zero-touch pairing: $hostValue:$portValue code=$codeValue")
+            executePairing(hostValue, portValue, codeValue, service)
         }
     }
 
-    private fun executePairing(port: Int, code: String, service: AccessibilityService) {
+    private fun executePairing(host: String, port: Int, code: String, service: AccessibilityService) {
+        if (!LocalNetworkGate.checkOrSkip(
+                caller = "AdbPairingDetector.executePairing",
+                port = port,
+                context = service,
+                isBackground = true,
+                host = host
+            )
+        ) {
+            isPairingInProgress = false
+            cancel()
+            return
+        }
         detectorScope.launch {
             val key = try {
                 AdbKey(PreferenceAdbKeyStore(ShizukuSettings.getPreferences()), "shizuku")
@@ -183,17 +201,16 @@ object AdbPairingDetector {
                 return@launch
             }
 
-            val success = AdbPairingClient("127.0.0.1", port, code, key).runCatching {
+            val success = AdbPairingClient(host, port, code, key).runCatching {
                 start()
             }.getOrDefault(false)
 
             withContext(Dispatchers.Main) {
                 if (success) {
-                    Log.i(TAG, "Auto-pairing succeeded!")
+                    Log.i(TAG, "Auto-pairing succeeded on $host:$port!")
                     // 立即结束单次配对会话并停止通知栏配对搜索，防止后续用户给其他 App 配对时再次拦截
                     cancel()
                     runCatching { service.startService(AdbPairingService.stopIntent(service)) }
-                    ShizukuSettings.setLastPort(port)
                     Toast.makeText(service, service.getString(R.string.pairing_code_auto_success), Toast.LENGTH_LONG).show()
 
                     // 1. 自动后退关闭系统配对弹窗
@@ -206,7 +223,8 @@ object AdbPairingDetector {
                     }
                     service.startActivity(intent)
                 } else {
-                    Log.w(TAG, "Auto-pairing handshake failed, resetting candidates to retry on next frame")
+                    Log.w(TAG, "Auto-pairing handshake failed on $host:$port, resetting candidates to retry on next frame")
+                    pairingHost = null
                     pairingPort = null
                     pairingPassword = null
                     isPairingInProgress = false
@@ -220,10 +238,15 @@ object AdbPairingDetector {
         val text = try { node.text?.toString() ?: "" } catch (_: Throwable) { "" }
 
         if (text.isNotEmpty()) {
-            ipPortRegex.find(text)?.groupValues?.get(1)?.toIntOrNull()?.let {
-                pairingPort = it
-                Log.i(TAG, "Pairing port found via IP:Port -> $it")
-                return
+            ipPortRegex.find(text)?.let { match ->
+                val hostCandidate = match.groupValues.getOrNull(1)?.takeIf { it.isNotBlank() }
+                val portCandidate = match.groupValues.getOrNull(2)?.toIntOrNull()
+                if (portCandidate != null) {
+                    pairingHost = hostCandidate
+                    pairingPort = portCandidate
+                    Log.i(TAG, "Pairing endpoint found via IP:Port -> ${hostCandidate ?: "auto"}:$portCandidate")
+                    return
+                }
             }
             if (text.contains("Port", ignoreCase = true) || text.contains("端口", ignoreCase = true)) {
                 fiveDigitRegex.find(text)?.value?.toIntOrNull()?.let {

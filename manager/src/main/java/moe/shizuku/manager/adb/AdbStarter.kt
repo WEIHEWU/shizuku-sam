@@ -4,6 +4,7 @@ import android.Manifest.permission.WRITE_SECURE_SETTINGS
 import android.content.Context
 import android.content.pm.PackageManager
 import android.provider.Settings
+import android.util.Log
 import android.widget.Toast
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -19,6 +20,7 @@ import moe.shizuku.manager.service.WatchdogService
 import moe.shizuku.manager.starter.Starter
 import moe.shizuku.manager.utils.EnvironmentUtils
 import moe.shizuku.manager.utils.ShizukuStateMachine
+import moe.shizuku.manager.utils.StartupCoordinator
 import rikka.shizuku.Shizuku
 import java.io.EOFException
 import java.io.File
@@ -54,8 +56,31 @@ object AdbStarter {
         }
     }
 
-    suspend fun startAdb(context: Context, port: Int, log: ((String) -> Unit)? = null) {
+    suspend fun startAdb(
+        context: Context,
+        port: Int,
+        log: ((String) -> Unit)? = null
+    ) = startAdb(context, "127.0.0.1", port, log)
+
+    suspend fun startAdb(
+        context: Context,
+        host: String?,
+        port: Int,
+        log: ((String) -> Unit)? = null
+    ) {
         if (port !in 1..65535) return
+        var activeHost = AdbPortProber.resolveConnectHost(host)
+        if (!LocalNetworkGate.checkOrSkip(
+                caller = "AdbStarter.startAdb",
+                port = port,
+                context = context,
+                host = activeHost
+            )
+        ) {
+            val msg = "本地网络权限未授予，已跳过连接无线调试地址 $activeHost:$port"
+            log?.invoke("$msg\n")
+            throw LocalNetworkGate.LocalNetworkPermissionException(msg)
+        }
 
         suspend fun AdbClient.runCommand(cmd: String) {
             command(cmd) { log?.invoke(String(it)) }
@@ -63,7 +88,7 @@ object AdbStarter {
 
         try {
             ShizukuStateMachine.set(ShizukuStateMachine.State.STARTING)
-            log?.invoke("Starting with wireless adb in port $port...\n")
+            log?.invoke("Starting with wireless adb ($activeHost:$port)...\n")
 
             withContext(Dispatchers.IO) {
                 val key = runCatching {
@@ -77,14 +102,18 @@ object AdbStarter {
                 val tcpMode = ShizukuSettings.getTcpMode()
                 val tcpPort = ShizukuSettings.getTcpPort()
                 if (tcpMode && activePort != tcpPort && tcpPort in 1..65535) {
-                    log?.invoke("Connecting on port $activePort...")
-                    AdbClient("127.0.0.1", activePort, key).use { client ->
+                    StartupCoordinator.recordConnectTarget(activeHost, activePort, "AdbStarter.tcpSwitch")
+                    Log.i("AdbStarter", "Connecting to $activeHost:$activePort for tcpip:$tcpPort switch")
+                    log?.invoke("Connecting to $activeHost:$activePort...\n")
+                    AdbClient(activeHost, activePort, key).use { client ->
                         connectWithRetry(client)
-                        log?.invoke("Successfully connected on port $activePort...\nRestarting in TCP mode port: $tcpPort\n")
+                        log?.invoke("Connected to $activeHost:$activePort, restarting in TCP mode port: $tcpPort\n")
                         activePort = tcpPort
+                        activeHost = "127.0.0.1"
                         runCatching { client.command("tcpip:$activePort") }
                             .onFailure { if (it !is EOFException && it !is SocketException) throw it }
                     }
+                    delay(250)
                 }
 
                 // Only ask an existing root (uid 0) server to exit via fast Binder IPC so
@@ -94,11 +123,14 @@ object AdbStarter {
                     delay(150)
                 }
 
-                log?.invoke("Connecting on port $activePort...\n")
-                AdbClient("127.0.0.1", activePort, key).use { client ->
+                StartupCoordinator.recordConnectTarget(activeHost, activePort, "AdbStarter.startAdb")
+                Log.i("AdbStarter", "Connecting to $activeHost:$activePort to launch starter")
+                log?.invoke("Connecting to $activeHost:$activePort...\n")
+                AdbClient(activeHost, activePort, key).use { client ->
                     connectWithRetry(client)
-                    log?.invoke("Successfully connected on port $activePort...\n")
+                    log?.invoke("Successfully connected to $activeHost:$activePort\n")
                     client.runCommand("shell:${Starter.internalCommand}")
+                    ShizukuSettings.setLastHost(activeHost)
                     ShizukuSettings.setLastPort(activePort)
                     ShizukuSettings.setLastLaunchMode(ShizukuSettings.LaunchMethod.ADB)
                     ShizukuSettings.setLastSettledStateRunning(true)
@@ -129,8 +161,19 @@ object AdbStarter {
         }
     }
 
-    suspend fun stopTcp(context: Context, port: Int) {
+    suspend fun stopTcp(context: Context, port: Int, host: String? = "127.0.0.1") {
         if (port !in 1..65535) return
+        val targetHost = AdbPortProber.resolveConnectHost(host)
+        if (!LocalNetworkGate.checkOrSkip(
+                caller = "AdbStarter.stopTcp",
+                port = port,
+                context = context,
+                isBackground = true,
+                host = targetHost
+            )
+        ) {
+            return
+        }
         runCatching {
             val cr = context.contentResolver
             if (context.checkSelfPermission(WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED) {
@@ -144,7 +187,8 @@ object AdbStarter {
             ShizukuStateMachine.set(ShizukuStateMachine.State.STOPPING)
             val key = AdbKey(PreferenceAdbKeyStore(ShizukuSettings.getPreferences()), "shizuku")
             withContext(Dispatchers.IO) {
-                AdbClient("127.0.0.1", port, key).use { client ->
+                Log.i("AdbStarter", "Connecting to $targetHost:$port to stop TCP mode")
+                AdbClient(targetHost, port, key).use { client ->
                     connectWithRetry(client)
                     client.command("usb:")
                 }
@@ -178,7 +222,9 @@ object AdbStarter {
                 )
                 break
             } catch (e: Exception) {
-                if (attempt == maxAttempts || e is CancellationException) throw e
+                if (e is LocalNetworkGate.LocalNetworkPermissionException || e is CancellationException || attempt == maxAttempts) {
+                    throw e
+                }
             }
         }
     }

@@ -38,7 +38,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import moe.shizuku.manager.utils.StartupCoordinator
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -163,7 +165,11 @@ class HomeActions(
     val onNightWakeupGuardClick: () -> Unit = {},
     val onCalibrateLtpoAdaptiveClick: () -> Unit = {},
     val onSelectAppForGameAuto: ((onSelected: (packageName: String, label: String) -> Unit) -> Unit) = {},
+    val onManualAddGamePackages: ((onAdded: (packageName: String, label: String) -> Unit) -> Unit) = {},
     val onStaticGameIntervention: (packageName: String, enable: Boolean) -> Unit = { _, _ -> },
+    val onRequestLocalNetPermissionClick: () -> Unit = {},
+    val onStopAutoRetryClick: () -> Unit = {},
+    val onResumeAutoRetryClick: () -> Unit = {},
     val onApplyQuickDozeConfig: (enabled: Boolean, minutes: Int, noMaintenance: Boolean, onResult: (Boolean, String) -> Unit) -> Unit = { _, _, _, _ -> },
     val onReadQuickDozeStatus: (onResult: (String) -> Unit) -> Unit = { _ -> },
     val onRunAppLaunchBoostAction: (actionType: Int, onResult: (Boolean, String) -> Unit) -> Unit = { _, _ -> },
@@ -1163,6 +1169,26 @@ private fun MiuixGameAutoConfigDialog(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+            val isShellPrivilegeReady = remember(show, packages.size, enabled) {
+                runCatching { MaxHzShell.isReady() }.getOrDefault(false)
+            }
+            if (!isShellPrivilegeReady) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (isDark) Color(0x26F59E0B) else Color(0xFFFFFBEB))
+                        .padding(12.dp)
+                ) {
+                    Text(
+                        text = "服务未运行也可先配置游戏名单与独立档位，Shizuku / Root 服务就绪后将自动生效。",
+                        fontSize = 12.sp,
+                        lineHeight = 17.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = if (isDark) Color(0xFFFCD34D) else Color(0xFFB45309)
+                    )
+                }
+            }
             if (!isInstantSwitchActive) {
                 Box(
                     modifier = Modifier
@@ -1398,7 +1424,7 @@ private fun MiuixGameAutoConfigDialog(
                     )
                 }
                 TextButton(
-                    text = "+ 添加游戏应用",
+                    text = "+ 添加游戏",
                     colors = ButtonDefaults.textButtonColorsPrimary(),
                     onClick = {
                         actions.onSelectAppForGameAuto { pkg, _ ->
@@ -1413,12 +1439,29 @@ private fun MiuixGameAutoConfigDialog(
                             actions.onSyncStates()
                         }
                     },
-                    modifier = Modifier.weight(1.3f)
+                    modifier = Modifier.weight(1.15f)
+                )
+                TextButton(
+                    text = "包名添加",
+                    onClick = {
+                        actions.onManualAddGamePackages { pkg, _ ->
+                            MaxHzPrefs.addGameAutoPerformancePackage(context, pkg)
+                            if (!enabled) {
+                                enabled = true
+                                MaxHzPrefs.setGameAutoPerformanceEnabled(context, true)
+                            }
+                            packages = MaxHzPrefs.gameAutoPerformancePackages(context).sorted()
+                            profileMap = MaxHzPrefs.gameAutoPackageProfiles(context)
+                            actions.onStaticGameIntervention(pkg, true)
+                            actions.onSyncStates()
+                        }
+                    },
+                    modifier = Modifier.weight(0.95f)
                 )
                 TextButton(
                     text = "完成",
                     onClick = onDismiss,
-                    modifier = Modifier.weight(0.8f)
+                    modifier = Modifier.weight(0.75f)
                 )
             }
         }
@@ -2070,6 +2113,7 @@ private fun HeroCard(
     val apiVersion = status?.apiVersion ?: 0
     val patchVersion = status?.patchVersion ?: 0
     val runningModeName = if (isRoot) "Root" else "ADB"
+    val coordinatorSnap by StartupCoordinator.state.collectAsState()
 
     GlassCard(
         modifier = Modifier
@@ -2174,7 +2218,7 @@ private fun HeroCard(
                                 .background(pillFg)
                         )
                         Text(
-                            text = if (ok) "$runningModeName · v$apiVersion.$patchVersion" else "待激活",
+                            text = if (ok) "$runningModeName · v$apiVersion.$patchVersion" else coordinatorSnap.phase.label,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = pillFg
@@ -2281,6 +2325,27 @@ private fun HeroCard(
                         )
                     }
                 } else {
+                    if (coordinatorSnap.phase == StartupCoordinator.Phase.WAITING_FOR_PERMISSION ||
+                        coordinatorSnap.phase == StartupCoordinator.Phase.FAILED ||
+                        coordinatorSnap.phase == StartupCoordinator.Phase.RETRY_PAUSED
+                    ) {
+                        val hintText = when (coordinatorSnap.phase) {
+                            StartupCoordinator.Phase.WAITING_FOR_PERMISSION ->
+                                "Android 17 本地网络保护（LNP）需授予「本地网络」权限后才能连接无线调试地址，已暂停后台自动连接。"
+                            StartupCoordinator.Phase.RETRY_PAUSED ->
+                                "已手动停止后台自动重连（点击下方按钮可随时手动启动）。"
+                            else ->
+                                "${coordinatorSnap.lastFailureReason.label}${if (coordinatorSnap.autoRetryCount > 0) " · 自动重连 ${coordinatorSnap.autoRetryCount}/${coordinatorSnap.maxAutoRetries}" else ""}"
+                        }
+                        Text(
+                            text = hintText,
+                            fontSize = 12.sp,
+                            lineHeight = 16.5.sp,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            modifier = Modifier.padding(bottom = 10.dp)
+                        )
+                    }
+
                     GlassPillButton(
                         text = stringResource(R.string.home_btn_adb_start),
                         isDark = isDark,
@@ -2288,6 +2353,37 @@ private fun HeroCard(
                         onClick = actions.onWirelessStartClick,
                         modifier = Modifier.fillMaxWidth()
                     )
+
+                    if (coordinatorSnap.phase == StartupCoordinator.Phase.WAITING_FOR_PERMISSION) {
+                        Spacer(Modifier.height(8.dp))
+                        GlassPillButton(
+                            text = "一次性授予本地网络权限",
+                            isDark = isDark,
+                            style = GlassButtonStyle.Regular,
+                            onClick = actions.onRequestLocalNetPermissionClick,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    } else if (!coordinatorSnap.retryStoppedByUser &&
+                        (coordinatorSnap.phase == StartupCoordinator.Phase.STARTING || coordinatorSnap.autoRetryCount > 0)
+                    ) {
+                        Spacer(Modifier.height(8.dp))
+                        GlassPillButton(
+                            text = "停止后台自动重连",
+                            isDark = isDark,
+                            style = GlassButtonStyle.Regular,
+                            onClick = actions.onStopAutoRetryClick,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    } else if (coordinatorSnap.retryStoppedByUser) {
+                        Spacer(Modifier.height(8.dp))
+                        GlassPillButton(
+                            text = "恢复后台自动重连",
+                            isDark = isDark,
+                            style = GlassButtonStyle.Regular,
+                            onClick = actions.onResumeAutoRetryClick,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
             }
         }

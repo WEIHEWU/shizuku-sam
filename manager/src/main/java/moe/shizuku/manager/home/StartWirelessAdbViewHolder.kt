@@ -22,6 +22,7 @@ import moe.shizuku.manager.Helps
 import moe.shizuku.manager.R
 import moe.shizuku.manager.adb.AdbPairingTutorialActivity
 import moe.shizuku.manager.adb.AdbPortProber
+import moe.shizuku.manager.adb.LocalNetworkGate
 import moe.shizuku.manager.databinding.HomeItemContainerBinding
 import moe.shizuku.manager.databinding.HomeStartWirelessAdbBinding
 import moe.shizuku.manager.ktx.toHtml
@@ -74,6 +75,17 @@ class StartWirelessAdbViewHolder(binding: HomeStartWirelessAdbBinding, root: Vie
 
     private fun onAdbClicked(context: Context) {
         val activity = runCatching { context.asActivity<FragmentActivity>() }.getOrNull()
+        if (activity is HomeActivity) {
+            activity.triggerWirelessAdbStartFromUser()
+            return
+        }
+
+        if (!LocalNetworkGate.checkOrSkip("StartWirelessAdbViewHolder.onAdbClicked", -1, context)) {
+            if (activity != null) {
+                LocalNetworkGate.showSettingsGuideDialog(activity)
+            }
+            return
+        }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !EnvironmentUtils.isAdbEnabled()) {
             val intent = Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).apply {
@@ -94,10 +106,10 @@ class StartWirelessAdbViewHolder(binding: HomeStartWirelessAdbBinding, root: Vie
 
         val scope = activity?.lifecycleScope
 
-        val launchAction: (Int) -> Unit = { port ->
+        val launchAction: (String, Int) -> Unit = { host, port ->
             val intent = Intent(context, StarterActivity::class.java).apply {
                 putExtra(StarterActivity.EXTRA_IS_ROOT, false)
-                putExtra(StarterActivity.EXTRA_HOST, "127.0.0.1")
+                putExtra(StarterActivity.EXTRA_HOST, host)
                 putExtra(StarterActivity.EXTRA_PORT, port)
             }
             context.startActivity(intent)
@@ -105,17 +117,17 @@ class StartWirelessAdbViewHolder(binding: HomeStartWirelessAdbBinding, root: Vie
 
         if (scope == null) {
             val port = EnvironmentUtils.getAdbTcpPort().takeIf { it > 0 } ?: 5555
-            launchAction(port)
+            launchAction("127.0.0.1", port)
             return
         }
 
         scope.launch {
-            val activePort = withContext(Dispatchers.IO) {
-                AdbPortProber.findActiveLoopbackPort(context, 120)
+            val activeEndpoint = withContext(Dispatchers.IO) {
+                AdbPortProber.findActiveEndpoint(context, 120, caller = "StartWirelessAdbViewHolder")
             }
 
-            if (activePort > 0) {
-                launchAction(activePort)
+            if (activeEndpoint != null && activeEndpoint.second > 0) {
+                launchAction("127.0.0.1", activeEndpoint.second)
                 return@launch
             }
 
@@ -125,16 +137,22 @@ class StartWirelessAdbViewHolder(binding: HomeStartWirelessAdbBinding, root: Vie
             }
 
             val port = EnvironmentUtils.getAdbTcpPort().takeIf { it > 0 } ?: 5555
-            launchAction(port)
+            launchAction("127.0.0.1", port)
         }
     }
 
     @RequiresApi(Build.VERSION_CODES.R)
     private fun onPairClicked(context: Context) {
+        val activity = runCatching { context.asActivity<FragmentActivity>() }.getOrNull()
+        if (activity is HomeActivity) {
+            activity.triggerWirelessAdbPairFromUser()
+            return
+        }
         if ((context.display?.displayId ?: -1) > 0) {
-            // Running in a multi-display environment (e.g., Windows Subsystem for Android),
-            // pairing dialog can be displayed simultaneously with Shizuku.
-            // Input from notification is harder to use under this situation.
+            if (!LocalNetworkGate.checkOrSkip("StartWirelessAdbViewHolder.onPairClicked", -1, context)) {
+                if (activity != null) LocalNetworkGate.showSettingsGuideDialog(activity)
+                return
+            }
             AdbPairDialogFragment().show(context.asActivity<FragmentActivity>().supportFragmentManager)
         } else {
             context.startActivity(Intent(context, AdbPairingTutorialActivity::class.java))

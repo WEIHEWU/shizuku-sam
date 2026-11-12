@@ -119,9 +119,21 @@ object EnvironmentUtils {
     fun isWifiRequired(context: Context? = null): Boolean {
         if (ShizukuSettings.getTcpMode()) return false
         if (getAdbTcpPort() > 0) return false
-        if (AdbPortProber.isPortOpen(5555, 100)) return false
+        if (!moe.shizuku.manager.adb.LocalNetworkGate.checkOrSkip(
+                caller = "EnvironmentUtils.isWifiRequired",
+                port = 5555,
+                context = context,
+                isBackground = true,
+                host = "127.0.0.1"
+            )
+        ) {
+            return true
+        }
+        if (runCatching { AdbPortProber.isPortOpen(5555, 100, caller = "EnvironmentUtils.isWifiRequired", context = context, isBackground = true) }.getOrDefault(false)) {
+            return false
+        }
         val lastPort = ShizukuSettings.getLastPort()
-        if (lastPort in 1..65535 && AdbPortProber.isPortOpen(lastPort, 100)) {
+        if (lastPort in 1..65535 && runCatching { AdbPortProber.isPortOpen(lastPort, 100, caller = "EnvironmentUtils.isWifiRequired", context = context, isBackground = true) }.getOrDefault(false)) {
             return false
         }
         return true
