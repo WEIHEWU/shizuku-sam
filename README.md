@@ -6,10 +6,7 @@
 </p>
 
 <p align="center">
-  <a href="./README.md">简体中文</a> | <a href="./README.en.md">English</a> | <a href="https://github.com/WEIHEWU/shizuku-sam/releases/latest"><b>⬇️ 下载最新正式版 (v13.8.23)</b></a>
-</p>
-
----
+  <a href="./README.md">简体中文</a> | <a href="./README.en.md">English</a> | <a 
 
 ## 📌 项目简介
 
