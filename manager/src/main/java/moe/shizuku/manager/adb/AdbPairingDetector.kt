@@ -177,18 +177,6 @@ object AdbPairingDetector {
     }
 
     private fun executePairing(host: String, port: Int, code: String, service: AccessibilityService) {
-        if (!LocalNetworkGate.checkOrSkip(
-                caller = "AdbPairingDetector.executePairing",
-                port = port,
-                context = service,
-                isBackground = true,
-                host = host
-            )
-        ) {
-            isPairingInProgress = false
-            cancel()
-            return
-        }
         detectorScope.launch {
             val key = try {
                 AdbKey(PreferenceAdbKeyStore(ShizukuSettings.getPreferences()), "shizuku")
@@ -201,8 +189,10 @@ object AdbPairingDetector {
                 return@launch
             }
 
-            val success = AdbPairingClient(host, port, code, key).runCatching {
-                start()
+            val success = runCatching {
+                AdbPairingClient.pairWithFallback(host, port, code, key)
+            }.onFailure { err ->
+                Log.w(TAG, "Auto-pairing handshake failed on $host:$port", err)
             }.getOrDefault(false)
 
             withContext(Dispatchers.Main) {

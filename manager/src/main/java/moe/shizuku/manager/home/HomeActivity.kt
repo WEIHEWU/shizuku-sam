@@ -2023,9 +2023,9 @@ abstract class HomeActivity : MaxHzActivity() {
             return
         }
 
-        localNetRequester.requestIfNeeded(
+        localNetRequester.requestBestEffort(
             caller = "HomeActivity.wirelessStart",
-            onGranted = { proceedWirelessAdbStart() }
+            onProceed = { proceedWirelessAdbStart() }
         )
     }
 
@@ -2088,9 +2088,9 @@ abstract class HomeActivity : MaxHzActivity() {
      */
     private fun handleWirelessAdbPairClick() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            localNetRequester.requestIfNeeded(
+            localNetRequester.requestBestEffort(
                 caller = "HomeActivity.wirelessPair",
-                onGranted = {
+                onProceed = {
                     val hasExternalDisplay = (display?.displayId ?: -1) > 0
                     if (hasExternalDisplay) {
                         AdbPairDialogFragment().show(supportFragmentManager)
@@ -2109,22 +2109,27 @@ abstract class HomeActivity : MaxHzActivity() {
             Toast.makeText(this, R.string.toast_wireless_pairing_requires_android_11, Toast.LENGTH_SHORT).show()
             return
         }
-        AdbPairingDetector.request()
-        if (AdbPairingAccessibilityService.isEnabled(this)) {
-            val intent = Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                putExtra(":settings:fragment_args_key", "toggle_adb_wireless")
+        localNetRequester.requestBestEffort(
+            caller = "HomeActivity.autoPairingAssistant",
+            onProceed = {
+                AdbPairingDetector.request()
+                if (AdbPairingAccessibilityService.isEnabled(this)) {
+                    val intent = Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                        putExtra(":settings:fragment_args_key", "toggle_adb_wireless")
+                    }
+                    try {
+                        startActivity(intent)
+                        Toast.makeText(this, R.string.toast_auto_pairing_ready, Toast.LENGTH_LONG).show()
+                    } catch (e: ActivityNotFoundException) {
+                        AdbPairingDetector.cancel()
+                        Toast.makeText(this, R.string.toast_dev_settings_failed, Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    AccessibilityHelper.openPairingAssistantSettings(this)
+                }
             }
-            try {
-                startActivity(intent)
-                Toast.makeText(this, R.string.toast_auto_pairing_ready, Toast.LENGTH_LONG).show()
-            } catch (e: ActivityNotFoundException) {
-                AdbPairingDetector.cancel()
-                Toast.makeText(this, R.string.toast_dev_settings_failed, Toast.LENGTH_SHORT).show()
-            }
-        } else {
-            AccessibilityHelper.openPairingAssistantSettings(this)
-        }
+        )
     }
 
     private fun handleStartAdbClick() {

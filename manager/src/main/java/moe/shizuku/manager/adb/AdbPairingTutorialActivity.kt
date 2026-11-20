@@ -239,23 +239,12 @@ class AdbPairingTutorialActivity : AppActivity() {
     }
 
     private val localNetRequester = LocalNetworkGate.Requester(this)
-    private var permissionRequestedOnceInSession = false
 
-    private fun startPairingService(userInitiated: Boolean = false) {
-        if (LocalNetworkGate.hasPermission(this)) {
-            doStartPairingService()
-            return
-        }
-        if (userInitiated || !permissionRequestedOnceInSession) {
-            permissionRequestedOnceInSession = true
-            localNetRequester.requestIfNeeded(
-                caller = "AdbPairingTutorialActivity.startPairingService",
-                onGranted = { doStartPairingService() },
-                onDenied = { LocalNetworkGate.showSettingsGuideDialog(this) }
-            )
-        } else {
-            LocalNetworkGate.checkOrSkip("AdbPairingTutorialActivity.onResume(alreadyPrompted)", -1, this)
-        }
+    private fun startPairingService() {
+        localNetRequester.requestBestEffort(
+            caller = "AdbPairingTutorialActivity.startPairingService",
+            onProceed = { doStartPairingService() }
+        )
     }
 
     private fun doStartPairingService() {
@@ -886,7 +875,7 @@ private fun MiuixManualPairingDialog(
                                 return@launch
                             }
                             val result = runCatching {
-                                AdbPairingClient(detectedHost, port, codeText, key).start()
+                                AdbPairingClient.pairWithFallback(detectedHost, port, codeText, key)
                             }
                             withContext(Dispatchers.Main) {
                                 isPairing = false

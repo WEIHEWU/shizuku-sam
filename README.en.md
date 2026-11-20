@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <a href="./README.md">简体中文</a> | <a href="./README.en.md">English</a> | <a href="https://github.com/WEIHEWU/shizuku-sam/releases/latest"><b>⬇️ Download Latest Release (v13.8.23)</b></a>
+  <a href="./README.md">简体中文</a> | <a href="./README.en.md">English</a>
 </p>
 
 ---
@@ -15,19 +15,23 @@
 
 **Shizuku Sam** integrates the **Shizuku privileged service** with a purpose-built **Samsung Galaxy (One UI) system scheduler & hardware enhancer, background & deep sleep controller, and per-app refresh rate rule manager** in a single cohesive application.
 
-The entire app (Level 1, Level 2, Level 3 screens, and all dialogs) is unified under the **Miuix (`top.yukonga.miuix.kmp`) UI system**, a **3-tab Liquid Glass floating dock (`Shizuku` · `Hardware` · `App Rules`)**, **One UI 9 Unified Modal Architecture (100% modal sheet representation for secondary and tertiary menus + in-modal smooth slide navigation, persistent home dashboard and floating dock without flicker)**, and **on-demand subtitle toggles (clean single-line titles by default + long-press any row/card to toggle its explanation in place + a `显示说明 / 隐藏说明` pill button on every section/page header)**. Every section, card title, switch, and secondary screen listed below corresponds 1:1 with the actual `v13.8.23` app UI, with 100% full adaptation for **Samsung One UI 9 / Android 17**.
+The entire app (Level 1, Level 2, Level 3 screens, and all dialogs) is unified under the **Miuix (`top.yukonga.miuix.kmp`) UI system**, a **3-tab Liquid Glass floating dock (`Shizuku` · `Hardware` · `App Rules`)**, **One UI 9 Unified Modal Architecture (100% modal sheet representation for secondary and tertiary menus + in-modal smooth slide navigation, persistent home dashboard and floating dock without flicker)**, and **on-demand subtitle toggles (clean single-line titles by default + long-press any row/card to toggle its explanation in place + a `显示说明 / 隐藏说明` pill button on every section/page header)**. Every section, card title, switch, and secondary screen listed below corresponds 1:1 with the actual `v13.8.43` app UI, with deep adaptation for **Samsung One UI 9 / Android 17**.
 
 ---
 
-## 🚀 What's New in `v13.8.23`
+## 🚀 What's New in `v13.8.43`
 
-1. **Fixed Crash Loop Upon Enabling "Game Auto High-Hz Boost" (`MaxHzService.kt`)**:
-   - Fixed fatal defect where `MaxHzService` omitted calling `createNotificationChannel()` during foreground service initialization, causing the system server to throw an uncaught `CannotPostForegroundServiceNotificationException` and crash the app;
-   - Added dual-channel registration guards in `onCreate()` and `updateForegroundState()`, and strictly passed `FOREGROUND_SERVICE_TYPE_DATA_SYNC` conforming to Android 10+ / 14+ specifications.
-2. **In-App GitHub Update Checker & One-Tap Direct Upgrade (from v13.8.22)**:
-   - Added `Check for Updates` and `Auto-Check for Updates on Launch` with real-time download progress and dual-mode silent / system installation.
-3. **Fixed Battery Voltage Reading `0 mV` When Unplugged (from v13.8.21)**:
-   - Anchored `dumpsys battery` field regexes to line start and added kernel sysfs fallback.
+1. **Fixed Wireless ADB Pairing Failure After In-Place Updates (e.g., `v13.8.41` → `v13.8.43`)**:
+   - Removed overly strict hard blocks in `LocalNetworkGate` across foreground pairing and user-initiated ADB launch flows, shifting to a single best-effort foreground prompt while preserving background silent-poll gating—preventing pairing deadlocks caused by retained `DENIED / USER_FIXED` permission states across `targetSdk 37 -> 36` updates;
+   - Added best-effort permission prompting to the "Hands-Free Auto Pairing" (`免输入自动配对助手`) entry point and introduced `AdbPairingClient.pairWithFallback()` with a 3-second connect timeout and automatic fallback to `127.0.0.1` when a LAN IP fails;
+   - Fixed address selection mismatch between `AdbMdns.isLoopbackCompat()` and `hostAddressCompat()`, and eliminated an early `stopSelf()` foreground-service boundary issue in `AdbPairingService`.
+2. **Starter Modal Overhaul, Android 17 LNP Alignment & Decoupled Game Picker (`v13.8.42`)**:
+   - Redesigned the `StarterActivity` modal with content-adaptive height and an explicit 18s binder timeout failure view (`Retry` / `Copy Logs` / `Close` / `Retry 5555`);
+   - Aligned `targetSdk` to `36` (with `compileSdk 37`), added `StartupCoordinator` single-flight retry backoff and in-app "System Environment & Connection Diagnostics" log export;
+   - Decoupled the Game Mode app picker from service running state—supporting offline game list editing, package-name search, and manual package-name addition (`包名添加`).
+3. **Core Stability & System Safeguards (`v13.8.24` ~ `v13.8.41`)**:
+   - **Root Boot Auto-Start & Watchdog Self-Healing (`v13.8.41`)**: Early-boot `su` readiness retries (up to 8 attempts), `BootCompleteReceiver` `goAsync()` protection, and automatic Watchdog recovery;
+   - **System Guards & Instant UX (`v13.8.27` ~ `v13.8.40`)**: Titanium Liquid Glass architecture with 0ms reactive theme switching, 0ms authorized apps dialog, persistent Accessibility self-healing, and safeguards preventing unintended DPI/resolution changes or USB debugging auto-reopen.
 
 ---
 
@@ -71,8 +75,9 @@ The entire app (Level 1, Level 2, Level 3 screens, and all dialogs) is unified u
   - **`Game Mode Auto Switch`**: Master switch **`Enable Game Auto Switch`**; detects foreground games to apply target performance and restores your pre-game daily snapshot upon exit.
   - **`Default In-Game Target Mode`**: Choose **`System Default`** / **`Adaptive Saver High-Hz`** / **`Game Performance Mode`** as the global fallback for games without a custom override.
   - **`Background Hold Duration`**: Choose **`30s`** / **`60s (Recommended)`** / **`120s`**.
-  - **`Game List` (`v13.8.2` Per-Game Target Profile Override)**:
-    - Action buttons: **`Add Game`**, **`Add to Quick Settings`** (adds the Game Mode QS Tile), and **`Clear List`**;
+  - **`Game List` (Offline Editing, Manual Package Addition & Per-Game Profile Override)**:
+    - Even when Shizuku / Root is not running, you can open the app picker, search by app label or package name, add packages manually via **Add by Package Name** (`包名添加`), and configure per-game target profiles (applied automatically once privileged service starts);
+    - Action buttons: **`+ Add Game`**, **`Add by Package Name`**, **`Add to Quick Settings`** (adds the Game Mode QS Tile), and **`Clear List`**;
     - Each game row includes a dedicated mode pill (**`System Default ▾`** / **`Performance Mode ▾`** / **`Saver High-Hz ▾`**) to assign a per-game target profile:
       1. **`Follow Global Default`**
       2. **`System Default (Lift Saver Throttle · Cool)`** (ideal when daily mode is `Adaptive Saver`—lifts Battery Saver CPU throttling for lightweight games without excess heat)
@@ -138,18 +143,14 @@ The entire app (Level 1, Level 2, Level 3 screens, and all dialogs) is unified u
   - **`Startup & Persistence`**: `Start on boot (root)`, `Watchdog service`, `Keep ADB TCP mode after wireless start`, `ADB TCP port`.
   - **`Appearance & Theme`**: `Dark theme` (Follow system / Always on / Always off), `Black night theme` (Pure black OLED), `Use system theme color` (Android 12+).
   - **`Language & Internationalization`**: Switch app display language.
+  - **`Updates & System Diagnostics`**: Includes `Check for Updates`, `Auto-Check for Updates on Launch`, and `System Environment & Connection Diagnostics` (inspects local network permission status, actual `host:port` endpoint, port probing, state machine & retry counters, with one-tap diagnostic log copy).
 
 ---
 
-## 📦 Download & Build
+## 📦 Build from Source
 
-### Prebuilt APK
-Download the latest signed release APK from **[GitHub Releases](https://github.com/WEIHEWU/shizuku-sam/releases/latest)**:
-- Latest Release: **[`Shizuku-Sam-v13.8.21.apk`](https://github.com/WEIHEWU/shizuku-sam/releases/download/v13.8.21/Shizuku-Sam-v13.8.21.apk)** (also archived under [`releases/`](./releases/))
-
-### Build from Source
 - **JDK**: Java 21
-- **Android SDK**: `compileSdk 37` / `targetSdk 37` / `minSdk 26`
+- **Android SDK**: `compileSdk 37` / `targetSdk 36` / `minSdk 26`
 
 ```bash
 git clone https://github.com/WEIHEWU/shizuku-sam.git

@@ -22,7 +22,6 @@ import moe.shizuku.manager.Helps
 import moe.shizuku.manager.R
 import moe.shizuku.manager.adb.AdbPairingTutorialActivity
 import moe.shizuku.manager.adb.AdbPortProber
-import moe.shizuku.manager.adb.LocalNetworkGate
 import moe.shizuku.manager.databinding.HomeItemContainerBinding
 import moe.shizuku.manager.databinding.HomeStartWirelessAdbBinding
 import moe.shizuku.manager.ktx.toHtml
@@ -77,13 +76,6 @@ class StartWirelessAdbViewHolder(binding: HomeStartWirelessAdbBinding, root: Vie
         val activity = runCatching { context.asActivity<FragmentActivity>() }.getOrNull()
         if (activity is HomeActivity) {
             activity.triggerWirelessAdbStartFromUser()
-            return
-        }
-
-        if (!LocalNetworkGate.checkOrSkip("StartWirelessAdbViewHolder.onAdbClicked", -1, context)) {
-            if (activity != null) {
-                LocalNetworkGate.showSettingsGuideDialog(activity)
-            }
             return
         }
 
@@ -149,10 +141,6 @@ class StartWirelessAdbViewHolder(binding: HomeStartWirelessAdbBinding, root: Vie
             return
         }
         if ((context.display?.displayId ?: -1) > 0) {
-            if (!LocalNetworkGate.checkOrSkip("StartWirelessAdbViewHolder.onPairClicked", -1, context)) {
-                if (activity != null) LocalNetworkGate.showSettingsGuideDialog(activity)
-                return
-            }
             AdbPairDialogFragment().show(context.asActivity<FragmentActivity>().supportFragmentManager)
         } else {
             context.startActivity(Intent(context, AdbPairingTutorialActivity::class.java))

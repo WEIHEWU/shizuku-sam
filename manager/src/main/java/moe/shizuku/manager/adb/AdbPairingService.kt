@@ -92,19 +92,6 @@ class AdbPairingService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == startAction || intent?.action == replyAction) {
-            if (!LocalNetworkGate.checkOrSkip(
-                    caller = "AdbPairingService.${intent.action}",
-                    port = -1,
-                    context = this,
-                    isBackground = true
-                )
-            ) {
-                stopForeground(STOP_FOREGROUND_REMOVE)
-                stopSelf()
-                return START_NOT_STICKY
-            }
-        }
         val notification = when (intent?.action) {
             startAction -> {
                 onStart()
@@ -191,8 +178,8 @@ class AdbPairingService : Service() {
             }
 
             Log.i(tag, "Initiating pairing with endpoint $host:$port")
-            AdbPairingClient(host, port, code, key).runCatching {
-                start()
+            runCatching {
+                AdbPairingClient.pairWithFallback(host, port, code, key)
             }.onFailure {
                 handleResult(false, it)
             }.onSuccess {

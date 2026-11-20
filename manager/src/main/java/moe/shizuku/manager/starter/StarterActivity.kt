@@ -136,16 +136,13 @@ class StarterActivity : AppActivity() {
     private fun triggerStart(forceRetry: Boolean = false, overridePort: Int? = null) {
         if (serviceReadyState.value) return
         val isRoot = viewModel.isRootMode
-        if (!isRoot && !LocalNetworkGate.hasPermission(this)) {
+        if (!isRoot) {
             errorState.value = null
             isStartingState.value = true
-            localNetRequester.requestIfNeeded(
+            localNetRequester.requestBestEffort(
                 caller = "StarterActivity",
-                onGranted = {
+                onProceed = {
                     viewModel.start(forceRetry = forceRetry, overridePort = overridePort)
-                },
-                onDenied = {
-                    viewModel.failWithMissingLocalNetworkPermission()
                 }
             )
             return

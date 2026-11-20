@@ -7,6 +7,7 @@ import com.android.org.conscrypt.Conscrypt
 import java.io.Closeable
 import java.io.DataInputStream
 import java.io.DataOutputStream
+import java.net.InetSocketAddress
 import java.net.Socket
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -201,11 +202,15 @@ class AdbPairingClient(private val host: String, private val port: Int, private 
     }
 
     private fun setupTlsConnection() {
-        if (!LocalNetworkGate.checkOrSkip(caller = "AdbPairingClient.setupTlsConnection", port = port, host = host)) {
-            throw LocalNetworkGate.LocalNetworkPermissionException("本地网络权限未授予，已跳过配对连接 $host:$port")
-        }
+        LocalNetworkGate.checkOrSkip(
+            caller = "AdbPairingClient.setupTlsConnection",
+            port = port,
+            host = host,
+            isBackground = false
+        )
         Log.i(TAG, "Connecting pairing TLS socket -> $host:$port")
-        socket = Socket(host, port)
+        socket = Socket()
+        socket.connect(InetSocketAddress(host, port), 3_000)
         socket.tcpNoDelay = true
 
         val sslContext = key.sslContext
@@ -316,5 +321,25 @@ class AdbPairingClient(private val host: String, private val port: Int, private 
 
         @JvmStatic
         external fun available(): Boolean
+
+        fun pairWithFallback(host: String, port: Int, pairCode: String, key: AdbKey): Boolean {
+            val normalizedHost = host.trim().ifBlank { "127.0.0.1" }
+            return try {
+                AdbPairingClient(normalizedHost, port, pairCode, key).use { it.start() }
+            } catch (e: AdbInvalidPairingCodeException) {
+                throw e
+            } catch (e: AdbKeyException) {
+                throw e
+            } catch (e: Throwable) {
+                if (LocalNetworkGate.isLoopbackHost(normalizedHost)) {
+                    throw e
+                }
+                Log.w(
+                    TAG,
+                    "Pairing to $normalizedHost:$port failed (${e.javaClass.simpleName}: ${e.message}), retrying on 127.0.0.1:$port"
+                )
+                AdbPairingClient("127.0.0.1", port, pairCode, key).use { it.start() }
+            }
+        }
     }
 }

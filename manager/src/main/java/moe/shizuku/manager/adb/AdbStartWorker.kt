@@ -176,12 +176,22 @@ class AdbStartWorker(
                     )
                     return Result.failure()
                 }
+                if (isBackground && !LocalNetworkGate.checkOrSkip(
+                        caller = "AdbStartWorker.mDNS",
+                        port = -1,
+                        context = applicationContext,
+                        isBackground = true,
+                        requiresLocalNetwork = true
+                    )
+                ) {
+                    return Result.failure()
+                }
                 callbackFlow {
                     val adbMdns = AdbMdns(applicationContext, AdbMdns.TLS_CONNECT, Observer { (_, p) ->
                         if (p > 0) {
                             trySend("127.0.0.1" to p)
                         }
-                    })
+                    }, isBackground = isBackground)
 
                         var awaitingAuth = false
                         var timeoutJob: Job? = null

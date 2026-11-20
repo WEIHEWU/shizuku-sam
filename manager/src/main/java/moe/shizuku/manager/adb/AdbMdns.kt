@@ -16,15 +16,28 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.IOException
 import java.net.Inet4Address
+import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.NetworkInterface
 import java.net.ServerSocket
 
 @RequiresApi(Build.VERSION_CODES.R)
 class AdbMdns(
-    private val context: Context, private val serviceType: String,
+    private val context: Context,
+    private val serviceType: String,
     private val observer: Observer<Pair<String, Int>>
 ) {
+
+    private var isBackground: Boolean = false
+
+    constructor(
+        context: Context,
+        serviceType: String,
+        observer: Observer<Pair<String, Int>>,
+        isBackground: Boolean
+    ) : this(context, serviceType, observer) {
+        this.isBackground = isBackground
+    }
 
     private var registered = false
     private var running = false
@@ -52,6 +65,7 @@ class AdbMdns(
                 caller = "AdbMdns.start($serviceType)",
                 port = -1,
                 context = context,
+                isBackground = isBackground,
                 requiresLocalNetwork = true
             )
         ) {
@@ -145,6 +159,7 @@ class AdbMdns(
                             caller = "AdbMdns.restart($serviceType)",
                             port = -1,
                             context = context,
+                            isBackground = isBackground,
                             requiresLocalNetwork = true
                         )
                     ) {
@@ -186,24 +201,23 @@ class AdbMdns(
         }
     }
 
-    private fun NsdServiceInfo.hostAddressCompat(): String? {
+    private fun NsdServiceInfo.preferredAddressCompat(): InetAddress? {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            (hostAddresses.firstOrNull { !it.isLoopbackAddress && it is Inet4Address }
+            hostAddresses.firstOrNull { !it.isLoopbackAddress && it is Inet4Address }
                 ?: hostAddresses.firstOrNull { !it.isLoopbackAddress }
-                ?: hostAddresses.firstOrNull())?.hostAddress
+                ?: hostAddresses.firstOrNull()
         } else {
             @Suppress("DEPRECATION")
-            host?.hostAddress
+            host
         }
     }
 
+    private fun NsdServiceInfo.hostAddressCompat(): String? {
+        return preferredAddressCompat()?.hostAddress
+    }
+
     private fun NsdServiceInfo.isLoopbackCompat(): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            hostAddresses.firstOrNull()?.isLoopbackAddress == true
-        } else {
-            @Suppress("DEPRECATION")
-            host?.isLoopbackAddress == true
-        }
+        return preferredAddressCompat()?.isLoopbackAddress == true
     }
 
     internal class DiscoveryListener(private val adbMdns: AdbMdns) : NsdManager.DiscoveryListener {

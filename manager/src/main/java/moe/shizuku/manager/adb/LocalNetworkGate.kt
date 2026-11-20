@@ -79,18 +79,12 @@ object LocalNetworkGate {
         return normalized == "127.0.0.1" || normalized == "::1" || normalized == "localhost"
     }
 
-    private fun isDiscoveryOrPairingCaller(caller: String): Boolean {
-        return caller.startsWith("AdbMdns.start") ||
-            caller.startsWith("AdbMdns.restart") ||
-            caller.startsWith("AdbPairing") ||
-            caller.contains("Pair", ignoreCase = true) ||
-            caller == "AdbDialogFragment.onDialogShow"
-    }
-
     /**
      * 收窄后的本地网络门控：
-     * - 仅对 `NsdManager` 服务发现、`TLS_PAIRING` 配对、或目标为非回环 LAN 地址的连接检查 LNP 权限；
-     * - 目标 `host` 为 `127.0.0.1` 或 `::1` 的回环直连与后台自愈入口一律直接放行。
+     * - 前台用户主动触发的配对/启动路径（`isBackground == false`）只记录诊断日志、绝不硬阻断，
+     *   避免由高 targetSdk 覆盖更新降级或历史拒绝态导致无线配对死锁；
+     * - 后台静默路径（`isBackground == true`）仅对 `NsdManager` 服务发现或非回环 LAN 目标地址检查 LNP 权限，
+     *   未授权时跳过发现以避免后台反复弹出系统设备选择器；目标为 `127.0.0.1` / `::1` 的纯回环连接一律放行。
      */
     fun checkOrSkip(
         caller: String,
@@ -100,10 +94,22 @@ object LocalNetworkGate {
         host: String = "127.0.0.1",
         requiresLocalNetwork: Boolean = false
     ): Boolean {
-        val needsGate = requiresLocalNetwork || !isLoopbackHost(host) || isDiscoveryOrPairingCaller(caller)
+        val needsGate = requiresLocalNetwork || !isLoopbackHost(host)
         if (!needsGate || hasPermission(context)) return true
 
         val perm = requiredPermission() ?: "UNKNOWN"
+        if (!isBackground) {
+            Log.w(
+                TAG,
+                "PROCEED_FOREGROUND reason=LNP_NOT_GRANTED_NON_BLOCKING perm=$perm caller=$caller host=$host port=$port"
+            )
+            StartupCoordinator.recordLog(
+                "LOCAL_NET_GATE",
+                "PROCEED_FG perm=$perm caller=$caller host=$host port=$port"
+            )
+            return true
+        }
+
         Log.w(
             TAG,
             "SKIP_CONNECT reason=LNP_PERMISSION_NOT_GRANTED perm=$perm caller=$caller host=$host port=$port background=$isBackground"
@@ -144,9 +150,9 @@ object LocalNetworkGate {
         }
 
         val dialog = MaterialAlertDialogBuilder(activity)
-            .setTitle("需要开启本地网络权限")
+            .setTitle("需要开启本地网络 / 附近设备权限")
             .setMessage(
-                "无线调试配对与端口发现需要授予「本地网络 / 附近设备」权限；未授权时系统会拦截本地发现并弹出「选择要连接的设备」。\n\n请前往「应用信息 → 权限」开启权限后再试。"
+                "无线调试配对与端口发现建议授予权限（Android 17 为「本地网络」，Android 16 为「附近的设备」）；未授权时部分机型可能会拦截本地发现并弹出「选择要连接的设备」。\n\n请前往「应用信息 → 权限」开启「本地网络」或「附近的设备」后再试。"
             )
             .setNegativeButton(android.R.string.cancel, null)
             .setPositiveButton("去系统设置开启") { _, _ ->
@@ -171,12 +177,16 @@ object LocalNetworkGate {
 
         private var pendingGranted: (() -> Unit)? = null
         private var pendingDenied: (() -> Unit)? = null
+        private var promptedOnceInSession = false
+        private var strictMode = true
 
         private val launcher: ActivityResultLauncher<String> =
             activity.registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
                 val effectivelyGranted = isGranted && hasPermission(activity)
+                val isStrict = strictMode
                 val grantCb = pendingGranted
                 val denyCb = pendingDenied
+                strictMode = true
                 pendingGranted = null
                 pendingDenied = null
                 if (effectivelyGranted) {
@@ -185,11 +195,13 @@ object LocalNetworkGate {
                     grantCb?.invoke()
                 } else {
                     val permanentlyDenied = isPermanentlyDenied(activity)
-                    StartupCoordinator.markWaitingForPermission("${activity.javaClass.simpleName}.onDenied(permanent=$permanentlyDenied)")
-                    StartupCoordinator.recordLog("LOCAL_NET_GATE", "Runtime permission DENIED in ${activity.javaClass.simpleName} (permanent=$permanentlyDenied)")
+                    if (isStrict) {
+                        StartupCoordinator.markWaitingForPermission("${activity.javaClass.simpleName}.onDenied(permanent=$permanentlyDenied)")
+                    }
+                    StartupCoordinator.recordLog("LOCAL_NET_GATE", "Runtime permission DENIED in ${activity.javaClass.simpleName} (permanent=$permanentlyDenied, strict=$isStrict)")
                     if (denyCb != null) {
                         denyCb.invoke()
-                    } else {
+                    } else if (isStrict) {
                         showSettingsGuideDialog(activity)
                     }
                 }
@@ -205,6 +217,7 @@ object LocalNetworkGate {
                 onGranted()
                 return
             }
+            strictMode = true
             pendingGranted = onGranted
             pendingDenied = onDenied
             StartupCoordinator.recordLog("LOCAL_NET_GATE", "Requesting runtime permission ($perm) from user action caller=$caller")
@@ -212,9 +225,39 @@ object LocalNetworkGate {
                 launcher.launch(perm)
             }.onFailure { err ->
                 Log.w(TAG, "Failed to launch permission request", err)
+                strictMode = true
                 pendingGranted = null
                 pendingDenied = null
                 if (onDenied != null) onDenied() else showSettingsGuideDialog(activity)
+            }
+        }
+
+        /**
+         * Best-effort 单次请求：同一界面会话最多弹一次系统授权框；无论授权与否都放行 `onProceed`，
+         * 保证升级后存在残留拒绝态或回环直连的用户仍能正常完成配对与启动。
+         */
+        fun requestBestEffort(
+            caller: String,
+            onProceed: () -> Unit
+        ) {
+            val perm = requiredPermission()
+            if (perm == null || hasPermission(activity) || promptedOnceInSession) {
+                onProceed()
+                return
+            }
+            promptedOnceInSession = true
+            strictMode = false
+            pendingGranted = onProceed
+            pendingDenied = onProceed
+            StartupCoordinator.recordLog("LOCAL_NET_GATE", "Best-effort runtime permission ($perm) caller=$caller")
+            runCatching {
+                launcher.launch(perm)
+            }.onFailure { err ->
+                Log.w(TAG, "Failed to launch best-effort permission request", err)
+                strictMode = true
+                pendingGranted = null
+                pendingDenied = null
+                onProceed()
             }
         }
     }

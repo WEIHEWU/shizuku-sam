@@ -26,7 +26,6 @@ import moe.shizuku.manager.R
 import moe.shizuku.manager.ShizukuSettings
 import moe.shizuku.manager.adb.AdbMdns
 import moe.shizuku.manager.adb.AdbPortProber
-import moe.shizuku.manager.adb.LocalNetworkGate
 import moe.shizuku.manager.databinding.AdbDialogBinding
 import moe.shizuku.manager.starter.StarterActivity
 import moe.shizuku.manager.utils.EnvironmentUtils
@@ -88,17 +87,6 @@ class AdbDialogFragment : DialogFragment() {
 
     private fun onDialogShow(dialog: AlertDialog) {
         val context = dialog.context
-        if (!LocalNetworkGate.checkOrSkip("AdbDialogFragment.onDialogShow", -1, context)) {
-            binding.tvSearchStatus.text = "尚未授予「本地网络」权限，已暂停扫描以避免系统反复弹出设备选择框。\n请点击下方按钮前往应用权限页开启「本地网络」后再试。"
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).apply {
-                text = "去系统设置开启"
-                setOnClickListener {
-                    LocalNetworkGate.openAppPermissionSettings(context)
-                    dismissAllowingStateLoss()
-                }
-            }
-            return
-        }
         adbMdns.start()
 
         val isDark = (context.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
@@ -158,7 +146,6 @@ class AdbDialogFragment : DialogFragment() {
         // 持续轮询候选回环端口（127.0.0.1），只要发现开放端口立即秒连
         loopbackJob = lifecycleScope.launch(Dispatchers.IO) {
             while (isActive) {
-                if (!LocalNetworkGate.hasPermission(context)) break
                 val candidateEndpoint = AdbPortProber.findActiveEndpoint(
                     context = context,
                     timeoutMs = 150,
