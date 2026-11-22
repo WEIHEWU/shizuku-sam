@@ -15,20 +15,19 @@
 
 **Shizuku Sam** integrates the **Shizuku privileged service** with a purpose-built **Samsung Galaxy (One UI) system scheduler & hardware enhancer, background & deep sleep controller, and per-app refresh rate rule manager** in a single cohesive application.
 
-The entire app (Level 1, Level 2, Level 3 screens, and all dialogs) is unified under the **Miuix (`top.yukonga.miuix.kmp`) UI system**, a **3-tab Liquid Glass floating dock (`Shizuku` · `Hardware` · `App Rules`)**, **One UI 9 Unified Modal Architecture (100% modal sheet representation for secondary and tertiary menus + in-modal smooth slide navigation, persistent home dashboard and floating dock without flicker)**, and **on-demand subtitle toggles (clean single-line titles by default + long-press any row/card to toggle its explanation in place + a `显示说明 / 隐藏说明` pill button on every section/page header)**. Every section, card title, switch, and secondary screen listed below corresponds 1:1 with the actual `v13.8.43` app UI, with deep adaptation for **Samsung One UI 9 / Android 17**.
+The entire app (Level 1, Level 2, Level 3 screens, and all dialogs) is unified under the **Miuix (`top.yukonga.miuix.kmp`) UI system**, a **3-tab Liquid Glass floating dock (`Shizuku` · `Hardware` · `App Rules`)**, **One UI 9 Unified Modal Architecture (100% modal sheet representation for secondary and tertiary menus + in-modal smooth slide navigation, persistent home dashboard and floating dock without flicker)**, and **on-demand subtitle toggles (clean single-line titles by default + long-press any row/card to toggle its explanation in place + a `显示说明 / 隐藏说明` pill button on every section/page header)**. Every section, card title, switch, and secondary screen listed below corresponds 1:1 with the actual `v13.8.44` app UI, with deep adaptation for **Samsung One UI 9 / Android 17**.
 
 ---
 
-## 🚀 What's New in `v13.8.43`
+## 🚀 What's New in `v13.8.44`
 
-1. **Fixed Wireless ADB Pairing Failure After In-Place Updates (e.g., `v13.8.41` → `v13.8.43`)**:
-   - Removed overly strict hard blocks in `LocalNetworkGate` across foreground pairing and user-initiated ADB launch flows, shifting to a single best-effort foreground prompt while preserving background silent-poll gating—preventing pairing deadlocks caused by retained `DENIED / USER_FIXED` permission states across `targetSdk 37 -> 36` updates;
-   - Added best-effort permission prompting to the "Hands-Free Auto Pairing" (`免输入自动配对助手`) entry point and introduced `AdbPairingClient.pairWithFallback()` with a 3-second connect timeout and automatic fallback to `127.0.0.1` when a LAN IP fails;
-   - Fixed address selection mismatch between `AdbMdns.isLoopbackCompat()` and `hostAddressCompat()`, and eliminated an early `stopSelf()` foreground-service boundary issue in `AdbPairingService`.
-2. **Starter Modal Overhaul, Android 17 LNP Alignment & Decoupled Game Picker (`v13.8.42`)**:
-   - Redesigned the `StarterActivity` modal with content-adaptive height and an explicit 18s binder timeout failure view (`Retry` / `Copy Logs` / `Close` / `Retry 5555`);
-   - Aligned `targetSdk` to `36` (with `compileSdk 37`), added `StartupCoordinator` single-flight retry backoff and in-app "System Environment & Connection Diagnostics" log export;
-   - Decoupled the Game Mode app picker from service running state—supporting offline game list editing, package-name search, and manual package-name addition (`包名添加`).
+1. **Aligned Wireless ADB Pairing & mDNS Discovery with Upstream `ShizukuPlus` & `Shizuku-Next` (`v13.8.44`)**:
+   - **Fixed infinite "Searching for wireless debugging service" hang**: Removed `context.mainExecutor` from `AdbMdns` `resolveService()` (which caused `NetworkOnMainThreadException` when probing via `Socket.connect()` on Android 14+) and moved resolution verification to background `NsdManager` + `Dispatchers.IO` threads with non-network `ServerSocket.bind` checks supporting both loopback and LAN interfaces;
+   - **Added serial `resolveQueue` & 3-tier local address matching**: Implemented `resolveQueue` serialization + `FAILURE_ALREADY_ACTIVE` retry (matching upstream `ShizukuPlus` & `Shizuku-Next`), plus 3-tier `isDeviceAddress()` (`ConnectivityManager.getLinkProperties` -> `NetworkInterface` -> `TLS_PAIRING` local subnet fallback) for background pairing on Android 15/16/17 (One UI);
+   - **Fixed loopback-first priority & split-screen/pop-up lifecycle**: Updated `AdbPairingClient.pairWithFallback()`, `AdbStarter`, and `AdbPortProber` to prioritize `"127.0.0.1"` first with resolved interface fallback, and prevented `onResume()` / `onDestroy()` from prematurely cancelling Accessibility auto-pairing or the pairing notification service in split-screen / pop-up mode.
+2. **Startup & Permission Hardening (`v13.8.42` ~ `v13.8.43`)**:
+   - Removed overly strict foreground hard blocks in `LocalNetworkGate` to prevent pairing deadlocks after in-place updates;
+   - Redesigned `StarterActivity` modal with adaptive height and 18s timeout failure actions, aligned `targetSdk` to `36` (with `compileSdk 37`), added `StartupCoordinator` single-flight retry backoff, and enabled offline Game List editing with manual package addition.
 3. **Core Stability & System Safeguards (`v13.8.24` ~ `v13.8.41`)**:
    - **Root Boot Auto-Start & Watchdog Self-Healing (`v13.8.41`)**: Early-boot `su` readiness retries (up to 8 attempts), `BootCompleteReceiver` `goAsync()` protection, and automatic Watchdog recovery;
    - **System Guards & Instant UX (`v13.8.27` ~ `v13.8.40`)**: Titanium Liquid Glass architecture with 0ms reactive theme switching, 0ms authorized apps dialog, persistent Accessibility self-healing, and safeguards preventing unintended DPI/resolution changes or USB debugging auto-reopen.

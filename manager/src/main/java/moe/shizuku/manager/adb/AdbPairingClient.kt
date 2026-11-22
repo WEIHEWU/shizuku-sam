@@ -323,22 +323,22 @@ class AdbPairingClient(private val host: String, private val port: Int, private 
         external fun available(): Boolean
 
         fun pairWithFallback(host: String, port: Int, pairCode: String, key: AdbKey): Boolean {
-            val normalizedHost = host.trim().ifBlank { "127.0.0.1" }
+            val normalizedHost = host.trim()
             return try {
-                AdbPairingClient(normalizedHost, port, pairCode, key).use { it.start() }
+                AdbPairingClient("127.0.0.1", port, pairCode, key).use { it.start() }
             } catch (e: AdbInvalidPairingCodeException) {
                 throw e
             } catch (e: AdbKeyException) {
                 throw e
             } catch (e: Throwable) {
-                if (LocalNetworkGate.isLoopbackHost(normalizedHost)) {
+                if (normalizedHost.isBlank() || LocalNetworkGate.isLoopbackHost(normalizedHost)) {
                     throw e
                 }
                 Log.w(
                     TAG,
-                    "Pairing to $normalizedHost:$port failed (${e.javaClass.simpleName}: ${e.message}), retrying on 127.0.0.1:$port"
+                    "Pairing to 127.0.0.1:$port failed (${e.javaClass.simpleName}: ${e.message}), retrying on $normalizedHost:$port"
                 )
-                AdbPairingClient("127.0.0.1", port, pairCode, key).use { it.start() }
+                AdbPairingClient(normalizedHost, port, pairCode, key).use { it.start() }
             }
         }
     }

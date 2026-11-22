@@ -15,20 +15,19 @@
 
 **Shizuku Sam** 将原生 **Shizuku 特权服务** 与专为三星 Galaxy（One UI）定制的 **系统调度与硬件增强、后台与深度休眠、分应用刷新率规则** 整合为一体。
 
-全应用（一级页面、二级页面、三级页面及所有弹窗）全面统一采用 **Miuix (`top.yukonga.miuix.kmp`) 界面组件体系**、**底部三栏毛玻璃悬浮导航（`Shizuku` · `性能硬件` · `应用规则`）**、**One UI 9 统一模态架构（二级/三级菜单 100% 弹窗浮层化 + 弹窗内平滑推入导航，主仪表盘与底部 Dock 永驻不闪烁）** 以及 **按需展开说明交互（默认单行极简主标题 + 长按单行展开/收起说明 + 顶部 `显示说明 / 隐藏说明` 胶囊开关）**。以下所有卡片名称、开关文案、按钮与二级页面均与当前 `v13.8.43` 真实界面逐字对应，并深度适配 **Samsung One UI 9 / Android 17**。
+全应用（一级页面、二级页面、三级页面及所有弹窗）全面统一采用 **Miuix (`top.yukonga.miuix.kmp`) 界面组件体系**、**底部三栏毛玻璃悬浮导航（`Shizuku` · `性能硬件` · `应用规则`）**、**One UI 9 统一模态架构（二级/三级菜单 100% 弹窗浮层化 + 弹窗内平滑推入导航，主仪表盘与底部 Dock 永驻不闪烁）** 以及 **按需展开说明交互（默认单行极简主标题 + 长按单行展开/收起说明 + 顶部 `显示说明 / 隐藏说明` 胶囊开关）**。以下所有卡片名称、开关文案、按钮与二级页面均与当前 `v13.8.44` 真实界面逐字对应，并深度适配 **Samsung One UI 9 / Android 17**。
 
 ---
 
-## 🚀 最新版本亮点 (`v13.8.43`)
+## 🚀 最新版本亮点 (`v13.8.44`)
 
-1. **修复从旧版（如 `v13.8.41`）覆盖更新后无线调试无法配对的问题 (`v13.8.43`)**：
-   - 解除前台配对与无线调试启动链路中对 `LocalNetworkGate` 的过度硬拦截，改为「前台仅做单次 best-effort 权限申请 + 后台静默轮询保持门控」，彻底避免 `targetSdk 37 -> 36` 覆盖升级后因系统保留历史 `DENIED / USER_FIXED` 状态导致配对死锁；
-   - 补齐「免输入自动配对助手」入口的单次权限引导，并在 `AdbPairingClient.pairWithFallback()` 中新增 3 秒连接超时与局域网 IP 失败自动回退 `127.0.0.1` 机制；
-   - 修复 `AdbMdns.isLoopbackCompat()` 与 `hostAddressCompat()` 选取地址不一致，以及 `AdbPairingService` 前台服务未调用 `startForeground()` 即退出的边界问题。
-2. **启动弹窗重构、Android 17 LNP 对齐与游戏名单解耦 (`v13.8.42`)**：
-   - 重构「启动程序」弹窗为内容自适应高度与 18 秒超时失败态（支持「重试 / 复制日志 / 关闭 / 重试 5555」）；
-   - 将 `targetSdk` 对齐上游收敛至 `36`（保留 `compileSdk 37`），通过 `StartupCoordinator` 实现后台自动重连单飞防重与指数退避，并在设置新增「系统环境与连接诊断」日志导出；
-   - 解除「游戏名单」与服务运行状态的强绑定，未启动 Shizuku/Root 时也可直接搜索并配置名单与独立档位，并新增「包名添加」手动录入入口。
+1. **全面对齐上游 `ShizukuPlus` / `Shizuku-Next` 修复无线调试配对与服务搜索卡死问题 (`v13.8.44`)**：
+   - **彻底解决「正在搜索无线调试服务」永远卡死**：移除 `AdbMdns` 在 Android 14+ 使用 `context.mainExecutor` 时触发主线程 `Socket.connect()` 导致 `NetworkOnMainThreadException` 的缺陷；改为统一使用 `NsdManager` 后台解析线程 + `Dispatchers.IO` 异步校验，并通过安全 `ServerSocket` 占用探测兼容回环与本机非回环网卡；
+   - **补齐 mDNS 串行解析队列与三层本机地址校验**：引入 `resolveQueue` 串行队列及 `FAILURE_ALREADY_ACTIVE` 重试机制防止丢包；引入 `ConnectivityManager.getLinkProperties` → `NetworkInterface` → `TLS_PAIRING` 内网地址三层校验，解决 Android 15/16/17（尤其是 One UI）后台搜不到配对服务的问题；
+   - **修复配对优先级与分屏/小窗误取消**：将 `AdbPairingClient.pairWithFallback()`、`AdbStarter` 及 `AdbPortProber` 调整为「`127.0.0.1` 优先 + 非回环真实网卡兜底」，并解除 `onResume()`/`onDestroy()` 在三星分屏与小窗模式下对无障碍自动配对及配对通知服务的误取消。
+2. **启动与权限兼容修复 (`v13.8.42` ~ `v13.8.43`)**：
+   - 解除前台配对与启动链路中对 `LocalNetworkGate` 的过度硬拦截，避免高版本覆盖升级后因历史拒绝态导致的配对死锁；
+   - 重构「启动程序」弹窗为内容自适应高度与 18 秒超时失败态，将 `targetSdk` 收敛至 `36`（保留 `compileSdk 37`），通过 `StartupCoordinator` 实现后台重连指数退避，并支持游戏名单离线配置与「包名添加」。
 3. **核心稳定性与系统级增强 (`v13.8.24` ~ `v13.8.41`)**：
    - **Root 开机自启与 Watchdog 自愈 (`v13.8.41`)**：优化开机初期 `su` 守护进程就绪重试（最多 8 次）、`BootCompleteReceiver` `goAsync()` 异步保障与服务自愈拉起；
    - **系统安全护栏与瞬时交互 (`v13.8.27` ~ `v13.8.40`)**：全链路钛金属液态玻璃视觉与 0ms 即时主题切换、已授权应用 0ms 秒开管理、无障碍服务常驻保活、杜绝误改系统 DPI/分辨率及自动重开 USB 调试。

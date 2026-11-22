@@ -70,9 +70,8 @@ object AdbPairingDetector {
     }
 
     fun cancelIfReturnedToApp() {
-        val reqAt = requestedAtElapsed
-        if (reqAt > 0L && android.os.SystemClock.elapsedRealtime() - reqAt > 1_500L && !isPairingInProgress) {
-            Log.i(TAG, "User returned to Shizuku without pairing; disarming auto-pairing session")
+        if (rikka.shizuku.Shizuku.pingBinder()) {
+            Log.i(TAG, "Shizuku binder is active on return; disarming auto-pairing session")
             cancel()
         }
     }

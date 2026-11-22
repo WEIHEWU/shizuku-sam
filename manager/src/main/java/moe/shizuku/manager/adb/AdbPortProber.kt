@@ -96,21 +96,36 @@ object AdbPortProber {
         isBackground: Boolean = false
     ): Pair<String, Int>? {
         if (port !in 1..65535) return null
-        val targetHost = resolveConnectHost(preferredHost)
-        if (!LocalNetworkGate.checkOrSkip(
-                caller = caller,
-                port = port,
-                context = context,
-                isBackground = isBackground,
-                host = targetHost
-            )
-        ) {
-            return null
+
+        val candidates = ArrayList<String>(3)
+        candidates.add("127.0.0.1")
+        val preferred = preferredHost?.trim().orEmpty()
+        if (preferred.isNotEmpty() && preferred != "127.0.0.1") {
+            candidates.add(preferred)
+        }
+        if (!isBackground) {
+            val lanIp = findOwnLanAddress()?.trim().orEmpty()
+            if (lanIp.isNotEmpty() && lanIp !in candidates) {
+                candidates.add(lanIp)
+            }
         }
 
-        if (probeAddress(targetHost, port, timeoutMs)) {
-            Log.d(TAG, "PROBE_HIT caller=$caller endpoint=$targetHost:$port")
-            return targetHost to port
+        for (targetHost in candidates) {
+            if (!LocalNetworkGate.checkOrSkip(
+                    caller = caller,
+                    port = port,
+                    context = context,
+                    isBackground = isBackground,
+                    host = targetHost
+                )
+            ) {
+                continue
+            }
+
+            if (probeAddress(targetHost, port, timeoutMs)) {
+                Log.d(TAG, "PROBE_HIT caller=$caller endpoint=$targetHost:$port")
+                return targetHost to port
+            }
         }
         return null
     }
@@ -123,7 +138,7 @@ object AdbPortProber {
             }
         } catch (_: IOException) {
             false
-        } catch (_: Exception) {
+        } catch (_: Throwable) {
             false
         }
     }

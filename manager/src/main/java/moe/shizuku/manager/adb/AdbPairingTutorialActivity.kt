@@ -216,10 +216,7 @@ class AdbPairingTutorialActivity : AppActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (launchedDeveloperOptions) {
-            launchedDeveloperOptions = false
-            AdbPairingDetector.cancelIfReturnedToApp()
-        }
+        launchedDeveloperOptions = false
 
         val newNotificationEnabled = isNotificationEnabled()
         notificationEnabledState.value = newNotificationEnabled
@@ -230,10 +227,12 @@ class AdbPairingTutorialActivity : AppActivity() {
 
     override fun onDestroy() {
         if (isFinishing) {
-            if (!launchedDeveloperOptions) {
+            if (!launchedDeveloperOptions && rikka.shizuku.Shizuku.pingBinder()) {
                 AdbPairingDetector.cancel()
             }
-            runCatching { startService(AdbPairingService.stopIntent(this)) }
+            if (rikka.shizuku.Shizuku.pingBinder()) {
+                runCatching { startService(AdbPairingService.stopIntent(this)) }
+            }
         }
         super.onDestroy()
     }

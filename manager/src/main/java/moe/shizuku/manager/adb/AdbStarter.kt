@@ -99,15 +99,16 @@ object AdbStarter {
                 }
 
                 var activePort = port
+                val initialCandidates = buildCandidateHosts(host)
                 val tcpMode = ShizukuSettings.getTcpMode()
                 val tcpPort = ShizukuSettings.getTcpPort()
                 if (tcpMode && activePort != tcpPort && tcpPort in 1..65535) {
                     StartupCoordinator.recordConnectTarget(activeHost, activePort, "AdbStarter.tcpSwitch")
-                    Log.i("AdbStarter", "Connecting to $activeHost:$activePort for tcpip:$tcpPort switch")
+                    Log.i("AdbStarter", "Connecting to $initialCandidates:$activePort for tcpip:$tcpPort switch")
                     log?.invoke("Connecting to $activeHost:$activePort...\n")
-                    AdbClient(activeHost, activePort, key).use { client ->
-                        connectWithRetry(client)
-                        log?.invoke("Connected to $activeHost:$activePort, restarting in TCP mode port: $tcpPort\n")
+                    val (tcpClient, connectedSwitchHost) = connectWithHostFallback(initialCandidates, activePort, key, log)
+                    tcpClient.use { client ->
+                        log?.invoke("Connected to $connectedSwitchHost:$activePort, restarting in TCP mode port: $tcpPort\n")
                         activePort = tcpPort
                         activeHost = "127.0.0.1"
                         runCatching { client.command("tcpip:$activePort") }
@@ -123,14 +124,16 @@ object AdbStarter {
                     delay(150)
                 }
 
+                val launchCandidates = if (activePort == port) initialCandidates else buildCandidateHosts(activeHost)
                 StartupCoordinator.recordConnectTarget(activeHost, activePort, "AdbStarter.startAdb")
-                Log.i("AdbStarter", "Connecting to $activeHost:$activePort to launch starter")
-                log?.invoke("Connecting to $activeHost:$activePort...\n")
-                AdbClient(activeHost, activePort, key).use { client ->
-                    connectWithRetry(client)
-                    log?.invoke("Successfully connected to $activeHost:$activePort\n")
-                    client.runCommand("shell:${Starter.internalCommand}")
-                    ShizukuSettings.setLastHost(activeHost)
+                Log.i("AdbStarter", "Connecting to $launchCandidates:$activePort to launch starter")
+                log?.invoke("Connecting to ${launchCandidates.first()}:$activePort...\n")
+                val (client, connectedHost) = connectWithHostFallback(launchCandidates, activePort, key, log)
+                client.use { adbClient ->
+                    activeHost = connectedHost
+                    log?.invoke("Successfully connected to $connectedHost:$activePort\n")
+                    adbClient.runCommand("shell:${Starter.internalCommand}")
+                    ShizukuSettings.setLastHost(connectedHost)
                     ShizukuSettings.setLastPort(activePort)
                     ShizukuSettings.setLastLaunchMode(ShizukuSettings.LaunchMethod.ADB)
                     ShizukuSettings.setLastSettledStateRunning(true)
@@ -187,10 +190,11 @@ object AdbStarter {
             ShizukuStateMachine.set(ShizukuStateMachine.State.STOPPING)
             val key = AdbKey(PreferenceAdbKeyStore(ShizukuSettings.getPreferences()), "shizuku")
             withContext(Dispatchers.IO) {
-                Log.i("AdbStarter", "Connecting to $targetHost:$port to stop TCP mode")
-                AdbClient(targetHost, port, key).use { client ->
-                    connectWithRetry(client)
-                    client.command("usb:")
+                val stopCandidates = buildCandidateHosts(targetHost)
+                Log.i("AdbStarter", "Connecting to $stopCandidates:$port to stop TCP mode")
+                val (client, _) = connectWithHostFallback(stopCandidates, port, key)
+                client.use { adbClient ->
+                    adbClient.command("usb:")
                 }
             }
         }.onFailure {
@@ -207,25 +211,56 @@ object AdbStarter {
         }
     }
 
-    private suspend fun connectWithRetry(client: AdbClient) {
+    private fun buildCandidateHosts(preferredHost: String?): List<String> {
+        val candidates = ArrayList<String>(3)
+        candidates.add("127.0.0.1")
+        val trimmed = preferredHost?.trim().orEmpty()
+        if (trimmed.isNotEmpty() && trimmed != "127.0.0.1") {
+            candidates.add(trimmed)
+        }
+        val lanIp = AdbPortProber.findOwnLanAddress()?.trim().orEmpty()
+        if (lanIp.isNotEmpty() && lanIp !in candidates) {
+            candidates.add(lanIp)
+        }
+        return candidates
+    }
+
+    private suspend fun connectWithHostFallback(
+        candidateHosts: List<String>,
+        port: Int,
+        key: AdbKey,
+        log: ((String) -> Unit)? = null
+    ): Pair<AdbClient, String> {
         var delayTime = 500L
         val maxAttempts = 8
+        var lastError: Throwable? = null
         for (attempt in 1..maxAttempts) {
-            try {
-                if (attempt > 1) {
-                    delay(delayTime)
-                    delayTime = (delayTime * 1.5).toLong().coerceAtMost(3000L) // Exponential backoff up to 3s
-                }
-                client.connect(
-                    onKeyOffered = { keyOfferInFlight = true },
-                    onKeyOfferDone = { keyOfferInFlight = false }
-                )
-                break
-            } catch (e: Exception) {
-                if (e is LocalNetworkGate.LocalNetworkPermissionException || e is CancellationException || attempt == maxAttempts) {
-                    throw e
+            if (attempt > 1) {
+                delay(delayTime)
+                delayTime = (delayTime * 1.5).toLong().coerceAtMost(3000L) // Exponential backoff up to 3s
+            }
+            for (candidateHost in candidateHosts) {
+                val client = AdbClient(candidateHost, port, key)
+                try {
+                    client.connect(
+                        onKeyOffered = { keyOfferInFlight = true },
+                        onKeyOfferDone = { keyOfferInFlight = false }
+                    )
+                    return client to candidateHost
+                } catch (e: Throwable) {
+                    runCatching { client.close() }
+                    if (e is CancellationException) throw e
+                    if (e is LocalNetworkGate.LocalNetworkPermissionException && candidateHosts.size == 1) {
+                        throw e
+                    }
+                    lastError = e
+                    Log.d("AdbStarter", "Attempt $attempt failed for $candidateHost:$port (${e.javaClass.simpleName}: ${e.message})")
+                    if (attempt == 1 && candidateHosts.size > 1 && candidateHost != candidateHosts.last()) {
+                        log?.invoke("Fallback connecting to alternate local interface...\n")
+                    }
                 }
             }
         }
+        throw (lastError ?: IllegalStateException("Failed to connect to port $port"))
     }
 }
