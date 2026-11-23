@@ -25,10 +25,12 @@ import moe.shizuku.manager.utils.StartupCoordinator
 import rikka.shizuku.Shizuku
 import java.io.File
 import java.net.ConnectException
+import java.util.concurrent.atomic.AtomicBoolean
 
 object AdbStarter {
 
     private val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val enableTcpInFlight = AtomicBoolean(false)
 
     @Volatile
     var keyOfferInFlight: Boolean = false
@@ -56,11 +58,30 @@ object AdbStarter {
         }
     }
 
-    private fun execRootCommand(cmd: Array<String>): Boolean {
+    private fun execRootLines(vararg lines: String): Shell.Result? {
         return try {
-            Shell.cmd(*cmd).exec().isSuccess
+            Shell.cmd(*lines).exec()
         } catch (_: Throwable) {
-            false
+            null
+        }
+    }
+
+    private fun waitPortOpen(port: Int, maxWaitMs: Long, stepMs: Long = 200L): Boolean {
+        val deadline = System.currentTimeMillis() + maxWaitMs
+        while (System.currentTimeMillis() < deadline) {
+            if (AdbPortProber.isPortOpen(port, 200)) return true
+            try {
+                Thread.sleep(stepMs)
+            } catch (_: InterruptedException) {
+                return AdbPortProber.isPortOpen(port, 200)
+            }
+        }
+        return AdbPortProber.isPortOpen(port, 200)
+    }
+
+    fun enableAdbTcpAsync(port: Int = 5555) {
+        backgroundScope.launch {
+            enableAdbTcp(port)
         }
     }
 
@@ -72,37 +93,54 @@ object AdbStarter {
         if (port !in 1..65535) return false
         if (runCatching { Shizuku.pingBinder() && Shizuku.getUid() == 2000 }.getOrDefault(false)) {
             Log.w("AdbStarter", "enableAdbTcp skipped: refusing to restart adbd while uid 2000 shizuku_server is running")
+            StartupCoordinator.recordEvent("TCP_ENABLE", "skip=uid2000 port=$port")
             return false
         }
         if (!Shell.getShell().isRoot) {
             Log.w("AdbStarter", "enableAdbTcp skipped: root shell unavailable")
+            StartupCoordinator.recordEvent("TCP_ENABLE", "skip=no_root port=$port")
             return false
         }
-        return runCatching {
-            val currentPort = EnvironmentUtils.getAdbTcpPort()
-            if (currentPort == port && AdbPortProber.isPortOpen(port, 300)) {
-                execRootCommand(arrayOf("setprop", "persist.adb.tcp.port", port.toString()))
-                return@runCatching true
-            }
-
-            execRootCommand(arrayOf("setprop", "service.adb.tcp.port", port.toString()))
-            execRootCommand(arrayOf("setprop", "persist.adb.tcp.port", port.toString()))
-            execRootCommand(arrayOf("setprop", "adb.network.port", port.toString()))
-
-            val restartViaCtl = execRootCommand(arrayOf("setprop", "ctl.restart", "adbd"))
-            if ((!restartViaCtl || EnvironmentUtils.isSamsung()) && !AdbPortProber.isPortOpen(port, 250)) {
-                val stopped = execRootCommand(arrayOf("stop", "adbd"))
-                if (stopped) {
-                    execRootCommand(arrayOf("start", "adbd"))
-                } else {
-                    execRootCommand(arrayOf("pkill", "adbd"))
+        if (!enableTcpInFlight.compareAndSet(false, true)) {
+            return AdbPortProber.isPortOpen(port, 250)
+        }
+        return try {
+            runCatching {
+                if (AdbPortProber.isPortOpen(port, 250)) {
+                    execRootLines("setprop persist.adb.tcp.port $port")
+                    StartupCoordinator.recordEvent("TCP_ENABLE", "port=$port open=true alreadyOpen=true")
+                    return@runCatching true
                 }
-            }
-            Log.i("AdbStarter", "enableAdbTcp applied for port $port")
-            true
-        }.onFailure {
-            Log.w("AdbStarter", "Failed to enable ADB TCP mode on port $port", it)
-        }.getOrDefault(false)
+
+                val propRes = execRootLines(
+                    "setprop service.adb.tcp.port $port",
+                    "setprop persist.adb.tcp.port $port",
+                    "setprop adb.network.port $port"
+                )
+                val ctlRes = execRootLines("setprop ctl.restart adbd")
+                var isOpen = waitPortOpen(port, maxWaitMs = 800L)
+                var fallbackTried = false
+                var fallbackOk: Boolean? = null
+                if (!isOpen) {
+                    fallbackTried = true
+                    val stopStartRes = execRootLines("stop adbd", "sleep 0.2", "start adbd")
+                    fallbackOk = stopStartRes?.isSuccess
+                    isOpen = waitPortOpen(port, maxWaitMs = 1000L)
+                }
+
+                val svcPort = execRootLines("getprop service.adb.tcp.port")?.out?.firstOrNull()?.trim().orEmpty()
+                val adbdState = execRootLines("getprop init.svc.adbd")?.out?.firstOrNull()?.trim().orEmpty()
+                val summary = "port=$port open=$isOpen propOk=${propRes?.isSuccess} ctlOk=${ctlRes?.isSuccess} fallback=$fallbackTried($fallbackOk) svcPort=$svcPort adbd=$adbdState"
+                Log.i("AdbStarter", "enableAdbTcp result: $summary")
+                StartupCoordinator.recordEvent("TCP_ENABLE", summary)
+                isOpen
+            }.onFailure {
+                Log.w("AdbStarter", "Failed to enable ADB TCP mode on port $port", it)
+                StartupCoordinator.recordEvent("TCP_ENABLE", "port=$port error=${it.javaClass.simpleName}:${it.message}")
+            }.getOrDefault(false)
+        } finally {
+            enableTcpInFlight.set(false)
+        }
     }
 
     suspend fun startAdb(

@@ -680,7 +680,7 @@ private class ViewModel(
                     Shell.cmd(AdbStarter.buildSelfHardeningCommand(appContext)).submit()
                     if (ShizukuSettings.getTcpMode()) {
                         val tcpPort = ShizukuSettings.getTcpPort().takeIf { it in 1..65535 } ?: 5555
-                        runCatching { AdbStarter.enableAdbTcp(tcpPort) }
+                        AdbStarter.enableAdbTcpAsync(tcpPort)
                     }
                     if (ShizukuSettings.getWatchdog()) {
                         runCatching { WatchdogService.start(appContext) }

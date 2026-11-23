@@ -372,6 +372,10 @@ object StartupCoordinator {
         recordLog("CONNECT_TARGET", "endpoint=$endpoint caller=$caller")
     }
 
+    fun recordEvent(tag: String, message: String) {
+        recordLog(tag, message)
+    }
+
     fun recordPortProbe(
         candidates: Collection<Int>,
         hitPort: Int,
