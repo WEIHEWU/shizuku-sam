@@ -93,8 +93,6 @@ private class StarterBinderTimeoutException(message: String) : TimeoutException(
 
 class StarterActivity : AppActivity() {
 
-    private val localNetRequester = LocalNetworkGate.Requester(this)
-
     private val viewModel by viewModels {
         ViewModel(
             this,
@@ -135,17 +133,9 @@ class StarterActivity : AppActivity() {
 
     private fun triggerStart(forceRetry: Boolean = false, overridePort: Int? = null) {
         if (serviceReadyState.value) return
-        val isRoot = viewModel.isRootMode
-        if (!isRoot) {
+        if (!viewModel.isRootMode) {
             errorState.value = null
             isStartingState.value = true
-            localNetRequester.requestBestEffort(
-                caller = "StarterActivity",
-                onProceed = {
-                    viewModel.start(forceRetry = forceRetry, overridePort = overridePort)
-                }
-            )
-            return
         }
         viewModel.start(forceRetry = forceRetry, overridePort = overridePort)
     }

@@ -200,10 +200,12 @@ abstract class HomeActivity : MaxHzActivity() {
             val rootAvail = MaxHzShell.isRootAvailable()
             val wifi = HotspotHelper.isWifiConnected(this@HomeActivity)
             val hotspot = HotspotHelper.isHotspotActive(this@HomeActivity)
+            val port = AdbPortProber.findActiveLoopbackPort(this@HomeActivity)
             withContext(Dispatchers.Main) {
                 isRootAvailableState.value = rootAvail
                 isWifiConnectedState.value = wifi
                 isHotspotActiveState.value = hotspot
+                activeAdbPortState.intValue = port
             }
         }
 
@@ -666,8 +668,7 @@ abstract class HomeActivity : MaxHzActivity() {
             val dialog = MaterialAlertDialogBuilder(this)
                 .setMessage(R.string.dialog_stop_message)
                 .setPositiveButton(android.R.string.ok) { _, _ ->
-                    ShizukuSettings.setLastSettledStateRunning(false)
-                    try { Shizuku.exit() } catch (_: Throwable) {}
+                    performManualStopService()
                 }
                 .setNegativeButton(android.R.string.cancel, null)
                 .create()
@@ -677,8 +678,7 @@ abstract class HomeActivity : MaxHzActivity() {
             applyUnifiedDialogWindowStyle(dialog)
         },
         onConfirmStopService = {
-            ShizukuSettings.setLastSettledStateRunning(false)
-            try { Shizuku.exit() } catch (_: Throwable) {}
+            performManualStopService()
         },
         onModeChange = { mode -> handleModeChange(mode) },
         onTogglePassThrough = { on -> handleTogglePassThrough(on) },
@@ -1956,8 +1956,7 @@ abstract class HomeActivity : MaxHzActivity() {
                                     MaterialAlertDialogBuilder(this@HomeActivity)
                                         .setMessage(R.string.dialog_stop_message)
                                         .setPositiveButton(android.R.string.ok) { _, _ ->
-                                            ShizukuSettings.setLastSettledStateRunning(false)
-                                            try { Shizuku.exit() } catch (_: Throwable) {}
+                                            performManualStopService()
                                         }
                                         .setNegativeButton(android.R.string.cancel, null)
                                         .showUnified()
@@ -2007,10 +2006,20 @@ abstract class HomeActivity : MaxHzActivity() {
         handleWirelessAdbPairClick()
     }
 
+    private fun performManualStopService() {
+        rootAutoStartAttempted = true
+        ShizukuSettings.setLastSettledStateRunning(false)
+        ShizukuStateMachine.set(ShizukuStateMachine.State.STOPPING)
+        StartupCoordinator.stopAutoRetry(this)
+        try {
+            Shizuku.exit()
+        } catch (_: Throwable) {
+        }
+    }
+
     /**
-     * 通过无线调试「启动」服务：Android 11+ 弹 AdbDialogFragment（自动发现 ADB 端口并启动，
-     * 端口可用时点端口号也可直接启动）；旧版本走 TCP 端口直连。
-     * 仅在用户主动点击时请求一次本地网络运行时权限，被拒后引导去系统设置开启。
+     * 通过无线调试「启动」服务：Android 11+ 优先直接探测本地回环可用端口（含离线/5G 下的 5555），
+     * 命中则零门槛直接启动；未命中再按需引导本地网络权限并打开 AdbDialogFragment 搜索。
      */
     private fun handleWirelessAdbStartClick() {
         if (rikka.shizuku.Shizuku.pingBinder()) {
@@ -2023,10 +2032,7 @@ abstract class HomeActivity : MaxHzActivity() {
             return
         }
 
-        localNetRequester.requestBestEffort(
-            caller = "HomeActivity.wirelessStart",
-            onProceed = { proceedWirelessAdbStart() }
-        )
+        proceedWirelessAdbStart()
     }
 
     private fun proceedWirelessAdbStart() {
@@ -2040,35 +2046,43 @@ abstract class HomeActivity : MaxHzActivity() {
         lifecycleScope.launch {
             val detectedPort = activeAdbPortState.intValue
             val isValidDetectedPort = detectedPort > 0
-            val activeEndpoint = withContext(Dispatchers.IO) {
+            val activePort = withContext(Dispatchers.IO) {
                 val detectedHit = if (isValidDetectedPort) {
                     AdbPortProber.probeOpenEndpoint(
                         port = detectedPort,
                         timeoutMs = 200,
                         caller = "HomeActivity.wirelessStart",
                         context = this@HomeActivity
+                    )?.second ?: -1
+                } else -1
+                if (detectedHit > 0) {
+                    detectedHit
+                } else {
+                    AdbPortProber.findActiveLoopbackPort(
+                        context = this@HomeActivity,
+                        timeoutMs = 200,
+                        caller = "HomeActivity.wirelessStart",
+                        isBackground = false,
+                        forceRefresh = true
                     )
-                } else null
-                detectedHit ?: AdbPortProber.findActiveEndpoint(
-                    context = this@HomeActivity,
-                    timeoutMs = 200,
-                    caller = "HomeActivity.wirelessStart",
-                    isBackground = false
-                )
+                }
             }
 
-            if (activeEndpoint != null && activeEndpoint.second > 0) {
+            if (activePort > 0) {
                 val intent = Intent(this@HomeActivity, StarterActivity::class.java).apply {
                     putExtra(StarterActivity.EXTRA_IS_ROOT, false)
                     putExtra(StarterActivity.EXTRA_HOST, "127.0.0.1")
-                    putExtra(StarterActivity.EXTRA_PORT, activeEndpoint.second)
+                    putExtra(StarterActivity.EXTRA_PORT, activePort)
                 }
                 startActivity(intent)
                 return@launch
             }
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                AdbDialogFragment().show(supportFragmentManager)
+                localNetRequester.requestBestEffort(
+                    caller = "HomeActivity.wirelessStartDialog",
+                    onProceed = { AdbDialogFragment().show(supportFragmentManager) }
+                )
                 return@launch
             }
 
@@ -2249,7 +2263,6 @@ abstract class HomeActivity : MaxHzActivity() {
     private fun checkServerStatus() {
         homeModel.reload()
         if (Shizuku.pingBinder()) {
-            rootAutoStartAttempted = false
             appsModel.load()
             if (ShizukuStateMachine.isServerVersionSkewed()) {
                 ShizukuSettings.setServerStartedBuild(moe.shizuku.manager.BuildConfig.VERSION_CODE)
@@ -2280,7 +2293,10 @@ abstract class HomeActivity : MaxHzActivity() {
             if (!Shizuku.pingBinder() && !rootAutoStartAttempted && rootAvail) {
                 val launchMode = ShizukuSettings.getLastLaunchMode()
                 val isKeepBoot = ShizukuSettings.isKeepStartOnBoot()
-                if (launchMode == ShizukuSettings.LaunchMethod.ROOT || (launchMode == ShizukuSettings.LaunchMethod.UNKNOWN && isKeepBoot)) {
+                val shouldAutoStartRoot =
+                    (launchMode == ShizukuSettings.LaunchMethod.ROOT && ShizukuSettings.isLastSettledStateRunning()) ||
+                        (launchMode == ShizukuSettings.LaunchMethod.UNKNOWN && isKeepBoot)
+                if (shouldAutoStartRoot) {
                     rootAutoStartAttempted = true
                     Log.i(AppConstants.TAG, "Auto-launching Shizuku with Root on HomeActivity startup")
                     moe.shizuku.manager.receiver.ShizukuReceiverStarter.start(applicationContext, forceStart = true)
@@ -2320,11 +2336,7 @@ abstract class HomeActivity : MaxHzActivity() {
                 val dialog = MaterialAlertDialogBuilder(this)
                     .setMessage(R.string.dialog_stop_message)
                     .setPositiveButton(android.R.string.ok) { _: DialogInterface?, _: Int ->
-                        ShizukuSettings.setLastSettledStateRunning(false)
-                        try {
-                            Shizuku.exit()
-                        } catch (_: Throwable) {
-                        }
+                        performManualStopService()
                     }
                     .setNegativeButton(android.R.string.cancel, null)
                     .create()

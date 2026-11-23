@@ -66,20 +66,6 @@ class AdbStartWorker(
                 return Result.failure()
             }
 
-            if (!LocalNetworkGate.checkOrSkip(
-                    caller = "AdbStartWorker.doWork",
-                    port = -1,
-                    context = applicationContext,
-                    isBackground = isBackground
-                )
-            ) {
-                return Result.failure()
-            }
-
-            if (!StartupCoordinator.tryBeginStart("ADB", userInitiated = allowEnableWifi, caller = "AdbStartWorker.doWork")) {
-                return Result.failure()
-            }
-
             val cr = applicationContext.contentResolver
 
             if (allowEnableWifi &&
@@ -90,8 +76,7 @@ class AdbStartWorker(
                 }
             }
 
-            // Fast path: if TCP mode is on and the port is already listening, connect directly —
-            // no Wireless Debugging or Wi-Fi required.
+            // Fast path 1: TCP mode / 5555 loopback — works completely offline without Wi-Fi or LNP gates.
             if (ShizukuSettings.getTcpMode()) {
                 val desiredPort = ShizukuSettings.getTcpPort()
                 if (desiredPort in 1..65535) {
@@ -121,10 +106,7 @@ class AdbStartWorker(
             val savedPort = ShizukuSettings.getLastPort()
             val isWifiOk = !EnvironmentUtils.isWifiRequired(applicationContext) || ShizukuSettings.isForceStartWadbEnabled()
 
-            // force_start_wadb fast-path: probe the default ADB TCP port when no port is already
-            // known from the system. Handles devices (e.g. Vivo/FunTouchOS) that block mDNS
-            // multicast — if adbd is already listening via persist.adb.tcp.port from a prior
-            // session, we connect directly without going through mDNS discovery.
+            // Fast path 2: force_start_wadb offline 5555 loopback probe
             if (ShizukuSettings.isForceStartWadbEnabled() && tcpPort <= 0 && savedPort <= 0) {
                 val probePort = ShizukuSettings.getTcpPort().takeIf { it in 1..65535 } ?: 5555
                 val ep = AdbPortProber.probeOpenEndpoint(
@@ -144,6 +126,7 @@ class AdbStartWorker(
                 }
             }
 
+            // Fast path 3: known tcpPort or savedPort open on 127.0.0.1 loopback
             val tcpEndpoint = if (tcpPort > 0 && isWifiOk) {
                 AdbPortProber.probeOpenEndpoint(
                     port = tcpPort,
@@ -164,7 +147,33 @@ class AdbStartWorker(
                 )
             } else null
 
-            val (resolvedHost, port) = tcpEndpoint ?: savedEndpoint ?: run {
+            val directEndpoint = tcpEndpoint ?: savedEndpoint
+            if (directEndpoint != null) {
+                AdbStarter.startAdb(applicationContext, directEndpoint.first, directEndpoint.second)
+                if (!Starter.waitForBinder()) {
+                    throw TimeoutException("等待 Shizuku 服务响应超时 (${directEndpoint.first}:${directEndpoint.second})")
+                }
+                StartupCoordinator.onStartSucceeded("ADB")
+                return Result.success()
+            }
+
+            // mDNS fallback path requires LocalNetworkGate (in background) and coordinator lock
+            if (isBackground && !LocalNetworkGate.checkOrSkip(
+                    caller = "AdbStartWorker.mDNS",
+                    port = -1,
+                    context = applicationContext,
+                    isBackground = true,
+                    requiresLocalNetwork = true
+                )
+            ) {
+                return Result.failure()
+            }
+
+            if (!StartupCoordinator.tryBeginStart("ADB", userInitiated = allowEnableWifi, caller = "AdbStartWorker.doWork")) {
+                return Result.failure()
+            }
+
+            val (resolvedHost, port) = run {
                 val isWifiAdbEnabled = Settings.Global.getInt(cr, "adb_wifi_enabled", 0) == 1
                 if (!allowEnableWifi && !isWifiAdbEnabled) {
                     Log.i(AppConstants.TAG, "doWork: adb_wifi_enabled is 0 and allowEnableWifi=false; aborting background start")
@@ -174,16 +183,6 @@ class AdbStartWorker(
                         userInitiated = false,
                         caller = "AdbStartWorker.doWork"
                     )
-                    return Result.failure()
-                }
-                if (isBackground && !LocalNetworkGate.checkOrSkip(
-                        caller = "AdbStartWorker.mDNS",
-                        port = -1,
-                        context = applicationContext,
-                        isBackground = true,
-                        requiresLocalNetwork = true
-                    )
-                ) {
                     return Result.failure()
                 }
                 callbackFlow {

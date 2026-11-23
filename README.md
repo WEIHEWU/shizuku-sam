@@ -15,19 +15,20 @@
 
 **Shizuku Sam** 将原生 **Shizuku 特权服务** 与专为三星 Galaxy（One UI）定制的 **系统调度与硬件增强、后台与深度休眠、分应用刷新率规则** 整合为一体。
 
-全应用（一级页面、二级页面、三级页面及所有弹窗）全面统一采用 **Miuix (`top.yukonga.miuix.kmp`) 界面组件体系**、**底部三栏毛玻璃悬浮导航（`Shizuku` · `性能硬件` · `应用规则`）**、**One UI 9 统一模态架构（二级/三级菜单 100% 弹窗浮层化 + 弹窗内平滑推入导航，主仪表盘与底部 Dock 永驻不闪烁）** 以及 **按需展开说明交互（默认单行极简主标题 + 长按单行展开/收起说明 + 顶部 `显示说明 / 隐藏说明` 胶囊开关）**。以下所有卡片名称、开关文案、按钮与二级页面均与当前 `v13.8.44` 真实界面逐字对应，并深度适配 **Samsung One UI 9 / Android 17**。
+全应用（一级页面、二级页面、三级页面及所有弹窗）全面统一采用 **Miuix (`top.yukonga.miuix.kmp`) 界面组件体系**、**底部三栏毛玻璃悬浮导航（`Shizuku` · `性能硬件` · `应用规则`）**、**One UI 9 统一模态架构（二级/三级菜单 100% 弹窗浮层化 + 弹窗内平滑推入导航，主仪表盘与底部 Dock 永驻不闪烁）** 以及 **按需展开说明交互（默认单行极简主标题 + 长按单行展开/收起说明 + 顶部 `显示说明 / 隐藏说明` 胶囊开关）**。以下所有卡片名称、开关文案、按钮与二级页面均与当前 `v13.8.45` 真实界面逐字对应，并深度适配 **Samsung One UI 9 / Android 17**。
 
 ---
 
-## 🚀 最新版本亮点 (`v13.8.44`)
+## 🚀 最新版本亮点 (`v13.8.45`)
 
-1. **全面对齐上游 `ShizukuPlus` / `Shizuku-Next` 修复无线调试配对与服务搜索卡死问题 (`v13.8.44`)**：
-   - **彻底解决「正在搜索无线调试服务」永远卡死**：移除 `AdbMdns` 在 Android 14+ 使用 `context.mainExecutor` 时触发主线程 `Socket.connect()` 导致 `NetworkOnMainThreadException` 的缺陷；改为统一使用 `NsdManager` 后台解析线程 + `Dispatchers.IO` 异步校验，并通过安全 `ServerSocket` 占用探测兼容回环与本机非回环网卡；
-   - **补齐 mDNS 串行解析队列与三层本机地址校验**：引入 `resolveQueue` 串行队列及 `FAILURE_ALREADY_ACTIVE` 重试机制防止丢包；引入 `ConnectivityManager.getLinkProperties` → `NetworkInterface` → `TLS_PAIRING` 内网地址三层校验，解决 Android 15/16/17（尤其是 One UI）后台搜不到配对服务的问题；
-   - **修复配对优先级与分屏/小窗误取消**：将 `AdbPairingClient.pairWithFallback()`、`AdbStarter` 及 `AdbPortProber` 调整为「`127.0.0.1` 优先 + 非回环真实网卡兜底」，并解除 `onResume()`/`onDestroy()` 在三星分屏与小窗模式下对无障碍自动配对及配对通知服务的误取消。
-2. **启动与权限兼容修复 (`v13.8.42` ~ `v13.8.43`)**：
-   - 解除前台配对与启动链路中对 `LocalNetworkGate` 的过度硬拦截，避免高版本覆盖升级后因历史拒绝态导致的配对死锁；
-   - 重构「启动程序」弹窗为内容自适应高度与 18 秒超时失败态，将 `targetSdk` 收敛至 `36`（保留 `compileSdk 37`），通过 `StartupCoordinator` 实现后台重连指数退避，并支持游戏名单离线配置与「包名添加」。
+1. **修复无 Wi-Fi（纯流量/离线 `5555`）启动失败与 Root 手动停止后被强制重启的问题 (`v13.8.45`)**：
+   - **恢复 `v13.8.41` 无无线网络极速启动体验**：修复 `AdbPortProber` 在无 Wi-Fi 仅开启 5G/4G 时误抓蜂窝接口 IP 探测、端口探测排序及过期负缓存导致无法直接命中 `127.0.0.1:5555` 的问题，恢复「`5555` 优先 + 纯回环零阻塞直连」；
+   - **还原 `AdbStarter` / `AdbMdns` / `StarterActivity` / `AdbStartWorker` 回环主线**：`TLS_CONNECT` 与 `tcpip:5555` 切换严格固定走 `"127.0.0.1"` 重试（不再因 `adbd` 重启间隙误漂移到非回环网卡或蜂窝 IP 导致 18 秒超时），并将 `AdbStartWorker` 的 `5555` 快速通道置于所有网络与协调器门控之前；
+   - **修复 Root 启动后点击「停止服务」被强制拉起的问题**：在 `HomeActivity` 手动停止路径统一通过 `performManualStopService()` 置位 `rootAutoStartAttempted = true`、停止状态与状态机 `STOPPING`，取消后台重连并移除 `checkServerStatus()` 中重复清零逻辑及补齐运行态判断。
+2. **对齐上游 `ShizukuPlus` / `Shizuku-Next` 无线调试配对与 mDNS 发现 (`v13.8.44`)**：
+   - 移除 `AdbMdns` 在 Android 14+ 使用 `context.mainExecutor` 时触发 `NetworkOnMainThreadException` 导致「正在搜索无线调试服务」永远卡死的缺陷；补齐 `resolveQueue` 串行队列、三层 `isDeviceAddress` 本机校验、`127.0.0.1` 优先配对顺序及分屏/小窗生命周期兼容。
+3. **启动弹窗重构与系统兼容增强 (`v13.8.42` ~ `v13.8.43`)**：
+   - 解除前台过度硬拦截，重构自适应高度「启动程序」弹窗与 18 秒超时失败态，将 `targetSdk` 收敛至 `36`（保留 `compileSdk 37`），新增「系统环境与连接诊断」日志导出与游戏名单离线配置。
 3. **核心稳定性与系统级增强 (`v13.8.24` ~ `v13.8.41`)**：
    - **Root 开机自启与 Watchdog 自愈 (`v13.8.41`)**：优化开机初期 `su` 守护进程就绪重试（最多 8 次）、`BootCompleteReceiver` `goAsync()` 异步保障与服务自愈拉起；
    - **系统安全护栏与瞬时交互 (`v13.8.27` ~ `v13.8.40`)**：全链路钛金属液态玻璃视觉与 0ms 即时主题切换、已授权应用 0ms 秒开管理、无障碍服务常驻保活、杜绝误改系统 DPI/分辨率及自动重开 USB 调试。

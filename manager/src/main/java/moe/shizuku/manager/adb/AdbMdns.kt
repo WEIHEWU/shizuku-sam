@@ -237,13 +237,14 @@ class AdbMdns(
             if (running && belongsToThisDevice && portReady) {
                 serviceName = resolvedName
                 resolvedHost = normalizedCandidate
+                val callbackHost = if (serviceType == TLS_PAIRING) normalizedCandidate else "127.0.0.1"
                 Log.i(
                     TAG,
-                    "mDNS resolved $serviceType -> resolvedHost=$normalizedCandidate port=$resolvedPort"
+                    "mDNS resolved $serviceType -> resolvedHost=$normalizedCandidate callback=$callbackHost:$resolvedPort"
                 )
                 withContext(Dispatchers.Main.immediate) {
                     if (running) {
-                        observer.onChanged(normalizedCandidate to resolvedPort)
+                        observer.onChanged(callbackHost to resolvedPort)
                     }
                 }
             } else if (running && belongsToThisDevice && !portReady && attempts < 5 && !restartScheduled) {

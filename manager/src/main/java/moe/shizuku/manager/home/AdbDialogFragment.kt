@@ -152,10 +152,9 @@ class AdbDialogFragment : DialogFragment() {
                     caller = "AdbDialogFragment.endpointPoll"
                 )
                 if (candidateEndpoint != null && candidateEndpoint.second > 0) {
-                    val targetHost = candidateEndpoint.first.ifBlank { "127.0.0.1" }
                     withContext(Dispatchers.Main) {
                         if (isAdded && !isStateSaved) {
-                            startAndDismiss(targetHost, candidateEndpoint.second)
+                            startAndDismiss("127.0.0.1", candidateEndpoint.second)
                         }
                     }
                     break
@@ -175,18 +174,17 @@ class AdbDialogFragment : DialogFragment() {
             }
         }
 
-        endpoint.observe(this) { (host, port) ->
+        endpoint.observe(this) { (_, port) ->
             if (port > 65535 || port < 1) return@observe
             endpoint.removeObservers(this)
             loopbackJob?.cancel()
-            startAndDismiss(host.ifBlank { "127.0.0.1" }, port)
+            startAndDismiss("127.0.0.1", port)
         }
     }
 
     private fun startAndDismiss(host: String, port: Int) {
         loopbackJob?.cancel()
         adbMdns.stop()
-        ShizukuSettings.setLastPort(port)
         val intent = Intent(context, StarterActivity::class.java).apply {
             putExtra(StarterActivity.EXTRA_IS_ROOT, false)
             putExtra(StarterActivity.EXTRA_HOST, host)

@@ -2,13 +2,7 @@ package moe.shizuku.manager.adb
 
 import android.content.Context
 import android.util.Log
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.async
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import moe.shizuku.manager.ShizukuSettings
 import moe.shizuku.manager.utils.EnvironmentUtils
@@ -23,58 +17,44 @@ import java.util.Locale
 object AdbPortProber {
 
     private const val TAG = "AdbPortProber"
-    private const val POSITIVE_CACHE_TTL_MS = 2_500L
-    private const val NEGATIVE_CACHE_TTL_MS = 1_500L
 
     private val PREFERRED_LAN_IF_PREFIXES = arrayOf(
-        "wlan", "swlan", "wifi", "ap", "eth", "rndis", "bond", "br"
+        "wlan", "swlan", "wifi", "ap", "eth", "rndis"
     )
 
     private val EXCLUDED_WAN_TUN_IF_PREFIXES = arrayOf(
         "rmnet", "ccmni", "tun", "tap", "ppp", "v4-", "sit", "ip6tnl", "dummy", "lo"
     )
 
-    private val probeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val inFlightMutex = Mutex()
-    private var inFlightProbe: Deferred<Pair<String, Int>?>? = null
-
-    @Volatile
-    private var lastCachedEndpoint: Pair<String, Int>? = null
-
-    @Volatile
-    private var lastCachedAtMs: Long = 0L
-
     fun invalidateCache() {
-        lastCachedAtMs = 0L
+        // Live loopback probing no longer uses stale cache
     }
 
     /**
-     * 获取当前本机活动的局域网 IPv4 地址（排除蜂窝与 VPN 隧道网卡，仅供连接诊断面板展示当前网络状态，不参与常规连接选址）。
+     * 获取当前本机活动的局域网 IPv4 地址（仅匹配显式 WLAN/以太网前缀并排除蜂窝与隧道网卡，避免无 Wi-Fi 时误返回 5G/4G 公网 IP）。
      */
     fun findOwnLanAddress(): String? {
         return runCatching {
             val interfaces = NetworkInterface.getNetworkInterfaces()?.toList().orEmpty()
-            var fallbackIpv4: String? = null
             for (ni in interfaces) {
                 val up = runCatching { ni.isUp && !ni.isLoopback }.getOrDefault(false)
                 if (!up) continue
                 val name = ni.name.orEmpty().lowercase(Locale.ROOT)
                 if (EXCLUDED_WAN_TUN_IF_PREFIXES.any { name.startsWith(it) }) continue
-                val isPreferredIf = PREFERRED_LAN_IF_PREFIXES.any { name.startsWith(it) }
+                if (PREFERRED_LAN_IF_PREFIXES.none { name.startsWith(it) }) continue
                 for (addr in ni.inetAddresses) {
                     if (addr is Inet4Address && !addr.isLoopbackAddress && !addr.isLinkLocalAddress) {
-                        val ip = addr.hostAddress ?: continue
-                        if (isPreferredIf) return ip
-                        if (fallbackIpv4 == null) fallbackIpv4 = ip
+                        val ip = addr.hostAddress
+                        if (!ip.isNullOrBlank()) return ip
                     }
                 }
             }
-            fallbackIpv4
+            null
         }.getOrNull()
     }
 
     /**
-     * 解析实际建连使用的目标主机（对齐上游 127.0.0.1 主线）：
+     * 解析实际建连使用的目标主机（对齐 v13.8.41 与上游 127.0.0.1 主线）：
      * - 显式传入非空 host（如配对路径的 mDNS `resolvedHost` 或 `127.0.0.1`）时原样返回；
      * - 未传入或为空白时，统一返回回环地址 `"127.0.0.1"`。
      */
@@ -84,8 +64,8 @@ object AdbPortProber {
     }
 
     /**
-     * 探测指定端口在目标主机（默认 `127.0.0.1`）上是否可连接，并返回命中的 `host to port`。
-     * 绝不在未通过 LocalNetworkGate 时创建 Socket。
+     * 仅探测指定目标主机（默认 `"127.0.0.1"`）上的开放端口，不再追加探测网卡 IP。
+     * 回环地址 `"127.0.0.1"` / `"::1"` 永不拦截或跳过。
      */
     fun probeOpenEndpoint(
         port: Int,
@@ -96,36 +76,22 @@ object AdbPortProber {
         isBackground: Boolean = false
     ): Pair<String, Int>? {
         if (port !in 1..65535) return null
-
-        val candidates = ArrayList<String>(3)
-        candidates.add("127.0.0.1")
-        val preferred = preferredHost?.trim().orEmpty()
-        if (preferred.isNotEmpty() && preferred != "127.0.0.1") {
-            candidates.add(preferred)
+        val targetHost = resolveConnectHost(preferredHost)
+        if (!LocalNetworkGate.isLoopbackHost(targetHost) &&
+            !LocalNetworkGate.checkOrSkip(
+                caller = caller,
+                port = port,
+                context = context,
+                isBackground = isBackground,
+                host = targetHost
+            )
+        ) {
+            return null
         }
-        if (!isBackground) {
-            val lanIp = findOwnLanAddress()?.trim().orEmpty()
-            if (lanIp.isNotEmpty() && lanIp !in candidates) {
-                candidates.add(lanIp)
-            }
-        }
 
-        for (targetHost in candidates) {
-            if (!LocalNetworkGate.checkOrSkip(
-                    caller = caller,
-                    port = port,
-                    context = context,
-                    isBackground = isBackground,
-                    host = targetHost
-                )
-            ) {
-                continue
-            }
-
-            if (probeAddress(targetHost, port, timeoutMs)) {
-                Log.d(TAG, "PROBE_HIT caller=$caller endpoint=$targetHost:$port")
-                return targetHost to port
-            }
+        if (probeAddress(targetHost, port, timeoutMs)) {
+            Log.d(TAG, "PROBE_HIT caller=$caller endpoint=$targetHost:$port")
+            return targetHost to port
         }
         return null
     }
@@ -165,8 +131,8 @@ object AdbPortProber {
     }
 
     /**
-     * 单飞去重地探测回环（`127.0.0.1`）上可用的无线调试 / TCP 端口：
-     * - 端口优先级：系统当前 `service.adb.tcp.port` -> 上次成功端口 -> `5555`（免 Wi-Fi 快速通道）-> 自定义 `tcpPort`
+     * 直接探测回环（`127.0.0.1`）上可用的无线调试 / TCP 端口（无过期缓存，100% 对齐 v13.8.41）：
+     * - 端口优先级：`5555`（免 Wi-Fi 快速通道）-> 系统当前 `adb.tcp.port` -> 上次成功端口 `lastPort` -> 自定义 `tcpPort` -> `service.adb.tls.port`
      */
     suspend fun findActiveEndpoint(
         context: Context? = null,
@@ -174,10 +140,11 @@ object AdbPortProber {
         preferredHost: String? = null,
         caller: String = "AdbPortProber.findActiveEndpoint",
         isBackground: Boolean = false,
-        forceRefresh: Boolean = false
+        @Suppress("UNUSED_PARAMETER") forceRefresh: Boolean = false
     ): Pair<String, Int>? = withContext(Dispatchers.IO) {
         val primaryHost = resolveConnectHost(preferredHost)
-        if (!LocalNetworkGate.checkOrSkip(
+        if (!LocalNetworkGate.isLoopbackHost(primaryHost) &&
+            !LocalNetworkGate.checkOrSkip(
                 caller = caller,
                 port = -1,
                 context = context,
@@ -195,35 +162,7 @@ object AdbPortProber {
             return@withContext null
         }
 
-        val now = System.currentTimeMillis()
-        if (!forceRefresh && lastCachedAtMs > 0L) {
-            val cached = lastCachedEndpoint
-            val ttl = if (cached != null) POSITIVE_CACHE_TTL_MS else NEGATIVE_CACHE_TTL_MS
-            if (now - lastCachedAtMs < ttl) {
-                return@withContext cached
-            }
-        }
-
-        val deferred = inFlightMutex.withLock {
-            val existing = inFlightProbe
-            if (existing != null && existing.isActive) {
-                existing
-            } else {
-                probeScope.async {
-                    doProbeCandidates(context, timeoutMs, primaryHost, caller, isBackground)
-                }.also { inFlightProbe = it }
-            }
-        }
-
-        try {
-            deferred.await()
-        } finally {
-            inFlightMutex.withLock {
-                if (inFlightProbe === deferred && deferred.isCompleted) {
-                    inFlightProbe = null
-                }
-            }
-        }
+        doProbeCandidates(context, timeoutMs, primaryHost, caller, isBackground)
     }
 
     /**
@@ -252,22 +191,31 @@ object AdbPortProber {
     ): Pair<String, Int>? {
         val candidatePorts = LinkedHashSet<Int>()
 
+        // 1. Standard ADB TCP port (5555 - works offline / over 5G without Wi-Fi)
+        candidatePorts.add(5555)
+
+        // 2. System active TCP port
         val sysTcpPort = EnvironmentUtils.getAdbTcpPort()
         if (sysTcpPort in 1..65535) {
             candidatePorts.add(sysTcpPort)
         }
 
+        // 3. Last known port
         val lastPort = ShizukuSettings.getLastPort()
         if (lastPort in 1..65535) {
             candidatePorts.add(lastPort)
         }
 
-        // Standard ADB TCP port (5555 - works offline / over 5G without Wi-Fi)
-        candidatePorts.add(5555)
-
+        // 4. User configured TCP port
         val tcpPort = ShizukuSettings.getTcpPort()
         if (tcpPort in 1..65535) {
             candidatePorts.add(tcpPort)
+        }
+
+        // 5. System TLS port
+        val tlsPort = EnvironmentUtils.getAdbTlsPort()
+        if (tlsPort in 1..65535) {
+            candidatePorts.add(tlsPort)
         }
 
         var resolved: Pair<String, Int>? = null
@@ -286,8 +234,6 @@ object AdbPortProber {
             }
         }
 
-        lastCachedEndpoint = resolved
-        lastCachedAtMs = System.currentTimeMillis()
         StartupCoordinator.recordPortProbe(
             candidates = candidatePorts,
             hitPort = resolved?.second ?: -1,
