@@ -2328,12 +2328,24 @@ abstract class HomeActivity : MaxHzActivity() {
             val rootAvail = MaxHzShell.isRootAvailable()
             val wifi = HotspotHelper.isWifiConnected(this@HomeActivity)
             val hotspot = HotspotHelper.isHotspotActive(this@HomeActivity)
-            val port = AdbPortProber.findActiveLoopbackPort(
+            var port = AdbPortProber.findActiveLoopbackPort(
                 context = this@HomeActivity,
                 timeoutMs = 150,
                 caller = "HomeActivity.checkServerStatus",
                 isBackground = true
             )
+            if (port <= 0 && Shizuku.pingBinder() && ShizukuSettings.getTcpMode()) {
+                val tcpPort = ShizukuSettings.getTcpPort().takeIf { it in 1..65535 } ?: 5555
+                val applied = runCatching { AdbStarter.enableAdbTcp(tcpPort) }.getOrDefault(false)
+                if (applied) {
+                    port = AdbPortProber.findActiveLoopbackPort(
+                        context = this@HomeActivity,
+                        timeoutMs = 150,
+                        caller = "HomeActivity.afterEnableTcp",
+                        isBackground = true
+                    )
+                }
+            }
             val resolvedPort = resolveActiveOrDiscoveredPort(port)
             withContext(Dispatchers.Main) {
                 isRootAvailableState.value = rootAvail

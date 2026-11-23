@@ -7,6 +7,7 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import moe.shizuku.manager.AppConstants
+import moe.shizuku.manager.ShizukuSettings
 
 object RootBootScriptHelper {
 
@@ -19,6 +20,15 @@ object RootBootScriptHelper {
                 val shell = Shell.getShell()
                 if (!shell.isRoot) return@launch
 
+                val tcpPort = ShizukuSettings.getTcpPort().takeIf { it in 1..65535 } ?: 5555
+                val tcpLines = if (ShizukuSettings.getTcpMode()) {
+                    "                    setprop persist.adb.tcp.port $tcpPort 2>/dev/null || true\n" +
+                        "                    setprop service.adb.tcp.port $tcpPort 2>/dev/null || true\n" +
+                        "                    setprop adb.network.port $tcpPort 2>/dev/null || true"
+                } else {
+                    ""
+                }
+
                 val scriptContent = """
                     #!/system/bin/sh
                     # Shizuku Root Boot Auto-starter for Magisk / KernelSU / APatch
@@ -29,6 +39,7 @@ object RootBootScriptHelper {
                     if /system/bin/pidof shizuku_server >/dev/null 2>&1; then
                         exit 0
                     fi
+$tcpLines
 
                     APK_PATH=${'$'}(pm path moe.shizuku.privileged.api 2>/dev/null | head -n1 | cut -d: -f2 | tr -d '\r')
                     if [ -n "${'$'}APK_PATH" ]; then

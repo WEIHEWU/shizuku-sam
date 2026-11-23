@@ -223,9 +223,13 @@ class StarterActivity : AppActivity() {
                 val activePrimaryColor = getSystemOrAppPrimaryColor(isDark)
                 val config = LocalConfiguration.current
                 val isLandscape = config.orientation == Configuration.ORIENTATION_LANDSCAPE
-                val windowMaxHeightDp = (config.screenHeightDp * if (isLandscape) 0.82f else 0.62f).dp
-                val terminalMaxHeightDp = (config.screenHeightDp * if (isLandscape) 0.30f else 0.32f).dp
-                    .coerceIn(112.dp, 240.dp)
+                val windowMaxHeightDp = (config.screenHeightDp * if (isLandscape) 0.86f else 0.78f).dp
+                val hasActiveError = errorState.value != null && !serviceReadyState.value
+                val terminalMaxHeightDp = if (hasActiveError) {
+                    (config.screenHeightDp * if (isLandscape) 0.20f else 0.18f).dp.coerceIn(88.dp, 136.dp)
+                } else {
+                    (config.screenHeightDp * if (isLandscape) 0.30f else 0.32f).dp.coerceIn(112.dp, 240.dp)
+                }
 
                 // 注意：此处严禁包裹 BackdropProvider（其内部在无自定义背景层时会附带 .fillMaxSize()，
                 // 在有限最大高度约束下会把弹窗强行撑满至上限而产生大片空白）。
@@ -356,12 +360,12 @@ private fun StarterMiuixScreen(
             error.localizedMessage?.takeIf { it.isNotBlank() } ?: stringResource(R.string.cannot_connect_port)
     }
 
-    // 根容器不挂 verticalScroll，避免在有界高度上限下撑高弹窗或形成双重滚动；
-    // 滚动仅保留在终端日志区域内部，整窗高度完全随内容紧凑自适应。
+    // 外层容器允许在报错/小屏场景下垂直滚动，避免底部快捷操作按钮被有界弹窗截断
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .wrapContentHeight()
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = 14.dp, vertical = 12.dp)
     ) {
         MiuixSubPageTopBar(
@@ -674,6 +678,10 @@ private class ViewModel(
                     ShizukuSettings.setLastLaunchMode(ShizukuSettings.LaunchMethod.ROOT)
                     ShizukuSettings.setLastSettledStateRunning(true)
                     Shell.cmd(AdbStarter.buildSelfHardeningCommand(appContext)).submit()
+                    if (ShizukuSettings.getTcpMode()) {
+                        val tcpPort = ShizukuSettings.getTcpPort().takeIf { it in 1..65535 } ?: 5555
+                        runCatching { AdbStarter.enableAdbTcp(tcpPort) }
+                    }
                     if (ShizukuSettings.getWatchdog()) {
                         runCatching { WatchdogService.start(appContext) }
                     }

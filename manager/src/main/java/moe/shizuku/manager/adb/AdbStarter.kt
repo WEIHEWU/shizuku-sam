@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.provider.Settings
 import android.util.Log
 import android.widget.Toast
+import com.topjohnwu.superuser.Shell
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -57,6 +58,58 @@ object AdbStarter {
         }
     }
 
+    private fun execPrivilegedCommand(cmd: Array<String>): Boolean {
+        return try {
+            if (MaxHzShell.isReady()) {
+                MaxHzShell.exec(cmd.joinToString(" "), timeoutSeconds = 5).code == 0
+            } else if (Shell.getShell().isRoot) {
+                Shell.cmd(*cmd).exec().isSuccess
+            } else {
+                false
+            }
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
+    /**
+     * 对齐上游 ShizukuPlus (`AdbProxyService.enableAdbTcp`):
+     * 通过 Shizuku 或 Root 特权写入 `service.adb.tcp.port`、`persist.adb.tcp.port` 及三星 `adb.network.port`，
+     * 确保持久开放 TCP `5555` 端口以支持停用 Root 或无 Wi-Fi 时一键离线启动。
+     */
+    fun enableAdbTcp(port: Int = 5555): Boolean {
+        if (port !in 1..65535) return false
+        if (!MaxHzShell.isReady() && !Shell.getShell().isRoot) {
+            Log.w("AdbStarter", "enableAdbTcp skipped: service not running and no root")
+            return false
+        }
+        return runCatching {
+            val currentPort = EnvironmentUtils.getAdbTcpPort()
+            if (currentPort == port && AdbPortProber.isPortOpen(port, 300)) {
+                execPrivilegedCommand(arrayOf("setprop", "persist.adb.tcp.port", port.toString()))
+                return@runCatching true
+            }
+
+            execPrivilegedCommand(arrayOf("setprop", "service.adb.tcp.port", port.toString()))
+            execPrivilegedCommand(arrayOf("setprop", "persist.adb.tcp.port", port.toString()))
+            execPrivilegedCommand(arrayOf("setprop", "adb.network.port", port.toString()))
+
+            val restartViaCtl = execPrivilegedCommand(arrayOf("setprop", "ctl.restart", "adbd"))
+            if ((!restartViaCtl || EnvironmentUtils.isSamsung()) && !AdbPortProber.isPortOpen(port, 250)) {
+                val stopped = execPrivilegedCommand(arrayOf("stop", "adbd"))
+                if (stopped) {
+                    execPrivilegedCommand(arrayOf("start", "adbd"))
+                } else {
+                    execPrivilegedCommand(arrayOf("pkill", "adbd"))
+                }
+            }
+            Log.i("AdbStarter", "enableAdbTcp applied for port $port")
+            true
+        }.onFailure {
+            Log.w("AdbStarter", "Failed to enable ADB TCP mode on port $port", it)
+        }.getOrDefault(false)
+    }
+
     suspend fun startAdb(
         context: Context,
         port: Int,
@@ -91,29 +144,6 @@ object AdbStarter {
                     throw AdbKeyException(it)
                 }
 
-                var activePort = port
-                val tcpMode = ShizukuSettings.getTcpMode()
-                val tcpPort = ShizukuSettings.getTcpPort()
-                if (tcpMode && activePort != tcpPort && tcpPort in 1..65535) {
-                    StartupCoordinator.recordConnectTarget(activeHost, activePort, "AdbStarter.tcpSwitch")
-                    Log.i("AdbStarter", "Connecting to $activeHost:$activePort for tcpip:$tcpPort switch")
-                    log?.invoke("Connecting on port $activePort...\n")
-                    val (tcpClient, connectedSwitchHost) = connectLoopbackThenOptionalFallback(
-                        fallbackHost = explicitFallbackHost,
-                        port = activePort,
-                        key = key,
-                        log = log
-                    )
-                    tcpClient.use { client ->
-                        log?.invoke("Successfully connected on $connectedSwitchHost:$activePort, restarting in TCP mode port: $tcpPort\n")
-                        activePort = tcpPort
-                        activeHost = "127.0.0.1"
-                        runCatching { client.command("tcpip:$activePort") }
-                            .onFailure { if (it !is EOFException && it !is SocketException) throw it }
-                    }
-                    delay(250)
-                }
-
                 // Only ask an existing root (uid 0) server to exit via fast Binder IPC so
                 // shell (uid 2000) starter does not hit EPERM when killing uid 0 shizuku_server.
                 if (runCatching { Shizuku.pingBinder() && Shizuku.getUid() == 0 }.getOrDefault(false)) {
@@ -121,12 +151,12 @@ object AdbStarter {
                     delay(150)
                 }
 
-                val launchFallbackHost = if (activePort == port) explicitFallbackHost else null
+                var activePort = port
                 StartupCoordinator.recordConnectTarget(activeHost, activePort, "AdbStarter.startAdb")
                 Log.i("AdbStarter", "Connecting to $activeHost:$activePort to launch starter")
                 log?.invoke("Connecting on port $activePort...\n")
                 val (client, connectedHost) = connectLoopbackThenOptionalFallback(
-                    fallbackHost = launchFallbackHost,
+                    fallbackHost = explicitFallbackHost,
                     port = activePort,
                     key = key,
                     log = log
@@ -135,7 +165,29 @@ object AdbStarter {
                     activeHost = connectedHost
                     log?.invoke("Successfully connected on $connectedHost:$activePort\n")
                     adbClient.runCommand("shell:${Starter.internalCommand}")
-                    ShizukuSettings.setLastHost(connectedHost)
+
+                    val tcpMode = ShizukuSettings.getTcpMode()
+                    val tcpPort = ShizukuSettings.getTcpPort().takeIf { it in 1..65535 } ?: 5555
+                    if (tcpMode) {
+                        runCatching {
+                            adbClient.runCommand(
+                                "shell:setprop service.adb.tcp.port $tcpPort; setprop persist.adb.tcp.port $tcpPort; setprop adb.network.port $tcpPort"
+                            )
+                        }
+                    }
+                    if (tcpMode && activePort != tcpPort && tcpPort in 1..65535) {
+                        log?.invoke("Restarting in TCP mode port: $tcpPort\n")
+                        runCatching { adbClient.command("tcpip:$tcpPort") }
+                            .onFailure {
+                                if (it !is EOFException && it !is SocketException) {
+                                    Log.w("AdbStarter", "tcpip:$tcpPort warning", it)
+                                }
+                            }
+                        activePort = tcpPort
+                        activeHost = "127.0.0.1"
+                    }
+
+                    ShizukuSettings.setLastHost(activeHost)
                     ShizukuSettings.setLastPort(activePort)
                     ShizukuSettings.setLastLaunchMode(ShizukuSettings.LaunchMethod.ADB)
                     ShizukuSettings.setLastSettledStateRunning(true)
@@ -149,6 +201,11 @@ object AdbStarter {
                 backgroundScope.launch {
                     delay(1500)
                     runCatching { MaxHzShell.exec(buildSelfHardeningCommand(appCtx)) }
+                    if (ShizukuSettings.getTcpMode()) {
+                        runCatching {
+                            enableAdbTcp(ShizukuSettings.getTcpPort().takeIf { it in 1..65535 } ?: 5555)
+                        }
+                    }
                 }
             }
         } catch (e: Throwable) {
