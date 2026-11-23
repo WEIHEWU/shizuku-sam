@@ -15,37 +15,40 @@
 
 **Shizuku Sam** 将原生 **Shizuku 特权服务** 与专为三星 Galaxy（One UI）定制的 **系统调度与硬件增强、后台与深度休眠、分应用刷新率规则** 整合为一体。
 
-全应用（一级页面、二级页面、三级页面及所有弹窗）全面统一采用 **Miuix (`top.yukonga.miuix.kmp`) 界面组件体系**、**底部三栏毛玻璃悬浮导航（`Shizuku` · `性能硬件` · `应用规则`）**、**One UI 9 统一模态架构（二级/三级菜单 100% 弹窗浮层化 + 弹窗内平滑推入导航，主仪表盘与底部 Dock 永驻不闪烁）** 以及 **按需展开说明交互（默认单行极简主标题 + 长按单行展开/收起说明 + 顶部 `显示说明 / 隐藏说明` 胶囊开关）**。以下所有卡片名称、开关文案、按钮与二级页面均与当前 `v13.8.49` 真实界面逐字对应，并深度适配 **Samsung One UI 9 / Android 17**。
+全应用（一级页面、二级页面、三级页面及所有弹窗）全面统一采用 **Miuix (`top.yukonga.miuix.kmp`) 界面组件体系**、**底部三栏毛玻璃悬浮导航（`Shizuku` · `性能硬件` · `应用规则`）**、**One UI 9 统一模态架构（二级/三级菜单 100% 弹窗浮层化 + 弹窗内平滑推入导航，主仪表盘与底部 Dock 永驻不闪烁）** 以及 **按需展开说明交互（默认单行极简主标题 + 长按单行展开/收起说明 + 顶部 `显示说明 / 隐藏说明` 胶囊开关）**。以下所有卡片名称、开关文案、按钮与二级页面均与当前 `v13.8.50` 真实界面逐字对应，并深度适配 **Samsung One UI 9 / Android 17**。
 
 ---
 
-## 🚀 最新版本亮点 (`v13.8.49`)
+## 🚀 最新版本亮点 (`v13.8.50`)
 
-1. **修复 Root 启动未实际打开 `127.0.0.1:5555` 导致停用 Root 后无 Wi-Fi 无法离线无线启动的根因 (`v13.8.49`)**：
+1. **修复真机日志捕捉到的 Direct Boot `WorkManager` 崩溃与 `MaxHzService` 6 小时超时闪退 (`v13.8.50`)**：
+   - **修复解锁后触发 `WorkManager is not initialized properly` 崩溃**：在 `ShizukuApplication.kt` 实现 `Configuration.Provider` 按需初始化，并在 `AndroidManifest.xml` 移除默认 `WorkManagerInitializer`，避免 `directBootAware` 进程开机预启动后解锁时 `WatchdogService` / `HomeActivity` 调用 `WorkManager` 崩溃；同时为 `ShizukuReceiverStarter.cancelAdbStart()` 增加安全捕获；
+   - **彻底消除 `MaxHzService` `ForegroundServiceDidNotStopInTimeException` 6 小时强制闪退**：将常驻服务 `MaxHzService` 的前台服务类型由 Android 15–17 严格限时 6 小时的 `dataSync` 迁移至 `specialUse`（同步更新 Manifest 声明、`PROPERTY_SPECIAL_USE_FGS_SUBTYPE` 属性与 `startForeground()` 类型参数）。
+2. **修复 Root 启动未实际打开 `127.0.0.1:5555` 导致停用 Root 后无 Wi-Fi 无法离线无线启动的根因 (`v13.8.49`)**：
    - **修复 `AdbStarter.enableAdbTcp()` 中 `libsu` 命令被拆行失效的 Bug**：修复 `Shell.cmd(*arrayOf("setprop", ...))` 将单个命令拆成多行无效 Shell 指令导致 `service.adb.tcp.port` / `persist.adb.tcp.port` / `adb.network.port` 及 `adbd` 重启全部失败的问题，改为完整整行 Shell 指令执行；
    - **补齐 `adbd` 重启与真实端口开放校验及防取消异步执行**：写入 TCP `5555` 属性并执行 `setprop ctl.restart adbd` 后轮询等待端口开放，未开放时自动执行 `stop adbd` / `sleep 0.2` / `start adbd` 二次拉起，并将 Root 启动后的 `AdbStarter.enableAdbTcpAsync()` 迁移至进程级作用域，避免 `StarterActivity` 350ms 自动关闭取消配置任务；
    - **写入真实 `TCP_ENABLE` 诊断记录**：将 `5555` 开放状态、属性写入及 `adbd` 状态写入 `StartupCoordinator` 诊断日志，便于在设置「系统环境与连接诊断」中核验。
-2. **彻底解决 Android 17 无线调试启动后 `Waiting for service...` 18 秒超时问题 (`v13.8.48`)**：
+3. **彻底解决 Android 17 无线调试启动后 `Waiting for service...` 18 秒超时问题 (`v13.8.48`)**：
    - **停止在拉起服务后重启 `adbd`**：移除 `AdbStarter.startAdb()` 在执行 `Starter.internalCommand` 之后触发 SELinux 拒绝的 `shell:setprop ... 5555`、`adbClient.command("tcpip:$tcpPort")` 以及 1.5s 后异步调用的 `enableAdbTcp(5555)`，防止 `adbd` 重启时将刚启动且同处 `adbd` cgroup 中的 `uid 2000` `shizuku_server` 直接杀掉；
    - **`enableAdbTcp(5555)` 收敛为严格仅 Root 可用并防误杀**：`AdbStarter.enableAdbTcp()` 改为仅通过 `su` 执行且在检测到 `uid == 2000` ADB 模式服务运行时直接跳过；`HomeActivity.checkServerStatus()` 亦仅在 Root 服务（`uid == 0`）就绪时才允许配置持久 `5555`；
    - **对齐上游 `starter.cpp` / `Starter.kt` / `ShizukuService` Android 17 兼容性**：`starter.cpp` 子进程忽略 `SIGHUP/SIGPIPE/SIGTERM/SIGQUIT/SIGTSTP` 并为全 UID 调用 `switch_cgroup()`；`Starter.internalCommand` 前置 `LD_LIBRARY_PATH=$nativeLibDir`；修复 `ShizukuService.attachApplication()` 漏掉 `Android17Compat.grantRuntimePermission()` 导致 Android 17 上 Manager 回调异常的问题。
-3. **修复无线调试连接成功后切换 `tcpip:5555` 报 `ECONNREFUSED` 及启动弹窗底部按钮截断问题 (`v13.8.47`)**：
+4. **修复无线调试连接成功后切换 `tcpip:5555` 报 `ECONNREFUSED` 及启动弹窗底部按钮截断问题 (`v13.8.47`)**：
    - **优先在已建立的无线调试连接上拉起服务**：修复 `AdbStarter` 先断连切 `5555` 再等待重连导致在三星 One UI 9 上因 `adbd` 端口重分配而报错 `ECONNREFUSED` 的问题——改为先在当前无线端口执行 `Starter.internalCommand` 完成启动，再设置 `service.adb.tcp.port`、`persist.adb.tcp.port` 与 `adb.network.port` 并切换 `tcpip:5555`；
    - **同步上游 `ShizukuPlus` (`a6e5b3d3`) 自动开放 `5555` 机制**：在 Root 启动、ADB 启动以及主页服务就绪检查时自动通过特权通道配置 `5555` TCP 属性并兼容三星 `adbd` 重启，并在开机 Root 脚本内持久化 `5555` 属性，确保停用 Root 或离线/无 Wi-Fi 环境下随时秒启；
    - **修复启动弹窗底部按钮被隐藏/截断的排版问题**：扩大启动弹窗最大高度至屏幕高度 `78%`（横屏 `86%`）、报错时自动收敛日志区域并恢复外层容器垂直滚动，确保「重试 5555」「开发者选项」「重试」「复制日志」按钮完整清晰可见。
-4. **100% 严格对齐上游 `ShizukuPlus` 无线调试启动与停止状态流 (`v13.8.46`)**：
+5. **100% 严格对齐上游 `ShizukuPlus` 无线调试启动与停止状态流 (`v13.8.46`)**：
    - **主页后台 `AdbMdns` 端口预发现与启动流程对齐上游**：进入主页即后台监听 `TLS_CONNECT` 端口；点击「无线调试启动」时按上游顺序写入 `ADB_ENABLED = 1` 与 `adb_allowed_connection_time = 0L`（不再在探测前提前写入 `adb_wifi_enabled = 1`），并依次检查本地 `127.0.0.1` 回环、主页预发现端口及 `getAdbTcpPort()`，命中即直连 `StarterActivity`，残留非 `tcpMode` 的 TCP 端口自动 `stopTcp()` 后开启搜寻；
    - **对齐上游无阻断权限模型与开机脚本**：将 `LocalNetworkGate` 调整为与上游 `LocalNetworkPermission` 一致的完全非阻断模式，同时还原 `RootBootScriptHelper` 移除非上游 `adb.tcp.port` 的 `setprop` 注入；
    - **对齐上游与 `v13.8.41` 停止服务卡片**：手动点击「停止服务」取消后台工作任务后，主状态卡片直接恢复干净的「`未运行 · 待激活`」。
-5. **修复无 Wi-Fi（纯流量/离线 `5555`）启动失败与 Root 手动停止后被强制重启的问题 (`v13.8.45`)**：
+6. **修复无 Wi-Fi（纯流量/离线 `5555`）启动失败与 Root 手动停止后被强制重启的问题 (`v13.8.45`)**：
    - **恢复 `v13.8.41` 无无线网络极速启动体验**：修复 `AdbPortProber` 在无 Wi-Fi 仅开启 5G/4G 时误抓蜂窝接口 IP 探测、端口探测排序及过期负缓存导致无法直接命中 `127.0.0.1:5555` 的问题，恢复「`5555` 优先 + 纯回环零阻塞直连」；
    - **还原 `AdbStarter` / `AdbMdns` / `StarterActivity` / `AdbStartWorker` 回环主线**：`TLS_CONNECT` 与 `tcpip:5555` 切换严格固定走 `"127.0.0.1"` 重试（不再因 `adbd` 重启间隙误漂移到非回环网卡或蜂窝 IP 导致 18 秒超时），并将 `AdbStartWorker` 的 `5555` 快速通道置于所有网络与协调器门控之前；
    - **修复 Root 启动后点击「停止服务」被强制拉起的问题**：在 `HomeActivity` 手动停止路径统一通过 `performManualStopService()` 置位 `rootAutoStartAttempted = true`、停止状态与状态机 `STOPPING`，取消后台重连并移除 `checkServerStatus()` 中重复清零逻辑及补齐运行态判断。
-6. **对齐上游 `ShizukuPlus` / `Shizuku-Next` 无线调试配对与 mDNS 发现 (`v13.8.44`)**：
+7. **对齐上游 `ShizukuPlus` / `Shizuku-Next` 无线调试配对与 mDNS 发现 (`v13.8.44`)**：
    - 移除 `AdbMdns` 在 Android 14+ 使用 `context.mainExecutor` 时触发 `NetworkOnMainThreadException` 导致「正在搜索无线调试服务」永远卡死的缺陷；补齐 `resolveQueue` 串行队列、三层 `isDeviceAddress` 本机校验、`127.0.0.1` 优先配对顺序及分屏/小窗生命周期兼容。
-7. **启动弹窗重构与系统兼容增强 (`v13.8.42` ~ `v13.8.43`)**：
+8. **启动弹窗重构与系统兼容增强 (`v13.8.42` ~ `v13.8.43`)**：
    - 解除前台过度硬拦截，重构自适应高度「启动程序」弹窗与 18 秒超时失败态，将 `targetSdk` 收敛至 `36`（保留 `compileSdk 37`），新增「系统环境与连接诊断」日志导出与游戏名单离线配置。
-8. **核心稳定性与系统级增强 (`v13.8.24` ~ `v13.8.41`)**：
+9. **核心稳定性与系统级增强 (`v13.8.24` ~ `v13.8.41`)**：
    - **Root 开机自启与 Watchdog 自愈 (`v13.8.41`)**：优化开机初期 `su` 守护进程就绪重试（最多 8 次）、`BootCompleteReceiver` `goAsync()` 异步保障与服务自愈拉起；
    - **系统安全护栏与瞬时交互 (`v13.8.27` ~ `v13.8.40`)**：全链路钛金属液态玻璃视觉与 0ms 即时主题切换、已授权应用 0ms 秒开管理、无障碍服务常驻保活、杜绝误改系统 DPI/分辨率及自动重开 USB 调试。
 

@@ -5,6 +5,7 @@ import android.content.Context
 import android.os.Build
 import android.os.UserManager
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.work.Configuration
 import com.topjohnwu.superuser.Shell
 import moe.shizuku.manager.ktx.logd
 import moe.shizuku.manager.service.WatchdogAlarmReceiver
@@ -17,7 +18,12 @@ import rikka.material.app.LocaleDelegate
 
 lateinit var application: ShizukuApplication
 
-class ShizukuApplication : Application() {
+class ShizukuApplication : Application(), Configuration.Provider {
+
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder()
+            .setMinimumLoggingLevel(if (BuildConfig.DEBUG) android.util.Log.DEBUG else android.util.Log.INFO)
+            .build()
 
     companion object {
 

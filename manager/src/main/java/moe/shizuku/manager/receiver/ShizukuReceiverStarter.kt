@@ -106,7 +106,9 @@ object ShizukuReceiverStarter {
     }
 
     fun cancelAdbStart(context: Context) {
-        WorkManager.getInstance(context.applicationContext).cancelUniqueWork(WORK_NAME)
+        runCatching {
+            WorkManager.getInstance(context.applicationContext).cancelUniqueWork(WORK_NAME)
+        }
     }
 
     private suspend fun rootStart() {

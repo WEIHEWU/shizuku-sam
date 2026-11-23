@@ -15,37 +15,40 @@
 
 **Shizuku Sam** integrates the **Shizuku privileged service** with a purpose-built **Samsung Galaxy (One UI) system scheduler & hardware enhancer, background & deep sleep controller, and per-app refresh rate rule manager** in a single cohesive application.
 
-The entire app (Level 1, Level 2, Level 3 screens, and all dialogs) is unified under the **Miuix (`top.yukonga.miuix.kmp`) UI system**, a **3-tab Liquid Glass floating dock (`Shizuku` · `Hardware` · `App Rules`)**, **One UI 9 Unified Modal Architecture (100% modal sheet representation for secondary and tertiary menus + in-modal smooth slide navigation, persistent home dashboard and floating dock without flicker)**, and **on-demand subtitle toggles (clean single-line titles by default + long-press any row/card to toggle its explanation in place + a `显示说明 / 隐藏说明` pill button on every section/page header)**. Every section, card title, switch, and secondary screen listed below corresponds 1:1 with the actual `v13.8.49` app UI, with deep adaptation for **Samsung One UI 9 / Android 17**.
+The entire app (Level 1, Level 2, Level 3 screens, and all dialogs) is unified under the **Miuix (`top.yukonga.miuix.kmp`) UI system**, a **3-tab Liquid Glass floating dock (`Shizuku` · `Hardware` · `App Rules`)**, **One UI 9 Unified Modal Architecture (100% modal sheet representation for secondary and tertiary menus + in-modal smooth slide navigation, persistent home dashboard and floating dock without flicker)**, and **on-demand subtitle toggles (clean single-line titles by default + long-press any row/card to toggle its explanation in place + a `显示说明 / 隐藏说明` pill button on every section/page header)**. Every section, card title, switch, and secondary screen listed below corresponds 1:1 with the actual `v13.8.50` app UI, with deep adaptation for **Samsung One UI 9 / Android 17**.
 
 ---
 
-## 🚀 What's New in `v13.8.49`
+## 🚀 What's New in `v13.8.50`
 
-1. **Fixed Root Launch Failing to Open `127.0.0.1:5555` for Offline Wireless Start (`v13.8.49`)**:
+1. **Fixed Direct Boot `WorkManager` Crash & `MaxHzService` 6-Hour `dataSync` Timeout Crash Captured on SM-S928B (`v13.8.50`)**:
+   - **Fixed `WorkManager is not initialized properly` Crash on Unlock**: Implemented on-demand `Configuration.Provider` initialization in `ShizukuApplication`, removed the conflicting default `androidx.work.WorkManagerInitializer` in `AndroidManifest.xml`, and guarded `ShizukuReceiverStarter.cancelAdbStart()` against pre-unlock calls so `WatchdogService` and `HomeActivity` never crash after Direct Boot unlock;
+   - **Fixed 6-Hour `ForegroundServiceDidNotStopInTimeException` on `MaxHzService`**: Migrated persistent `MaxHzService` from `dataSync` (which Android 15–17 terminates and crashes after 6 hours) to `specialUse` with `PROPERTY_SPECIAL_USE_FGS_SUBTYPE` and updated `startForeground()` accordingly.
+2. **Fixed Root Launch Failing to Open `127.0.0.1:5555` for Offline Wireless Start (`v13.8.49`)**:
    - **Fixed `libsu` `Shell.cmd(*cmd)` Split-Line Bug in `AdbStarter.enableAdbTcp()`**: Replaced array-spread arguments (which `libsu` interpreted as separate broken shell lines instead of a single command) with complete shell lines (`setprop service.adb.tcp.port`, `persist.adb.tcp.port`, `adb.network.port`) so Root launches genuinely configure ADB TCP port `5555`;
    - **Added `adbd` Restart Polling & Process-Scoped Execution**: Polls `127.0.0.1:5555` after `setprop ctl.restart adbd`, falls back to `stop adbd` / `sleep 0.2` / `start adbd` if still closed, and invokes `AdbStarter.enableAdbTcpAsync()` from `StarterActivity` so the 350ms auto-dismiss no longer cancels TCP configuration;
    - **Added `TCP_ENABLE` Event Telemetry**: Records port open state, property status, and `adbd` service state directly into `StartupCoordinator` diagnostic logs.
-2. **Fixed 18s Binder Timeout After Wireless ADB Launch on Android 17 (`v13.8.48`)**:
+3. **Fixed 18s Binder Timeout After Wireless ADB Launch on Android 17 (`v13.8.48`)**:
    - **Prevented Post-Launch `adbd` Restarts from Killing `shizuku_server`**: Removed SELinux-denied `shell:setprop ... 5555`, `adbClient.command("tcpip:$tcpPort")`, and the delayed background `enableAdbTcp(5555)` call from `AdbStarter.startAdb()` so restarting `adbd` no longer sends `SIGKILL` to the newly forked `uid 2000` `shizuku_server` inside `adbd`'s cgroup;
    - **Restricted `enableAdbTcp(5555)` to Root-Only with `uid 2000` Guard**: Changed `AdbStarter.enableAdbTcp()` to execute exclusively via `su` and skip whenever an ADB-mode (`uid == 2000`) server is running; updated `HomeActivity.checkServerStatus()` to apply TCP `5555` persistence only when Root service (`uid == 0`) is active;
    - **Upstream Android 17 Starter & Server Compatibility**: Aligned `starter.cpp` child signal isolation (`SIGHUP`/`SIGPIPE`/`SIGTERM`/`SIGQUIT`/`SIGTSTP`) and `switch_cgroup()` across all UIDs, prepended `LD_LIBRARY_PATH=$nativeLibDir` in `Starter.internalCommand`, and switched `ShizukuService.attachApplication()` to `Android17Compat.grantRuntimePermission()` catching `Throwable`.
-3. **Fixed Wireless ADB `tcpip:5555` `ECONNREFUSED` Failure & Clipped Starter Dialog Buttons (`v13.8.47`)**:
+4. **Fixed Wireless ADB `tcpip:5555` `ECONNREFUSED` Failure & Clipped Starter Dialog Buttons (`v13.8.47`)**:
    - **Launch Server Before Switching TCP Port**: Updated `AdbStarter.startAdb()` to execute `Starter.internalCommand` immediately on the active authenticated TLS port (e.g. `40935`/`46651`) before setting `service.adb.tcp.port` / `persist.adb.tcp.port` / `adb.network.port` and sending `tcpip:5555`, eliminating `ECONNREFUSED` failures when `adbd` restarts on Samsung One UI 9 / Android 17;
    - **Synced Upstream `ShizukuPlus` (`a6e5b3d3`) `enableAdbTcp(5555)` Self-Healing**: Automatically configures `adbd` TCP `5555` (including Samsung `adb.network.port` and `ctl.restart`/`adbd` restart fallback) across ADB start, Root start, `HomeActivity.checkServerStatus()`, and `RootBootScriptHelper`;
    - **Fixed Starter Dialog Bottom Action Button Clipping**: Increased modal max height to `78%` portrait (`86%` landscape), compacted terminal height on errors, and restored outer vertical scrolling so `重试 5555`, `开发者选项`, `重试`, and `复制日志` remain fully visible and unclipped.
-4. **100% Upstream Alignment with `ShizukuPlus` Wireless ADB Start Flow & Idle UI (`v13.8.46`)**:
+5. **100% Upstream Alignment with `ShizukuPlus` Wireless ADB Start Flow & Idle UI (`v13.8.46`)**:
    - **Aligned Home mDNS Discovery & Wireless Start Sequence**: Added background `TLS_CONNECT` discovery in `HomeActivity`, writes `ADB_ENABLED = 1` and `adb_allowed_connection_time = 0L` without prematurely toggling `adb_wifi_enabled = 1` before probing loopback, and follows upstream port precedence (loopback / home-discovered port -> `getAdbTcpPort()` -> `stopTcp()` when non-TCP mode -> `AdbDialogFragment`);
    - **Non-Blocking `LocalNetworkGate` & Upstream `RootBootScriptHelper`**: Aligned `LocalNetworkGate` with upstream's non-blocking `LocalNetworkPermission` and restored `RootBootScriptHelper` to remove non-upstream `adb.tcp.port` `setprop` injection;
    - **Clean Idle Hero Card State**: Stopping the service cancels scheduled workers and returns the home status badge cleanly to Pending (`待激活`).
-5. **Fixed Offline (No Wi-Fi) Wireless ADB Startup & Root Manual Stop Auto-Restart (`v13.8.45`)**:
+6. **Fixed Offline (No Wi-Fi) Wireless ADB Startup & Root Manual Stop Auto-Restart (`v13.8.45`)**:
    - **Restored `v13.8.41` offline `127.0.0.1:5555` fast-path**: Fixed `AdbPortProber` probing cellular WAN IPs when Wi-Fi is disabled, restored `5555`-first port priority, and removed stale negative caching so offline `5555` startup works immediately without Wi-Fi or permission prompts;
    - **Restored `127.0.0.1` loopback connection reliability**: Kept `TLS_CONNECT`, `tcpip:5555` transitions, `StarterActivity`, and `AdbStartWorker` fast-paths strictly on `"127.0.0.1"` before background gates (plus `setprop persist.adb.tcp.port 5555` in `RootBootScriptHelper`);
    - **Fixed Root auto-restart loop after clicking "Stop Service"**: Added `performManualStopService()` in `HomeActivity` to set `STOPPING`, persist stopped state, cancel auto-retry, and stop `checkServerStatus()` from resetting `rootAutoStartAttempted` or restarting Root when settled state is stopped.
-6. **Aligned Wireless ADB Pairing & mDNS Discovery with Upstream `ShizukuPlus` & `Shizuku-Next` (`v13.8.44`)**:
+7. **Aligned Wireless ADB Pairing & mDNS Discovery with Upstream `ShizukuPlus` & `Shizuku-Next` (`v13.8.44`)**:
    - Fixed infinite "Searching for wireless debugging service" caused by `NetworkOnMainThreadException`, added serial `resolveQueue` + 3-tier `isDeviceAddress()`, prioritized `"127.0.0.1"` in `pairWithFallback()`, and hardened split-screen / pop-up pairing lifecycle.
-7. **Startup & Compatibility Hardening (`v13.8.42` ~ `v13.8.43`)**:
+8. **Startup & Compatibility Hardening (`v13.8.42` ~ `v13.8.43`)**:
    - Removed overly strict foreground hard blocks in `LocalNetworkGate`, redesigned the `StarterActivity` modal with adaptive height and 18s timeout failure actions, aligned `targetSdk` to `36` (with `compileSdk 37`), added `StartupCoordinator` diagnostics, and enabled offline Game List editing.
-8. **Core Stability & System Safeguards (`v13.8.24` ~ `v13.8.41`)**:
+9. **Core Stability & System Safeguards (`v13.8.24` ~ `v13.8.41`)**:
    - **Root Boot Auto-Start & Watchdog Self-Healing (`v13.8.41`)**: Early-boot `su` readiness retries (up to 8 attempts), `BootCompleteReceiver` `goAsync()` protection, and automatic Watchdog recovery;
    - **System Guards & Instant UX (`v13.8.27` ~ `v13.8.40`)**: Titanium Liquid Glass architecture with 0ms reactive theme switching, 0ms authorized apps dialog, persistent Accessibility self-healing, and safeguards preventing unintended DPI/resolution changes or USB debugging auto-reopen.
 

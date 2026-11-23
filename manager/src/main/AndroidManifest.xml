@@ -238,7 +238,11 @@
             android:name=".maxhz.MaxHzService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="dataSync" />
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Maintains user-configured refresh rate, battery protection, and standby guard rules in the background." />
+        </service>
         <service
             android:name=".maxhz.MaxHzAccessibilityService"
             android:label="@string/accessibility_service_unified_label"
@@ -324,6 +328,17 @@
                 <action android:name="moe.shizuku.manager.maxhz.ACTION_APPLY" />
             </intent-filter>
         </receiver>
+
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
 
         <provider
             android:name=".ShizukuManagerProvider"
