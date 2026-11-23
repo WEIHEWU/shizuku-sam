@@ -19,7 +19,10 @@ object Starter {
         get() = "adb shell $userCommand"
 
     val internalCommand: String
-        get() = "$userCommand --apk=${application.applicationInfo.sourceDir}"
+        get() {
+            val nativeLibDir = application.applicationInfo.nativeLibraryDir
+            return "LD_LIBRARY_PATH=$nativeLibDir $userCommand --apk=${application.applicationInfo.sourceDir}"
+        }
 
     const val SERVICE_STARTED_MESSAGE = "Service started"
 

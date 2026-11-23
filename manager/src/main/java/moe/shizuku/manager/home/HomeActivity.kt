@@ -2334,7 +2334,8 @@ abstract class HomeActivity : MaxHzActivity() {
                 caller = "HomeActivity.checkServerStatus",
                 isBackground = true
             )
-            if (port <= 0 && Shizuku.pingBinder() && ShizukuSettings.getTcpMode()) {
+            val isRootServerRunning = runCatching { Shizuku.pingBinder() && Shizuku.getUid() == 0 }.getOrDefault(false)
+            if (port <= 0 && isRootServerRunning && ShizukuSettings.getTcpMode()) {
                 val tcpPort = ShizukuSettings.getTcpPort().takeIf { it in 1..65535 } ?: 5555
                 val applied = runCatching { AdbStarter.enableAdbTcp(tcpPort) }.getOrDefault(false)
                 if (applied) {

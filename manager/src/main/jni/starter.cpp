@@ -12,6 +12,7 @@
 #include <string>
 #include <termios.h>
 #include <poll.h>
+#include <csignal>
 #include "android.h"
 #include "misc.h"
 #include "selinux.h"
@@ -45,6 +46,8 @@
 #elif defined(__aarch64__)
 #define ABI "arm64"
 #endif
+
+static int switch_cgroup();
 
 static void run_server(const char *dex_path, const char *main_class, const char *process_name) {
     if (setenv("CLASSPATH", dex_path, true)) {
@@ -131,7 +134,13 @@ static void start_server(const char *path, const char *main_class, const char *p
         case 0: {
             LOGD("child");
             if (has_pipe) close(fds[0]);
+            signal(SIGHUP, SIG_IGN);
+            signal(SIGPIPE, SIG_IGN);
+            signal(SIGTERM, SIG_IGN);
+            signal(SIGQUIT, SIG_IGN);
+            signal(SIGTSTP, SIG_IGN);
             setsid();
+            switch_cgroup();
             chdir("/");
             int fd = open("/dev/null", O_RDWR);
             if (fd != -1) {
@@ -222,9 +231,7 @@ int main(int argc, char *argv[]) {
 
     se::init();
 
-    if (uid == 0 || uid == 1000) {
-        switch_cgroup();
-    }
+    switch_cgroup();
 
     if (uid == 0) {
         if (android_get_device_api_level() >= 29) {
