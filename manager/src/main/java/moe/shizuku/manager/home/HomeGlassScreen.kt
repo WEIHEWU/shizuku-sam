@@ -2215,7 +2215,7 @@ private fun HeroCard(
                                 .background(pillFg)
                         )
                         Text(
-                            text = if (ok) "$runningModeName · v$apiVersion.$patchVersion" else "待激活",
+                            text = if (ok) "$runningModeName · v${moe.shizuku.manager.BuildConfig.VERSION_NAME}" else "待激活",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = pillFg
