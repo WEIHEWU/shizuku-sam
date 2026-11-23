@@ -38,9 +38,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import moe.shizuku.manager.utils.StartupCoordinator
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -2113,7 +2111,6 @@ private fun HeroCard(
     val apiVersion = status?.apiVersion ?: 0
     val patchVersion = status?.patchVersion ?: 0
     val runningModeName = if (isRoot) "Root" else "ADB"
-    val coordinatorSnap by StartupCoordinator.state.collectAsState()
 
     GlassCard(
         modifier = Modifier
@@ -2218,7 +2215,7 @@ private fun HeroCard(
                                 .background(pillFg)
                         )
                         Text(
-                            text = if (ok) "$runningModeName · v$apiVersion.$patchVersion" else coordinatorSnap.phase.label,
+                            text = if (ok) "$runningModeName · v$apiVersion.$patchVersion" else "待激活",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = pillFg
@@ -2325,27 +2322,6 @@ private fun HeroCard(
                         )
                     }
                 } else {
-                    if (coordinatorSnap.phase == StartupCoordinator.Phase.WAITING_FOR_PERMISSION ||
-                        coordinatorSnap.phase == StartupCoordinator.Phase.FAILED ||
-                        coordinatorSnap.phase == StartupCoordinator.Phase.RETRY_PAUSED
-                    ) {
-                        val hintText = when (coordinatorSnap.phase) {
-                            StartupCoordinator.Phase.WAITING_FOR_PERMISSION ->
-                                "Android 17 本地网络保护（LNP）需授予「本地网络」权限后才能连接无线调试地址，已暂停后台自动连接。"
-                            StartupCoordinator.Phase.RETRY_PAUSED ->
-                                "已手动停止后台自动重连（点击下方按钮可随时手动启动）。"
-                            else ->
-                                "${coordinatorSnap.lastFailureReason.label}${if (coordinatorSnap.autoRetryCount > 0) " · 自动重连 ${coordinatorSnap.autoRetryCount}/${coordinatorSnap.maxAutoRetries}" else ""}"
-                        }
-                        Text(
-                            text = hintText,
-                            fontSize = 12.sp,
-                            lineHeight = 16.5.sp,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                            modifier = Modifier.padding(bottom = 10.dp)
-                        )
-                    }
-
                     GlassPillButton(
                         text = stringResource(R.string.home_btn_adb_start),
                         isDark = isDark,
@@ -2353,37 +2329,6 @@ private fun HeroCard(
                         onClick = actions.onWirelessStartClick,
                         modifier = Modifier.fillMaxWidth()
                     )
-
-                    if (coordinatorSnap.phase == StartupCoordinator.Phase.WAITING_FOR_PERMISSION) {
-                        Spacer(Modifier.height(8.dp))
-                        GlassPillButton(
-                            text = "一次性授予本地网络权限",
-                            isDark = isDark,
-                            style = GlassButtonStyle.Regular,
-                            onClick = actions.onRequestLocalNetPermissionClick,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    } else if (!coordinatorSnap.retryStoppedByUser &&
-                        (coordinatorSnap.phase == StartupCoordinator.Phase.STARTING || coordinatorSnap.autoRetryCount > 0)
-                    ) {
-                        Spacer(Modifier.height(8.dp))
-                        GlassPillButton(
-                            text = "停止后台自动重连",
-                            isDark = isDark,
-                            style = GlassButtonStyle.Regular,
-                            onClick = actions.onStopAutoRetryClick,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    } else if (coordinatorSnap.retryStoppedByUser) {
-                        Spacer(Modifier.height(8.dp))
-                        GlassPillButton(
-                            text = "恢复后台自动重连",
-                            isDark = isDark,
-                            style = GlassButtonStyle.Regular,
-                            onClick = actions.onResumeAutoRetryClick,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
                 }
             }
         }

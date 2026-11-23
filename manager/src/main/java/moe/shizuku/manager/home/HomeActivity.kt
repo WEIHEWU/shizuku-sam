@@ -28,6 +28,7 @@ import android.widget.Space
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
+import androidx.lifecycle.Observer
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -51,10 +52,12 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import moe.shizuku.manager.Helps
 import moe.shizuku.manager.R
 import moe.shizuku.manager.ShizukuSettings
+import moe.shizuku.manager.adb.AdbMdns
 import moe.shizuku.manager.adb.AdbPairingAccessibilityService
 import moe.shizuku.manager.adb.AdbPairingDetector
 import moe.shizuku.manager.adb.AdbPairingTutorialActivity
 import moe.shizuku.manager.adb.AdbPortProber
+import moe.shizuku.manager.adb.AdbStarter
 import moe.shizuku.manager.adb.LocalNetworkGate
 import moe.shizuku.manager.utils.StartupCoordinator
 import moe.shizuku.manager.utils.DhizukuHelper
@@ -125,6 +128,8 @@ abstract class HomeActivity : MaxHzActivity() {
     private val isRootAvailableState = mutableStateOf(false)
     private val isAutoPairingState = mutableStateOf(false)
     private val activeAdbPortState = mutableIntStateOf(-1)
+    private val discoveredMdnsPortState = mutableIntStateOf(-1)
+    private var homeAdbMdns: AdbMdns? = null
     private val isWifiConnectedState = mutableStateOf(true)
     private val isHotspotActiveState = mutableStateOf(false)
     private val isDeviceOwnerState = mutableStateOf(false)
@@ -195,17 +200,21 @@ abstract class HomeActivity : MaxHzActivity() {
         if (Shizuku.pingBinder()) {
             moe.shizuku.manager.receiver.ShizukuReceiverStarter.cancelAdbStart(this)
         }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && EnvironmentUtils.isTlsSupported(this)) {
+            startAdbPortDiscovery()
+        }
 
         lifecycleScope.launch(Dispatchers.IO) {
             val rootAvail = MaxHzShell.isRootAvailable()
             val wifi = HotspotHelper.isWifiConnected(this@HomeActivity)
             val hotspot = HotspotHelper.isHotspotActive(this@HomeActivity)
             val port = AdbPortProber.findActiveLoopbackPort(this@HomeActivity)
+            val resolvedPort = resolveActiveOrDiscoveredPort(port)
             withContext(Dispatchers.Main) {
                 isRootAvailableState.value = rootAvail
                 isWifiConnectedState.value = wifi
                 isHotspotActiveState.value = hotspot
-                activeAdbPortState.intValue = port
+                activeAdbPortState.intValue = resolvedPort
             }
         }
 
@@ -2010,21 +2019,64 @@ abstract class HomeActivity : MaxHzActivity() {
         rootAutoStartAttempted = true
         ShizukuSettings.setLastSettledStateRunning(false)
         ShizukuStateMachine.set(ShizukuStateMachine.State.STOPPING)
-        StartupCoordinator.stopAutoRetry(this)
+        StartupCoordinator.resumeAutoRetry()
+        moe.shizuku.manager.receiver.ShizukuReceiverStarter.cancelAdbStart(this)
         try {
             Shizuku.exit()
         } catch (_: Throwable) {
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.R)
+    private fun startAdbPortDiscovery() {
+        homeAdbMdns?.stop()
+        val observer = Observer<Pair<String, Int>> { (_, port) ->
+            if (port in 1..65535) {
+                discoveredMdnsPortState.intValue = port
+                activeAdbPortState.intValue = port
+            } else {
+                val prev = discoveredMdnsPortState.intValue
+                discoveredMdnsPortState.intValue = -1
+                if (prev > 0 && activeAdbPortState.intValue == prev) {
+                    activeAdbPortState.intValue = -1
+                }
+            }
+        }
+        homeAdbMdns = AdbMdns(applicationContext, AdbMdns.TLS_CONNECT, observer).also { it.start() }
+    }
+
+    private fun resolveActiveOrDiscoveredPort(loopbackPort: Int): Int {
+        if (loopbackPort in 1..65535) return loopbackPort
+        val discovered = discoveredMdnsPortState.intValue
+        return if (discovered in 1..65535 && AdbPortProber.isPortOpen(discovered, 150)) {
+            discovered
+        } else {
+            -1
+        }
+    }
+
     /**
-     * 通过无线调试「启动」服务：Android 11+ 优先直接探测本地回环可用端口（含离线/5G 下的 5555），
-     * 命中则零门槛直接启动；未命中再按需引导本地网络权限并打开 AdbDialogFragment 搜索。
+     * 通过无线调试「启动」服务（100% 对齐上游 ShizukuPlus StartWirelessAdbViewHolder）：
+     * - 点击时若已有 WRITE_SECURE_SETTINGS，先写 ADB_ENABLED = 1 与 adb_allowed_connection_time = 0L，
+     *   不在探测回环端口前写 adb_wifi_enabled = 1（仅在打开搜索框 AdbDialogFragment 时写入）；
+     * - 依次排查 127.0.0.1 回环开放端口、主页后台 mDNS 预发现端口及系统属性端口，
+     *   命中则直连 StarterActivity，否则按上游逻辑停止残留 TCP 或开启搜索弹窗。
      */
     private fun handleWirelessAdbStartClick() {
         if (rikka.shizuku.Shizuku.pingBinder()) {
             Toast.makeText(this, "Shizuku 服务已在运行中", Toast.LENGTH_SHORT).show()
             return
+        }
+        if (ShizukuStateMachine.get() == ShizukuStateMachine.State.STARTING) {
+            Toast.makeText(this, getString(R.string.notification_service_starting), Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        if (checkSelfPermission(android.Manifest.permission.WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED) {
+            runCatching {
+                Settings.Global.putInt(contentResolver, Settings.Global.ADB_ENABLED, 1)
+                Settings.Global.putLong(contentResolver, "adb_allowed_connection_time", 0L)
+            }
         }
 
         if (!EnvironmentUtils.isAdbEnabled(this)) {
@@ -2036,63 +2088,61 @@ abstract class HomeActivity : MaxHzActivity() {
     }
 
     private fun proceedWirelessAdbStart() {
-        if (checkSelfPermission(android.Manifest.permission.WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED) {
-            runCatching {
-                Settings.Global.putLong(contentResolver, "adb_allowed_connection_time", 0L)
-                Settings.Global.putInt(contentResolver, "adb_wifi_enabled", 1)
-            }
-        }
-
         lifecycleScope.launch {
-            val detectedPort = activeAdbPortState.intValue
-            val isValidDetectedPort = detectedPort > 0
-            val activePort = withContext(Dispatchers.IO) {
-                val detectedHit = if (isValidDetectedPort) {
-                    AdbPortProber.probeOpenEndpoint(
-                        port = detectedPort,
-                        timeoutMs = 200,
-                        caller = "HomeActivity.wirelessStart",
-                        context = this@HomeActivity
-                    )?.second ?: -1
-                } else -1
-                if (detectedHit > 0) {
-                    detectedHit
-                } else {
-                    AdbPortProber.findActiveLoopbackPort(
-                        context = this@HomeActivity,
-                        timeoutMs = 200,
-                        caller = "HomeActivity.wirelessStart",
-                        isBackground = false,
-                        forceRefresh = true
-                    )
+            val sysPropPort = EnvironmentUtils.getAdbTcpPort()
+            val discoveredPort = activeAdbPortState.intValue
+            val tcpMode = ShizukuSettings.getTcpMode()
+            val lastPort = ShizukuSettings.getLastPort()
+
+            val activeLoopbackPort = withContext(Dispatchers.IO) {
+                val loopbackHit = AdbPortProber.findActiveLoopbackPort(
+                    context = this@HomeActivity,
+                    timeoutMs = 200,
+                    caller = "HomeActivity.wirelessStart",
+                    isBackground = false,
+                    forceRefresh = true
+                )
+                when {
+                    loopbackHit in 1..65535 -> loopbackHit
+                    discoveredPort in 1..65535 && AdbPortProber.isPortOpen(discoveredPort, 200) -> discoveredPort
+                    else -> -1
                 }
             }
 
-            if (activePort > 0) {
+            val livePort = when {
+                activeLoopbackPort in 1..65535 -> activeLoopbackPort
+                sysPropPort in 1..65535 -> sysPropPort
+                else -> -1
+            }
+
+            val supportsTls = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && EnvironmentUtils.isTlsSupported(this@HomeActivity)
+            if (sysPropPort > 0 && !tcpMode && activeLoopbackPort <= 0 && supportsTls) {
+                withContext(Dispatchers.IO) {
+                    AdbStarter.stopTcp(this@HomeActivity, sysPropPort)
+                }
+                AdbDialogFragment().show(supportFragmentManager)
+            } else if (livePort > 0) {
                 val intent = Intent(this@HomeActivity, StarterActivity::class.java).apply {
                     putExtra(StarterActivity.EXTRA_IS_ROOT, false)
                     putExtra(StarterActivity.EXTRA_HOST, "127.0.0.1")
-                    putExtra(StarterActivity.EXTRA_PORT, activePort)
+                    putExtra(StarterActivity.EXTRA_PORT, livePort)
                 }
                 startActivity(intent)
-                return@launch
+            } else if (supportsTls) {
+                AdbDialogFragment().show(supportFragmentManager)
+            } else if (!EnvironmentUtils.isTlsSupported(this@HomeActivity) && lastPort <= 0 && sysPropPort <= 0) {
+                WadbNotEnabledDialogFragment().show(supportFragmentManager)
+            } else {
+                val port = sysPropPort.takeIf { it in 1..65535 }
+                    ?: lastPort.takeIf { it in 1..65535 }
+                    ?: 5555
+                val intent = Intent(this@HomeActivity, StarterActivity::class.java).apply {
+                    putExtra(StarterActivity.EXTRA_IS_ROOT, false)
+                    putExtra(StarterActivity.EXTRA_HOST, "127.0.0.1")
+                    putExtra(StarterActivity.EXTRA_PORT, port)
+                }
+                startActivity(intent)
             }
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                localNetRequester.requestBestEffort(
-                    caller = "HomeActivity.wirelessStartDialog",
-                    onProceed = { AdbDialogFragment().show(supportFragmentManager) }
-                )
-                return@launch
-            }
-
-            val port = EnvironmentUtils.getAdbTcpPort().takeIf { it > 0 } ?: 5555
-            val intent = Intent(this@HomeActivity, StarterActivity::class.java).apply {
-                putExtra(StarterActivity.EXTRA_IS_ROOT, false)
-                putExtra(StarterActivity.EXTRA_HOST, "127.0.0.1")
-                putExtra(StarterActivity.EXTRA_PORT, port)
-            }
-            startActivity(intent)
         }
     }
 
@@ -2284,11 +2334,12 @@ abstract class HomeActivity : MaxHzActivity() {
                 caller = "HomeActivity.checkServerStatus",
                 isBackground = true
             )
+            val resolvedPort = resolveActiveOrDiscoveredPort(port)
             withContext(Dispatchers.Main) {
                 isRootAvailableState.value = rootAvail
                 isWifiConnectedState.value = wifi
                 isHotspotActiveState.value = hotspot
-                activeAdbPortState.intValue = port
+                activeAdbPortState.intValue = resolvedPort
             }
             if (!Shizuku.pingBinder() && !rootAutoStartAttempted && rootAvail) {
                 val launchMode = ShizukuSettings.getLastLaunchMode()
@@ -2307,6 +2358,8 @@ abstract class HomeActivity : MaxHzActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        homeAdbMdns?.stop()
+        homeAdbMdns = null
         Shizuku.removeBinderReceivedListener(binderReceivedListener)
         Shizuku.removeBinderDeadListener(binderDeadListener)
     }

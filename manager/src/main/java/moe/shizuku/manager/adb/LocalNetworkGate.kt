@@ -80,11 +80,8 @@ object LocalNetworkGate {
     }
 
     /**
-     * 收窄后的本地网络门控：
-     * - 前台用户主动触发的配对/启动路径（`isBackground == false`）只记录诊断日志、绝不硬阻断，
-     *   避免由高 targetSdk 覆盖更新降级或历史拒绝态导致无线配对死锁；
-     * - 后台静默路径（`isBackground == true`）仅对 `NsdManager` 服务发现或非回环 LAN 目标地址检查 LNP 权限，
-     *   未授权时跳过发现以避免后台反复弹出系统设备选择器；目标为 `127.0.0.1` / `::1` 的纯回环连接一律放行。
+     * 对齐上游 ShizukuPlus `LocalNetworkPermission`：
+     * - 只做最佳努力运行时权限申请提示，绝不在任何前台或后台 ADB、探测、mDNS 或 Worker 路径中阻断执行。
      */
     fun checkOrSkip(
         caller: String,
@@ -94,32 +91,14 @@ object LocalNetworkGate {
         host: String = "127.0.0.1",
         requiresLocalNetwork: Boolean = false
     ): Boolean {
-        val needsGate = requiresLocalNetwork || !isLoopbackHost(host)
-        if (!needsGate || hasPermission(context)) return true
-
-        val perm = requiredPermission() ?: "UNKNOWN"
-        if (!isBackground) {
-            Log.w(
+        val perm = requiredPermission()
+        if (perm != null && !hasPermission(context)) {
+            Log.d(
                 TAG,
-                "PROCEED_FOREGROUND reason=LNP_NOT_GRANTED_NON_BLOCKING perm=$perm caller=$caller host=$host port=$port"
+                "NON_BLOCKING perm=$perm caller=$caller host=$host port=$port bg=$isBackground requiresLocalNetwork=$requiresLocalNetwork"
             )
-            StartupCoordinator.recordLog(
-                "LOCAL_NET_GATE",
-                "PROCEED_FG perm=$perm caller=$caller host=$host port=$port"
-            )
-            return true
         }
-
-        Log.w(
-            TAG,
-            "SKIP_CONNECT reason=LNP_PERMISSION_NOT_GRANTED perm=$perm caller=$caller host=$host port=$port background=$isBackground"
-        )
-        StartupCoordinator.recordLog(
-            "LOCAL_NET_GATE",
-            "SKIP reason=LNP_PERMISSION_NOT_GRANTED caller=$caller host=$host port=$port bg=$isBackground"
-        )
-        StartupCoordinator.markWaitingForPermission("$caller ($host:$port)")
-        return false
+        return true
     }
 
     fun openAppPermissionSettings(context: Context) {
